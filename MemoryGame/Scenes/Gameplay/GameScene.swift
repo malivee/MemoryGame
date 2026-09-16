@@ -1,3 +1,8 @@
+// Penjelasan file: GameScene.swift
+// Layar utama papan jigsaw: menampilkan inventori, menerima drag, rotasi, dan pemilihan keping.
+// Perubahan papan diteruskan ke model lalu disimpan; tombol Masuk memeriksa rangkaian minimal tiga keping.
+// Scene ini juga menampilkan foto selesai dan animasi perpindahan menuju eksplorasi.
+
 import SpriteKit
 import UIKit
 
@@ -23,6 +28,7 @@ final class GameScene: SKScene {
     private var confirmingRestart = false
     private var enteringMemory = false
 
+    // Memuat progres, menyiapkan puzzle, lalu membangun papan saat scene dibuka.
     override func didMove(to view: SKView) {
         backgroundColor = SKColor(red: 0.08, green: 0.12, blue: 0.14, alpha: 1)
         progress.prepareJigsaw()
@@ -35,11 +41,13 @@ final class GameScene: SKScene {
         dragPiece = nil
         layoutPhoto()
     }
+    // Menyesuaikan skala papan dengan ukuran layar.
     private func layoutPhoto() {
         canvas.setScale(min(size.width / 1000, size.height / 600))
         canvas.position = CGPoint(x: size.width / 2, y: size.height / 2)
         rebuild()
     }
+    // Menggambar ulang papan, inventori, dan tombol berdasarkan state terbaru.
     private func rebuild(revealComplete: Bool = true) {
         canvas.removeAllChildren()
         tiles.removeAll(); hitPaths.removeAll(); renderScales.removeAll()
@@ -98,10 +106,12 @@ final class GameScene: SKScene {
         shade.storyButton("Batal", name: "cancelRestart", at: CGPoint(x: -75, y: -35))
         shade.storyButton("Mulai ulang", name: "confirmRestart", at: CGPoint(x: 75, y: -35), width: 130)
     }
+    // Mengubah indeks slot menjadi titik tengah pada papan SpriteKit.
     private func center(_ slot: Int) -> CGPoint {
         CGPoint(x: board.minX + (CGFloat(slot % PuzzleCatalog.columns) + 0.5) * cell.width,
                 y: board.maxY - (CGFloat(slot / PuzzleCatalog.columns) + 0.5) * cell.height)
     }
+    // Membuat gambar keping, outline, dan bentuk hit-test yang mengabaikan bagian transparan.
     private func addTile(_ id: Int, at position: CGPoint, inInventory: Bool) {
         let data = JigsawCatalog.data(for: id)
         let scale = inInventory ? min(70 / data.width, 70 / data.height) : boardScale
@@ -125,6 +135,7 @@ final class GameScene: SKScene {
         canvas.addChild(tile)
         tiles[id] = tile; hitPaths[id] = path; renderScales[id] = scale
     }
+    // Menyinkronkan area cerita, menyimpan progres, lalu memperbarui tampilan setelah perubahan keping.
     private func changed(focusInventory: Bool = false) {
         let wasComplete = progress.assembled
         progress.synchronizeJigsaw()
@@ -142,6 +153,7 @@ final class GameScene: SKScene {
         backing.zPosition = -1; label.addChild(backing)
         label.run(.sequence([.wait(forDuration: 3), .fadeOut(withDuration: 0.25), .removeFromParent()]))
     }
+    // Menampilkan foto lengkap setelah syarat penyelesaian terpenuhi.
     private func showAssembled(animated: Bool) {
         guard canvas.childNode(withName: "assembled") == nil else { return }
         let photo = SKSpriteNode(imageNamed: PuzzleCatalog.imageName)
@@ -152,6 +164,7 @@ final class GameScene: SKScene {
         caption.zPosition = 101
         for tile in tiles.values { tile.run(.sequence([.wait(forDuration: 1.5), .fadeOut(withDuration: 0.3)])) }
     }
+    // Memastikan keping terhubung minimal tiga, kemudian menjalankan transisi ke area kenangannya.
     private func enterSelected() {
         guard !enteringMemory, let view else { return }
         guard let id = selected else { message("Pilih keping dari rangkaian yang ingin dimasuki."); return }
@@ -189,6 +202,7 @@ final class GameScene: SKScene {
             view.presentScene(exploration, transition: transition)
         }]), withKey: "enterMemory")
     }
+    // Membedakan tombol dan pemilihan keping, lalu menyiapkan posisi awal drag.
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard !enteringMemory, let touch = touches.first else { return }
         let point = touch.location(in: canvas)
@@ -225,6 +239,7 @@ final class GameScene: SKScene {
         dragPiece = match.key; dragStart = point; dragHome = match.value.position; moved = false
         match.value.zPosition = 50
     }
+    // Memindahkan keping mengikuti sentuhan dan membedakan drag dari ketukan biasa.
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard !enteringMemory, let touch = touches.first, let id = dragPiece, let tile = tiles[id] else { return }
         let point = touch.location(in: canvas)
@@ -234,6 +249,7 @@ final class GameScene: SKScene {
             tile.position = CGPoint(x: dragHome.x + point.x - dragStart.x, y: dragHome.y + point.y - dragStart.y)
         }
     }
+    // Mengubah posisi lepas menjadi slot; drop di luar papan mengembalikan keping ke inventori.
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard !enteringMemory, let id = dragPiece else { return }
         defer { dragPiece = nil }
@@ -248,6 +264,7 @@ final class GameScene: SKScene {
             if !accepted { message("Keping belum tersedia atau berada di luar papan.") }
         } else { selected = id; rebuild() }
     }
+    // Membatalkan drag ketika sentuhan terputus dan memulihkan tampilan dari state.
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard !enteringMemory else { return }
         dragPiece = nil; rebuild()

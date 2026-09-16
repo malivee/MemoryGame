@@ -1,3 +1,8 @@
+// Penjelasan file: PrologueLevel.swift
+// Menyusun peta rumah, desa, dan kaki bukit beserta rintangan, patroli, dan titik interaksi.
+// Keping yang terpasang menentukan area berkabut, variasi danau, dan rotasi rintangan jalan.
+// Data rintangan ini digunakan bersama oleh gambar latar dan navigasi agar tampilannya sesuai aturan gerak.
+
 import CoreGraphics
 import Foundation
 
@@ -27,6 +32,7 @@ struct PrologueLevel {
     let gathering: CGPoint?
     let exit: CGPoint?
 
+    // Membentuk data wilayah dan menyesuaikan jalan serta danau dengan keping yang terpasang.
     static func make(region: MemoryRegion, progress: PrologueProgress) -> PrologueLevel {
         switch region {
         case .house:
@@ -118,9 +124,11 @@ struct PrologueLevel {
         if zone.piece == .boundary { return progress.installed(.boundary) || progress.installed(.closing) }
         return progress.installed(zone.piece)
     }
+    // Menghasilkan persegi area yang belum tersedia untuk visual kabut dan penghalang navigasi.
     func fog(progress: PrologueProgress) -> [CGRect] {
         zones.filter { !available($0, progress: progress) }.map(\.rect)
     }
+    // Memilih titik masuk awal berdasarkan lokasi keping; navigasi kemudian mencari posisi terbuka terdekat.
     func spawn(for entry: MemoryPiece, progress: PrologueProgress) -> CGPoint {
         switch entry {
         case .house: return CGPoint(x: 85, y: 90)

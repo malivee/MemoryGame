@@ -1,3 +1,7 @@
+// Penjelasan file: PrologueUI.swift
+// Helper SKNode untuk membuat label dan tombol dengan gaya prolog yang konsisten.
+// Nama node membantu scene mengenali tombol; namedAncestor mencari nama pada node atau induknya.
+
 import SpriteKit
 
 extension SKNode {

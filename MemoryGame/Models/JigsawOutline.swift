@@ -1,3 +1,7 @@
+// Penjelasan file: JigsawOutline.swift
+// Membentuk garis tepi jigsaw menggunakan kurva Bezier.
+// Bentuk yang sama dipakai untuk memotong tekstur, mengenali sentuhan pada keping, dan memeriksa geometri foto.
+
 import CoreGraphics
 import Foundation
 

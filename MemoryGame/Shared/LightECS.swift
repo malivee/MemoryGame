@@ -1,8 +1,13 @@
+// Penjelasan file: LightECS.swift
+// Kerangka Entity Component System untuk menyimpan data objek berdasarkan ID.
+// Komponen memisahkan posisi, node visual, data keping, drag, dan target snap.
+// Sistem puzzle lama memakai ECSWorld; papan prolog aktif menggunakan JigsawProgress.
+
 //
 //  LightECS.swift
 //  MemoryGame
 //
-//  Created by Codex on 16/09/26.
+//  Created by Daffa Burane Nugraha on 16/09/26.
 //
 
 import SpriteKit
@@ -53,6 +58,7 @@ final class ECSWorld {
     var draggables: [EntityID: DraggableComponent] = [:]
     var snapTargets: [EntityID: SnapTargetComponent] = [:]
 
+    // Memberikan ID baru dan mendaftarkan objek ke dunia ECS.
     func createEntity() -> EntityID {
         let entity = nextEntityID
         nextEntityID += 1
@@ -75,6 +81,7 @@ final class ECSWorld {
         return Int(name.replacingOccurrences(of: "entity-", with: ""))
     }
 
+    // Menyalin posisi, skala, dan urutan lapisan komponen ke node SpriteKit.
     func applyTransforms() {
         for entity in entities {
             guard let transform = transforms[entity], let render = renders[entity] else { continue }

@@ -1,3 +1,7 @@
+// Penjelasan file: PuzzleTextureService.swift
+// Memotong foto sumber menjadi tekstur keping berdasarkan bentuk JigsawOutline.
+// Hasil disimpan dalam cache agar tidak digambar ulang setiap papan diperbarui; varian danau kering memiliki efek tersendiri.
+
 //
 //  PuzzleTextureService.swift
 //  MemoryGame
@@ -18,6 +22,7 @@ final class PuzzleTextureService {
         self.photo = photo
     }
 
+    // Mengambil tekstur dari cache atau memotong foto sesuai path keping dan memberi efek varian kering.
     func texture(for piece: PuzzlePieceData, dryVariant: Bool = false) -> SKTexture {
         let key = piece.id + (dryVariant ? "-dry" : "")
         if let texture = textures[key] { return texture }

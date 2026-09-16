@@ -1,3 +1,7 @@
+// Penjelasan file: MemoryCharacter.swift
+// Membuat karakter sederhana untuk Arthur, teman, dan warga.
+// MemoryCharacter berjalan mengikuti rute; MemoryPatrol mengelola patroli, bidang pandang, dan tingkat kecurigaan.
+
 import SpriteKit
 
 final class MemoryCharacter: SKNode {
@@ -20,6 +24,7 @@ final class MemoryCharacter: SKNode {
         zPosition = 20
     }
     required init?(coder aDecoder: NSCoder) { fatalError("init(coder:) is not supported") }
+    // Mengikuti titik rute dengan kecepatan berbasis waktu sambil memeriksa tabrakan melalui navigasi.
     func walk(dt: CGFloat, speed: CGFloat, navigation: MemoryNavigation) {
         guard let next = route.first else { return }
         let dx = next.x - position.x, dy = next.y - position.y
@@ -51,6 +56,7 @@ final class MemoryPatrol {
         field.strokeColor = SKColor(white: 1, alpha: 0.07)
         field.zPosition = 8
     }
+    // Menggerakkan patroli, menguji jarak dan arah pandang, lalu menaikkan atau menurunkan kecurigaan.
     func update(dt: CGFloat, player: CGPoint, navigation: MemoryNavigation) -> Bool {
         let goal = definition.points[waypoint]
         let dx = goal.x - character.position.x, dy = goal.y - character.position.y

@@ -1,3 +1,8 @@
+// Penjelasan file: ExplorationScene.swift
+// Mengendalikan permainan di dalam kenangan: membangun dunia, HUD, karakter, dan patroli.
+// Menangani stik, ketuk untuk berjalan, dialog, interaksi misi, teman pengikut, dan kembali ke foto.
+// Memakai PrologueLevel untuk peta, MemoryNavigation untuk gerak, serta PrologueStore untuk progres.
+
 import SpriteKit
 import UIKit
 
@@ -55,6 +60,7 @@ final class ExplorationScene: SKScene {
         stage.setScale(min(size.width / 1000, size.height / 600))
         stage.position = CGPoint(x: (size.width - 1000 * stage.xScale) / 2, y: (size.height - 600 * stage.yScale) / 2)
     }
+    // Menampilkan animasi masuk dan menunda input sampai transisi selesai; mengikuti pengaturan Reduce Motion.
     private func animateArrival() {
         let reduced = UIAccessibility.isReduceMotionEnabled
         let duration: TimeInterval = reduced ? 0.22 : 1.0
@@ -88,6 +94,7 @@ final class ExplorationScene: SKScene {
             self.say("Geser stik atau ketuk tanah untuk bergerak. Dekati benda/teman, lalu ketuk Interaksi.", duration: 5)
         }]), withKey: "memoryArrival")
     }
+    // Membuat peta, kabut, objek interaksi, karakter, dan patroli dari progres yang sedang tersimpan.
     private func buildWorld() {
         level = PrologueLevel.make(region: entry.region, progress: progress)
         navigation = MemoryNavigation(bounds: PrologueLevel.bounds, solids: level.obstacles.map(\.rect), fog: level.fog(progress: progress))
@@ -185,6 +192,7 @@ final class ExplorationScene: SKScene {
         world.addChild(book)
         book.storyLabel("Buku lama", at: CGPoint(x: 0, y: 30), size: 11)
     }
+    // Membuat tujuan misi, tombol kembali, indikator kecurigaan, stik, dan tombol interaksi.
     private func buildHUD() {
         let top = SKShapeNode(rect: CGRect(x: 0, y: 548, width: 1000, height: 52))
         top.fillColor = SKColor(white: 0.06, alpha: 0.96); top.strokeColor = .clear
@@ -210,6 +218,7 @@ final class ExplorationScene: SKScene {
         toast = label
         label.run(.sequence([.wait(forDuration: duration), .fadeOut(withDuration: 0.4), .removeFromParent()]))
     }
+    // Menghentikan gerak pemain dan menyiapkan urutan dialog beserta aksi ketika selesai.
     private func startDialogue(_ lines: [StoryLine], completion: (() -> Void)? = nil) {
         guard dialoguePanel == nil else { return }
         arthur.route.removeAll(); stickVector = .zero; stickTouch = nil; stickKnob.position = stickCenter
@@ -228,6 +237,7 @@ final class ExplorationScene: SKScene {
         panel.storyLabel("Ketuk untuk lanjut  ·  \(dialogueIndex + 1)/\(dialogue.count)", at: CGPoint(x: 500, y: 102), size: 12, color: .lightGray)
         hud.addChild(panel); dialoguePanel = panel
     }
+    // Melanjutkan halaman; setelah halaman terakhir, menjalankan hadiah atau perubahan cerita lalu menyimpan.
     private func advanceDialogue() {
         dialogueIndex += 1
         if dialogueIndex < dialogue.count { showDialoguePage(); return }
@@ -239,6 +249,7 @@ final class ExplorationScene: SKScene {
         // Reading pauses the world; resume with time to regain control.
         catchGrace = 1.2
     }
+    // Memilih interaksi terdekat yang memenuhi syarat misi dan kondisi aman dari warga.
     private func interact() {
         guard !watched && patrols.allSatisfy({ $0.suspicion < 0.25 }) else { say("Cari tempat berlindung sebelum berinteraksi."); return }
         if let book = level.book, distance(arthur.position, book) < 62 {
@@ -277,6 +288,7 @@ final class ExplorationScene: SKScene {
         }
         say("Dekati buku, teman, atau penanda untuk berinteraksi.")
     }
+    // Memperbarui gerak dan kecurigaan setiap frame; dunia dijeda selama dialog dan transisi masuk.
     override func update(_ currentTime: TimeInterval) {
         let dt = CGFloat(min(0.04, max(0, lastTime == 0 ? 0 : currentTime - lastTime)))
         lastTime = currentTime
@@ -309,6 +321,7 @@ final class ExplorationScene: SKScene {
         }
         checkGroupProgress()
     }
+    // Menghitung ulang rute teman secara berkala agar mengikuti Arthur sambil menghindari rintangan.
     private func updateCompanions(dt: CGFloat) {
         guard !companions.isEmpty else { return }
         followerTimer -= dt
@@ -324,6 +337,7 @@ final class ExplorationScene: SKScene {
         }
         for actor in companions { actor.walk(dt: dt, speed: 152, navigation: navigation) }
     }
+    // Memastikan keempat anak berkumpul dan berada di pintu keluar sebelum melanjutkan misi.
     private func checkGroupProgress() {
         guard progress.foundMarker, !progress.leftVillage, companions.count == 3,
               progress.installed(.boundary), let gathering = level.gathering, let exit = level.exit else { return }
@@ -360,6 +374,7 @@ final class ExplorationScene: SKScene {
         say("Arthur: Aku belum ingat apa yang ada di sana…")
         warningCooldown = 5
     }
+    // Mengembalikan kelompok ke checkpoint dan mereset kecurigaan sambil mempertahankan progres misi.
     private func caught() {
         arthur.position = checkpoint; arthur.route.removeAll()
         stickVector = .zero; stickTouch = nil; stickKnob.position = stickCenter
@@ -372,6 +387,7 @@ final class ExplorationScene: SKScene {
         PrologueStore.shared.save()
         say(entry.region == .house ? "Orang tua: Jangan menyelinap. Kami hanya ingin kamu tetap aman di rumah." : "Warga: Pulang dulu, Arthur. Di luar desa berbahaya; kami tak mau kalian terluka.", duration: 6)
     }
+    // Menyimpan progres lalu kembali ke papan ketika warga sudah tidak memperhatikan Arthur.
     private func returnToPhoto() {
         guard !watched && patrols.allSatisfy({ $0.suspicion == 0 }) else {
             say("Arthur masih diperhatikan. Berlindung sampai warga tenang."); return
@@ -382,6 +398,7 @@ final class ExplorationScene: SKScene {
         view?.presentScene(photo, transition: .fade(withDuration: 0.35))
     }
     private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }
+    // Mengubah jarak sentuhan dari pusat stik menjadi arah dan kekuatan gerak terbatas.
     private func updateStick(_ touch: UITouch) {
         let point = touch.location(in: stage)
         let dx = point.x - stickCenter.x, dy = point.y - stickCenter.y
@@ -390,6 +407,7 @@ final class ExplorationScene: SKScene {
         stickVector = CGVector(dx: dx / length * magnitude, dy: dy / length * magnitude)
         stickKnob.position = CGPoint(x: stickCenter.x + stickVector.dx * 34, y: stickCenter.y + stickVector.dy * 34)
     }
+    // Mengarahkan sentuhan ke dialog, tombol, stik, atau pencarian rute menuju tanah yang diketuk.
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard !enteringMemory, let touch = touches.first else { return }
         if dialoguePanel != nil { advanceDialogue(); return }

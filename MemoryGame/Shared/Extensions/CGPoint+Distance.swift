@@ -1,3 +1,7 @@
+// Penjelasan file: CGPoint+Distance.swift
+// Menambahkan operasi bantu untuk CGPoint: penjumlahan dua titik dan jarak lurus antartitik.
+// Perhitungan jarak memakai hypot agar pemanggil tidak perlu menulis rumus berulang.
+
 //
 //  CGPoint+Distance.swift
 //  MemoryGame

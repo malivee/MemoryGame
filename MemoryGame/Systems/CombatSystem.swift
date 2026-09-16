@@ -1,3 +1,7 @@
+// Penjelasan file: CombatSystem.swift
+// Kerangka sistem pertarungan berbasis ECS; belum ada logika serangan atau kerusakan.
+// File ini tidak menjalankan mekanik kecurigaan warga pada prolog.
+
 //
 //  CombatSystem.swift
 //  MemoryGame

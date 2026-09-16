@@ -1,3 +1,7 @@
+// Penjelasan file: SceneDelegate.swift
+// Menangani siklus hidup jendela aplikasi: terhubung, aktif, dan masuk latar belakang.
+// Jendela disiapkan melalui storyboard; callback selain pemeriksaan UIWindowScene masih kosong.
+
 //
 //  SceneDelegate.swift
 //  MemoryGame

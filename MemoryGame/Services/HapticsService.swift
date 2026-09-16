@@ -1,8 +1,12 @@
+// Penjelasan file: HapticsService.swift
+// Menyediakan getaran sentuhan iOS untuk pemilihan, benturan, dan notifikasi.
+// Setiap fungsi membuat generator UIKit sesuai jenis umpan balik yang diminta.
+
 //
 //  HapticsService.swift
 //  MemoryGame
 //
-//  Created by Codex on 16/09/26.
+//  Created by Daffa Burane Nugraha on 16/09/26.
 //
 
 import UIKit

@@ -1,3 +1,7 @@
+// Penjelasan file: EnemySpawnSystem.swift
+// Kerangka sistem kemunculan musuh berbasis ECS; update belum melakukan apa pun.
+// Patroli prolog dibuat oleh ExplorationScene berdasarkan data PrologueLevel.
+
 //
 //  EnemySpawnSystem.swift
 //  MemoryGame

@@ -1,3 +1,7 @@
+// Penjelasan file: PuzzlePieceData.swift
+// Menentukan ukuran foto sumber serta pembagian menjadi 6 baris × 8 kolom.
+// Setiap keping menyimpan batas potongan gambar termasuk tonjolan jigsaw; koordinat foto berawal dari kiri atas.
+
 //
 //  PuzzlePieceData.swift
 //  MemoryGame

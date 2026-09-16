@@ -1,3 +1,7 @@
+// Penjelasan file: PuzzleSystems.swift
+// Sistem puzzle berbasis ECS untuk drag, snap ke target yang cocok, rendering, dan hitung progres.
+// Ini adalah implementasi kerangka lama; aturan peletakan bebas pada GameScene aktif berada di JigsawProgress.
+
 //
 //  PuzzleSystems.swift
 //  MemoryGame
@@ -8,6 +12,7 @@
 import SpriteKit
 
 struct DragSystem {
+    // Menyimpan offset dan kondisi awal keping agar drag tidak meloncat ke pusat sentuhan.
     func beginDrag(entity: EntityID, touchLocation: CGPoint, world: ECSWorld) {
         guard var draggable = world.draggables[entity], let transform = world.transforms[entity] else { return }
         draggable.isDragging = true
@@ -36,6 +41,7 @@ struct DragSystem {
 }
 
 struct SnapSystem {
+    // Mencari target dengan ID puzzle sama yang berada dalam radius snap.
     func nearestTarget(for entity: EntityID, world: ECSWorld) -> SnapTargetComponent? {
         guard let piece = world.puzzlePieces[entity], let transform = world.transforms[entity] else { return nil }
 
@@ -53,6 +59,7 @@ struct SnapSystem {
         }?.value
     }
 
+    // Menempatkan objek tepat di target dan menandainya sudah tersambung.
     func snap(entity: EntityID, to target: SnapTargetComponent, world: ECSWorld) {
         world.transforms[entity]?.position = target.position
         world.transforms[entity]?.scale = 1.0
@@ -91,6 +98,7 @@ struct PuzzleProgressSystem {
         world.draggables.count
     }
 
+    // Memastikan ada keping dan seluruh keping draggable telah snap ke target.
     func isCompleted(world: ECSWorld) -> Bool {
         let total = totalCount(world: world)
         return total > 0 && placedCount(world: world) == total

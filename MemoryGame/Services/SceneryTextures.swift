@@ -1,3 +1,7 @@
+// Penjelasan file: SceneryTextures.swift
+// Menyediakan dan menyimpan tekstur latar hasil SceneryPainter.
+// Kunci cache memperhitungkan wilayah, rotasi jalan, dan varian danau; cache dibersihkan ketika sudah berisi empat tekstur.
+
 import SpriteKit
 
 /// Keep repeated photo visits smooth without retaining every possible arrangement.

@@ -1,3 +1,8 @@
+// Penjelasan file: MemoryNavigation.swift
+// Menghitung area yang bisa dilewati, rute berjalan, dan garis pandang warga.
+// Rintangan dan kabut dipakai bersama agar karakter tidak bisa berjalan atau melihat menembus area tertutup.
+// Pencarian rute memakai penelusuran melebar pada grid dengan ruang untuk radius karakter.
+
 import CoreGraphics
 import Foundation
 
@@ -9,11 +14,13 @@ struct MemoryNavigation {
     let radius: CGFloat = 12
     private let step: CGFloat = 20
 
+    // Memeriksa batas dunia, rintangan, dan kabut dengan mempertimbangkan radius karakter.
     func walkable(_ point: CGPoint) -> Bool {
         bounds.insetBy(dx: radius, dy: radius).contains(point)
             && !solids.contains { $0.insetBy(dx: -radius, dy: -radius).contains(point) }
             && !fog.contains { $0.insetBy(dx: -radius + 1, dy: -radius + 1).contains(point) }
     }
+    // Menguji perpindahan sumbu X dan Y secara terpisah agar karakter bisa bergeser di sepanjang rintangan.
     func moved(from: CGPoint, by delta: CGVector) -> CGPoint {
         var result = from
         let x = CGPoint(x: result.x + delta.dx, y: result.y)
@@ -38,6 +45,7 @@ struct MemoryNavigation {
         }
         return near
     }
+    // Memotong garis pandang pada rintangan atau kabut terdekat.
     func sightEnd(from: CGPoint, to: CGPoint) -> CGPoint {
         let t = (solids + fog).compactMap { intersection(from: from, to: to, rect: $0) }.min() ?? 1
         return CGPoint(x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t)
@@ -58,6 +66,7 @@ struct MemoryNavigation {
     }
     private var gridPoints: [CGPoint] { (0..<(columns * rows)).map(point).filter(walkable) }
 
+    // Mencari rute pada grid dengan BFS, lalu menyusun kembali urutan titik dari tujuan ke awal.
     func route(from start: CGPoint, to destination: CGPoint) -> [CGPoint] {
         let allowed = Set((0..<(columns * rows)).filter { walkable(point($0)) })
         guard let first = allowed.min(by: { distance(point($0), start) < distance(point($1), start) }),

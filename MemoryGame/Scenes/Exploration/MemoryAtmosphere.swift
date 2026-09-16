@@ -1,3 +1,7 @@
+// Penjelasan file: MemoryAtmosphere.swift
+// Menambahkan riak air dan partikel debu atau daun untuk menghidupkan latar.
+// Efek dipotong mengikuti batas peta dan dinonaktifkan ketika pengaturan Reduce Motion aktif.
+
 import SpriteKit
 import UIKit
 

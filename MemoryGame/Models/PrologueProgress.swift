@@ -1,3 +1,8 @@
+// Penjelasan file: PrologueProgress.swift
+// Menyimpan progres cerita: buku, teman yang bergabung, penanda jalan, dan keberangkatan kelompok.
+// Model lokasi lama dipertahankan untuk kompatibilitas dan menjadi hasil sinkronisasi puzzle 48 keping.
+// PrologueStore memuat dan menyimpan progres sebagai JSON di UserDefaults.
+
 import Foundation
 
 enum MemoryPiece: String, CaseIterable, Codable {
@@ -98,22 +103,26 @@ final class PrologueProgress: Codable {
         placements[slot] = PhotoPlacement(piece: piece, turns: rotations[piece] ?? 0)
         assembled = false
     }
+    // Menandai buku ditemukan dan memberikan hadiah lokasi satu kali.
     func readBook() {
         guard !hasBook else { return }
         hasBook = true
         discovered.formUnion([.garden, .mountain, .dryLake])
     }
+    // Mencatat teman yang bergabung dan membuka hadiah ketika ketiga teman sudah setuju.
     func finishConversation(with friend: FriendID) {
         guard hasBook else { return }
         shownBook.insert(friend)
         joined.insert(friend)
         if joined.count == 3 { discovered.formUnion([.lake, .oldPath]) }
     }
+    // Membuka batas desa setelah semua teman bergabung dan penanda ditemukan.
     func readMarker() {
         guard joined.count == 3, !foundMarker else { return }
         foundMarker = true
         discovered.insert(.boundary)
     }
+    // Melanjutkan cerita hanya setelah kelompok berkumpul dan keempat nama hadir di titik keluar.
     func leaveVillage(childrenAtExit: Set<String>) {
         let required: Set<String> = ["Arthur", "Keneth", "Roland", "Anneth"]
         guard foundMarker, groupGathered, required.isSubset(of: childrenAtExit), !leftVillage else { return }
@@ -138,10 +147,12 @@ final class PrologueStore {
             progress = saved
         } else { progress = PrologueProgress() }
     }
+    // Mengubah progres menjadi JSON dan menyimpannya di UserDefaults perangkat.
     func save() {
         if let data = try? JSONEncoder().encode(progress) {
             UserDefaults.standard.set(data, forKey: Self.key)
         }
     }
+    // Mengganti progres dengan kondisi awal lalu menyimpannya; dipanggil setelah konfirmasi pengguna.
     func restart() { progress = PrologueProgress(); save() }
 }

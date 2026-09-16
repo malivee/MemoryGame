@@ -1,3 +1,8 @@
+// Penjelasan file: SceneryPainter.swift
+// Menggambar latar bergaya lukisan dengan CoreGraphics: tanah, rumah, pepohonan, air, dan perabot.
+// Mengikuti posisi rintangan dari PrologueLevel. Detail dekoratif tidak menambah aturan tabrakan.
+// Angka acak memakai seed tetap agar detail latar konsisten saat dibuat ulang.
+
 import CoreGraphics
 import Foundation
 
@@ -10,6 +15,7 @@ final class SceneryPainter {
     private let cream = CGColor(red: 0.85, green: 0.78, blue: 0.59, alpha: 1)
     private let dark = CGColor(red: 0.20, green: 0.24, blue: 0.17, alpha: 1)
 
+    // Membuat bitmap peta, melukis permukaan serta rintangan, lalu menambahkan pencahayaan dekoratif.
     func image(level: PrologueLevel, progress: PrologueProgress, scale: CGFloat = 2) -> CGImage? {
         seed = 1937
         guard let context = CGContext(data: nil, width: Int(960 * scale), height: Int(480 * scale),
@@ -32,6 +38,7 @@ final class SceneryPainter {
         c.restoreGState()
         return c.makeImage()
     }
+    // Menghasilkan variasi deterministik agar posisi detail kecil tidak berubah setiap kunjungan.
     private func random() -> CGFloat {
         seed = seed &* 6364136223846793005 &+ 1442695040888963407
         return CGFloat((seed >> 32) & 0xffff) / 65535
@@ -51,6 +58,7 @@ final class SceneryPainter {
         c.addPath(CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil))
         c.setFillColor(color); c.fillPath()
     }
+    // Melukis dasar wilayah luar ruangan, jalur tanah, dan detail tumbuhan.
     private func landscape(level: PrologueLevel, progress: PrologueProgress) {
         // Broad pigment patches and fine broken strokes give the ground a painted texture.
         for _ in 0..<2200 {
@@ -156,6 +164,7 @@ final class SceneryPainter {
             line([CGPoint(x: 634 + i * 15, y: 285), CGPoint(x: 634 + i * 15, y: 425)], color(0.66, 0.49, 0.32, 0.23), 1)
         }
     }
+    // Memilih cara menggambar rintangan berdasarkan jenisnya pada data level.
     private func paint(_ obstacle: WorldObstacle) {
         let r = obstacle.rect
         c.saveGState()

@@ -1,3 +1,8 @@
+// Penjelasan file: JigsawProgress.swift
+// Mengatur 48 keping utama, varian danau kering, hadiah misi, posisi, dan rotasi keping.
+// Keping boleh berada di slot mana pun; minimal tiga slot bertetangga lewat sisi membuka akses eksplorasi.
+// Penyelesaian akhir tetap memerlukan foto yang benar. File ini juga menjembatani puzzle dengan progres cerita.
+
 import Foundation
 import CoreGraphics
 
@@ -30,6 +35,7 @@ enum JigsawCatalog {
     static func data(for id: Int) -> PuzzlePieceData {
         PuzzleCatalog.pieces[id == dryLakeID ? primaryID(for: .lake) : id]
     }
+    // Menghitung keping yang diperoleh dari misi, termasuk hadiah yang sudah dimiliki pada save lama.
     static func availableIDs(progress: PrologueProgress) -> Set<Int> {
         var available = starterIDs
         if progress.hasBook { available.formUnion(bookReward) }
@@ -61,9 +67,11 @@ enum JigsawCatalog {
         return (0..<4).map { original[($0 - rotation + 4) % 4] }
     }
     // Exploration accepts any earned fragment in any board cell, in any rotation.
+    // Hanya memeriksa ID dan batas papan; isi foto, bentuk tepi, serta rotasi tidak membatasi drop.
     static func canPlace(_ id: Int, at slot: Int) -> Bool {
         allIDs.contains(id) && (0..<count).contains(slot)
     }
+    // Memeriksa kecocokan bentuk geometris untuk kompatibilitas lama; bukan syarat peletakan bebas saat ini.
     static func fits(_ id: Int, at slot: Int, turns: Int) -> Bool {
         guard allIDs.contains(id), (0..<count).contains(slot) else { return false }
         // The photo's aspect ratio gives rectangular cells. A quarter-turn has
@@ -87,6 +95,7 @@ struct JigsawProgress: Codable {
 
     /// Connected means physically adjacent on this board, not merely discovered
     /// or belonging to the same location. Separate components unlock independently.
+    // Menelusuri slot bertetangga lewat sisi; diagonal dan sambungan melintasi ujung baris tidak dihitung.
     func connectedIDs(to id: Int) -> Set<Int> {
         guard let start = placements.first(where: { $0.value.id == id })?.key,
               let seed = placements[start], JigsawCatalog.canPlace(seed.id, at: start) else { return [] }
@@ -106,6 +115,7 @@ struct JigsawProgress: Codable {
         }
         return Set(visited.compactMap { placements[$0]?.id })
     }
+    // Membuka akses hanya jika kelompok keping terpilih berisi setidaknya tiga keping.
     func canEnter(_ id: Int) -> Bool {
         connectedIDs(to: id).count >= JigsawCatalog.minimumConnectedPieces
     }
@@ -123,6 +133,7 @@ struct JigsawProgress: Codable {
         }
     }
     @discardableResult
+    // Memasang keping yang tersedia, memindahkannya dari slot lama, dan menangani penggantian varian danau.
     mutating func place(_ id: Int, at slot: Int, available: Set<Int>) -> Bool {
         let turns = rotations[id] ?? 0
         guard available.contains(id), JigsawCatalog.canPlace(id, at: slot) else { return false }
@@ -139,6 +150,7 @@ struct JigsawProgress: Codable {
         return true
     }
     mutating func remove(_ id: Int) { placements = placements.filter { $0.value.id != id } }
+    // Memutar keping 90 derajat sambil mempertahankan slot jika sudah berada di papan.
     mutating func rotate(_ id: Int) {
         let turns = ((rotations[id] ?? 0) + 1) % 4
         rotations[id] = turns
@@ -151,6 +163,7 @@ struct JigsawProgress: Codable {
 
 extension PrologueProgress {
     @discardableResult
+    // Menghitung keping tersedia sebelum mengubah jigsaw agar pembacaan dan mutasi tidak memicu crash eksklusivitas Swift.
     func placeJigsawPiece(_ id: Int, at slot: Int) -> Bool {
         // Resolve rewards before beginning exclusive mutation of jigsaw.
         // availableIDs also reads jigsaw to preserve rewards from older saves.
@@ -158,6 +171,7 @@ extension PrologueProgress {
         return jigsaw?.place(id, at: slot, available: available) ?? false
     }
 
+    // Menyiapkan state baru atau memigrasikan save lama tanpa menghapus progres cerita.
     func prepareJigsaw() {
         if var existing = jigsaw {
             if existing.connectionRulesVersion == nil {
@@ -206,6 +220,7 @@ extension PrologueProgress {
         jigsaw = state
         synchronizeJigsaw()
     }
+    // Menerjemahkan kelompok keping yang bisa dimasuki menjadi lokasi terbuka dan status penyelesaian cerita.
     func synchronizeJigsaw() {
         guard let jigsaw else { return }
         placements.removeAll()

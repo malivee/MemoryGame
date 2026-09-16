@@ -1,8 +1,12 @@
+// Penjelasan file: PhysicsCategory.swift
+// Mendefinisikan kategori bitmask untuk membedakan objek dalam fisika SpriteKit.
+// Setiap kategori memakai bit berbeda agar dapat digabungkan sebagai mask tabrakan atau kontak.
+
 //
 //  PhysicsCategory.swift
 //  MemoryGame
 //
-//  Created by Codex on 16/09/26.
+//  Created by Daffa Burane Nugraha on 16/09/26.
 //
 
 import Foundation

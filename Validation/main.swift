@@ -1,3 +1,8 @@
+// Penjelasan file: main.swift
+// Program validasi yang dijalankan terpisah dari aplikasi iOS.
+// Memeriksa progres cerita, geometri jigsaw, navigasi, penyimpanan, migrasi, dan syarat tiga keping.
+// Termasuk regresi crash akses bersamaan dan tes peletakan bebas; expect menghentikan program jika hasil tidak sesuai.
+
 import Foundation
 import CoreGraphics
 

@@ -1,3 +1,7 @@
+// Penjelasan file: GameViewController.swift
+// Menghubungkan layar UIKit dengan SpriteKit dan langsung menampilkan GameScene.
+// Mengatur ukuran scene, orientasi landscape, serta tampilan status bar dan indikator debug.
+
 //
 //  GameViewController.swift
 //  MemoryGame

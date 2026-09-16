@@ -1,3 +1,7 @@
+// Penjelasan file: CollisionSystem.swift
+// Kerangka aturan tabrakan nonfisika berbasis ECS; update masih kosong.
+// Eksplorasi prolog saat ini memeriksa rintangan dan kabut melalui MemoryNavigation.
+
 //
 //  CollisionSystem.swift
 //  MemoryGame

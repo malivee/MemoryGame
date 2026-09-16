@@ -1,3 +1,7 @@
+// Penjelasan file: MovementSystem.swift
+// Kerangka sistem gerak berbasis ECS; update belum memiliki implementasi.
+// Gerak eksplorasi saat ini ditangani oleh MemoryCharacter, ExplorationScene, dan MemoryNavigation.
+
 //
 //  MovementSystem.swift
 //  MemoryGame

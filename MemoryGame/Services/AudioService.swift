@@ -1,8 +1,12 @@
+// Penjelasan file: AudioService.swift
+// Layanan bersama untuk suara. playSystemSound memutar suara sistem melalui AudioToolbox.
+// playSound(named:) masih berupa tempat pengembangan dan belum memutar berkas audio kustom.
+
 //
 //  AudioService.swift
 //  MemoryGame
 //
-//  Created by Codex on 16/09/26.
+//  Created by Daffa Burane Nugraha on 16/09/26.
 //
 
 import AudioToolbox

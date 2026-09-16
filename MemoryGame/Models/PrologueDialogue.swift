@@ -1,3 +1,7 @@
+// Penjelasan file: PrologueDialogue.swift
+// Kumpulan dialog cerita serta nama pembicaranya.
+// ExplorationScene menampilkan dialog ini dan menjalankan perubahan progres setelah percakapan selesai.
+
 import Foundation
 
 struct StoryLine {

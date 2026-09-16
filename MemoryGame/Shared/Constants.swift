@@ -1,8 +1,12 @@
+// Penjelasan file: Constants.swift
+// Menyatukan warna dasar yang dapat digunakan oleh scene.
+// Nilai di sini mencakup warna meja dan sorotan target keping.
+
 //
 //  Constants.swift
 //  MemoryGame
 //
-//  Created by Codex on 16/09/26.
+//  Created by Daffa Burane Nugraha on 16/09/26.
 //
 
 import SpriteKit

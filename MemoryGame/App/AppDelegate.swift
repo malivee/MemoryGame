@@ -1,3 +1,7 @@
+// Penjelasan file: AppDelegate.swift
+// Titik masuk aplikasi iOS melalui @main. Menyediakan konfigurasi sesi UIKit.
+// Callback peluncuran dan pembuangan sesi masih memakai perilaku dasar; papan game dibuat oleh GameViewController.
+
 //
 //  AppDelegate.swift
 //  MemoryGame

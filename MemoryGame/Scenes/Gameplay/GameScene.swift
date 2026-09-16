@@ -1,505 +1,255 @@
-//
-//  GameScene.swift
-//  MemoryGame
-//
-//  SpriteKit port of kleryjohansen/PuzzleGame1.
-//
-
 import SpriteKit
+import UIKit
 
+/// A 6-row by 8-column jigsaw photo, also used to enter the remembered locations.
 final class GameScene: SKScene {
-
-    let world = ECSWorld()
-    let dragSystem = DragSystem()
-    let snapSystem = SnapSystem()
-    let renderSystem = RenderSystem()
-    let progressSystem = PuzzleProgressSystem()
-
-    var activeDragEntity: EntityID?
-    var boardRect = CGRect.zero
-    var boardScale: CGFloat = 1.0
-    var topZPosition: CGFloat = 10
-
-    private var hudCountLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
-    private var completionOverlay: SKNode?
-    private var finalPhotoNode: SKSpriteNode?
+    private var progress: PrologueProgress { PrologueStore.shared.progress }
+    private var state: JigsawProgress { progress.jigsaw ?? JigsawProgress() }
+    private let textures = PuzzleTextureService()
+    private let canvas = SKNode()
+    private var tiles: [Int: SKNode] = [:]
+    private var hitPaths: [Int: CGPath] = [:]
+    private var renderScales: [Int: CGFloat] = [:]
+    private var selected: Int?
+    private var board = CGRect.zero
+    private var boardScale: CGFloat = 1
+    private var cell = CGSize.zero
+    private var inventoryPage = 0
+    private let pageSize = 10
+    private var dragPiece: Int?
+    private var dragStart = CGPoint.zero
+    private var dragHome = CGPoint.zero
+    private var moved = false
+    private var confirmingRestart = false
+    private var enteringMemory = false
 
     override func didMove(to view: SKView) {
-        anchorPoint = CGPoint(x: 0.5, y: 0.5)
-        backgroundColor = GameConstants.Colors.tableBackground
-        configurePhysicsWorld()
-        buildPuzzleGame()
+        backgroundColor = SKColor(red: 0.08, green: 0.12, blue: 0.14, alpha: 1)
+        progress.prepareJigsaw()
+        PrologueStore.shared.save()
+        addChild(canvas)
+        layoutPhoto()
     }
-
-    override func update(_ currentTime: TimeInterval) {
-        renderSystem.update(world: world)
+    override func didChangeSize(_ oldSize: CGSize) {
+        guard canvas.parent != nil, !enteringMemory else { return }
+        dragPiece = nil
+        layoutPhoto()
     }
-
-    func buildPuzzleGame() {
-        removeAllChildren()
-        world.removeAll()
-        activeDragEntity = nil
-        completionOverlay = nil
-        finalPhotoNode = nil
-        topZPosition = 10
-
-        updateCanvas(size: size)
-        addDottedGridCanvas()
-        addBoardBracket()
-        createPuzzleTargets()
-        createPuzzlePieces()
-        addHUD()
-        updateHUD()
-        renderSystem.update(world: world)
+    private func layoutPhoto() {
+        canvas.setScale(min(size.width / 1000, size.height / 600))
+        canvas.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        rebuild()
     }
-
-    func updateCanvas(size: CGSize) {
-        guard size.width > 50, size.height > 50 else { return }
-
-        let aspect = PuzzleCatalog.canvasWidth / PuzzleCatalog.canvasHeight
-        let isLandscape = size.width > size.height
-        var targetWidth: CGFloat
-        var targetHeight: CGFloat
-
-        if isLandscape {
-            targetWidth = size.width * 0.44
-            targetHeight = targetWidth / aspect
-
-            if targetHeight > size.height * 0.56 {
-                targetHeight = size.height * 0.56
-                targetWidth = targetHeight * aspect
-            }
-        } else {
-            targetWidth = size.width * 0.88
-            targetHeight = targetWidth / aspect
-
-            if targetHeight > size.height * 0.38 {
-                targetHeight = size.height * 0.38
-                targetWidth = targetHeight * aspect
-            }
+    private func rebuild(revealComplete: Bool = true) {
+        canvas.removeAllChildren()
+        tiles.removeAll(); hitPaths.removeAll(); renderScales.removeAll()
+        board = CGRect(x: -470, y: -182, width: 600, height: 400)
+        boardScale = board.width / PuzzleCatalog.canvasWidth
+        cell = CGSize(width: board.width / CGFloat(PuzzleCatalog.columns), height: board.height / CGFloat(PuzzleCatalog.rows))
+        canvas.storyLabel("KEPING KENANGAN  ·  JIGSAW 6 × 8", at: CGPoint(x: -110, y: 275), size: 22)
+        canvas.storyLabel(progress.objective, at: CGPoint(x: -110, y: 243), size: 13, width: 760)
+        let backing = SKShapeNode(rect: board, cornerRadius: 4)
+        backing.fillColor = SKColor(white: 1, alpha: 0.025)
+        backing.strokeColor = SKColor(white: 1, alpha: 0.28)
+        backing.lineWidth = 1.5
+        canvas.addChild(backing)
+        // Neutral cell centres help dropping; they disclose no image or edge solution.
+        for slot in 0..<JigsawCatalog.count {
+            let dot = SKShapeNode(circleOfRadius: 1)
+            dot.position = center(slot); dot.strokeColor = .clear
+            dot.fillColor = SKColor(white: 1, alpha: 0.12)
+            canvas.addChild(dot)
         }
-
-        boardRect = CGRect(x: -targetWidth / 2, y: -targetHeight / 2, width: targetWidth, height: targetHeight)
-        boardScale = targetWidth / PuzzleCatalog.canvasWidth
-    }
-
-    func createPuzzleTargets() {
-        for (index, data) in PuzzleCatalog.pieces.enumerated() {
-            let entity = world.createEntity()
-            let marker = SKNode()
-            marker.name = "target-\(entity)"
-            addChild(marker)
-
-            let target = targetCenter(for: data)
-            world.transforms[entity] = TransformComponent(position: target, scale: 1.0, zPosition: 0)
-            world.renders[entity] = RenderComponent(node: marker)
-            world.puzzlePieces[entity] = PuzzlePieceComponent(
-                puzzleID: index,
-                column: data.col,
-                row: data.row,
-                title: data.id,
-                data: data,
-                isSnapped: true
-            )
-            world.snapTargets[entity] = SnapTargetComponent(position: target, radius: effectiveSnapThreshold)
+        for (slot, placement) in state.placements.sorted(by: { $0.key < $1.key }) {
+            addTile(placement.id, at: center(slot), inInventory: false)
         }
-    }
-
-    func createPuzzlePieces() {
-        for (index, data) in PuzzleCatalog.pieces.enumerated() {
-            let entity = world.createEntity()
-            let node = makePieceNode(entity: entity, data: data)
-            addChild(node)
-
-            let startPosition = scatteredPosition(index: index)
-            world.transforms[entity] = TransformComponent(position: startPosition, scale: 1.0, zPosition: 0)
-            world.renders[entity] = RenderComponent(node: node)
-            world.puzzlePieces[entity] = PuzzlePieceComponent(
-                puzzleID: index,
-                column: data.col,
-                row: data.row,
-                title: data.id,
-                data: data,
-                isSnapped: false
-            )
-            world.draggables[entity] = DraggableComponent(
-                homePosition: startPosition,
-                currentLoosePosition: startPosition,
-                dragOffset: .zero,
-                dragStartTouch: .zero,
-                dragStartPosition: startPosition,
-                wasSnappedAtDragStart: false,
-                isDragging: false
-            )
+        let inventory = state.inventory(progress: progress)
+        let pages = max(1, (inventory.count + pageSize - 1) / pageSize)
+        inventoryPage = min(inventoryPage, pages - 1)
+        canvas.storyLabel("INVENTORI · \(inventory.count) keping", at: CGPoint(x: 330, y: 214), size: 14, color: .lightGray)
+        let page = inventory.dropFirst(inventoryPage * pageSize).prefix(pageSize)
+        for (index, id) in page.enumerated() {
+            addTile(id, at: CGPoint(x: 260 + CGFloat(index % 2) * 140, y: 166 - CGFloat(index / 2) * 79), inInventory: true)
         }
+        canvas.storyButton("‹", name: "previousPage", at: CGPoint(x: 244, y: -215), width: 48)
+        canvas.storyLabel("\(inventoryPage + 1) / \(pages)", at: CGPoint(x: 330, y: -215), size: 14)
+        canvas.storyButton("›", name: "nextPage", at: CGPoint(x: 416, y: -215), width: 48)
+        let installed = state.placements.count
+        canvas.storyLabel("\(installed) / 48 terpasang · Taruh di mana saja · Dekatkan 3 keping lewat sisi, lalu Masuk.",
+                          at: CGPoint(x: -175, y: -204), size: 12, color: .lightGray, width: 660)
+        let selectedText = selected.map {
+            "\(JigsawCatalog.location(for: $0).title) · \((state.rotations[$0] ?? 0) * 90)° · Sambungan \(state.connectedIDs(to: $0).count)/3"
+        } ?? "Pilih keping dari rangkaian yang ingin dimasuki"
+        canvas.storyLabel(selectedText, at: CGPoint(x: -170, y: -232), size: 14)
+        canvas.storyButton("Putar 90°", name: "rotate", at: CGPoint(x: -310, y: -274))
+        canvas.storyButton("Simpan", name: "store", at: CGPoint(x: -180, y: -274))
+        let ready = selected.map { state.canEnter($0) } ?? false
+        let enterButton = canvas.storyButton(ready ? "Masuk" : "Terkunci", name: "enter", at: CGPoint(x: -50, y: -274))
+        enterButton.alpha = ready ? 1 : 0.42
+        canvas.storyButton("Mulai ulang", name: "restart", at: CGPoint(x: 330, y: -274), width: 140)
+        if confirmingRestart { addRestartConfirmation() }
+        if progress.assembled && revealComplete { showAssembled(animated: false) }
     }
-
-    func makePieceNode(entity: EntityID, data: PuzzlePieceData) -> SKSpriteNode {
-        let node = SKSpriteNode(imageNamed: data.assetName)
-        node.name = "entity-\(entity)"
-        node.size = CGSize(width: data.width * boardScale, height: data.height * boardScale)
-        node.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-        node.zPosition = 0
-        return node
+    private func addRestartConfirmation() {
+        let shade = SKShapeNode(rectOf: CGSize(width: 990, height: 590), cornerRadius: 10)
+        shade.zPosition = 200; shade.fillColor = SKColor(white: 0.04, alpha: 0.97); shade.strokeColor = .clear
+        canvas.addChild(shade)
+        shade.storyLabel("Mulai ulang prolog? Progres tersimpan akan dihapus.", at: CGPoint(x: 0, y: 35), size: 18)
+        shade.storyButton("Batal", name: "cancelRestart", at: CGPoint(x: -75, y: -35))
+        shade.storyButton("Mulai ulang", name: "confirmRestart", at: CGPoint(x: 75, y: -35), width: 130)
     }
-
-    func targetCenter(for data: PuzzlePieceData) -> CGPoint {
-        let scaledTargetX = (data.targetX - 18.0) * boardScale
-        let scaledTargetY = (data.targetY - 18.0) * boardScale
-        let scaledWidth = data.width * boardScale
-        let scaledHeight = data.height * boardScale
-
-        return CGPoint(
-            x: boardRect.minX + scaledTargetX + scaledWidth / 2,
-            y: boardRect.maxY - scaledTargetY - scaledHeight / 2
-        )
+    private func center(_ slot: Int) -> CGPoint {
+        CGPoint(x: board.minX + (CGFloat(slot % PuzzleCatalog.columns) + 0.5) * cell.width,
+                y: board.maxY - (CGFloat(slot / PuzzleCatalog.columns) + 0.5) * cell.height)
     }
-
-    func scatteredPosition(index: Int) -> CGPoint {
-        var pieces = PuzzleCatalog.pieces.indices.map { $0 }
-        var randomGenerator = StableRandom(seed: 42)
-        pieces.shuffle(using: &randomGenerator)
-        let shuffledIndex = pieces[index]
-        let data = PuzzleCatalog.pieces[shuffledIndex]
-        let pieceWidth = data.width * boardScale
-        let pieceHeight = data.height * boardScale
-        let isLandscape = size.width > size.height
-
-        if isLandscape {
-            return landscapeScatteredPosition(index: index, pieceWidth: pieceWidth, pieceHeight: pieceHeight)
-        } else {
-            return portraitScatteredPosition(index: index)
+    private func addTile(_ id: Int, at position: CGPoint, inInventory: Bool) {
+        let data = JigsawCatalog.data(for: id)
+        let scale = inInventory ? min(70 / data.width, 70 / data.height) : boardScale
+        let coreX = CGFloat(data.col - 1) * PuzzleCatalog.cellWidth - data.targetX + PuzzleCatalog.cellWidth / 2
+        let coreY = CGFloat(data.row - 1) * PuzzleCatalog.cellHeight - data.targetY + PuzzleCatalog.cellHeight / 2
+        let tile = SKNode()
+        tile.position = position
+        tile.zRotation = -CGFloat(state.rotations[id] ?? 0) * .pi / 2
+        tile.zPosition = selected == id ? 40 : 10
+        let image = SKSpriteNode(texture: textures.texture(for: data, dryVariant: id == JigsawCatalog.dryLakeID))
+        image.size = CGSize(width: data.width * scale, height: data.height * scale)
+        image.position = CGPoint(x: (data.width / 2 - coreX) * scale, y: (coreY - data.height / 2) * scale)
+        tile.addChild(image)
+        var transform = CGAffineTransform(a: scale, b: 0, c: 0, d: -scale, tx: -coreX * scale, ty: coreY * scale)
+        let path = JigsawOutline.path(for: data).copy(using: &transform)!
+        let outline = SKShapeNode(path: path)
+        outline.strokeColor = selected == id ? SKColor(red: 0.98, green: 0.80, blue: 0.42, alpha: 1) : SKColor(white: 1, alpha: 0.58)
+        outline.lineWidth = selected == id ? 2.2 : 0.85
+        outline.fillColor = .clear; outline.zPosition = 1
+        tile.addChild(outline)
+        canvas.addChild(tile)
+        tiles[id] = tile; hitPaths[id] = path; renderScales[id] = scale
+    }
+    private func changed(focusInventory: Bool = false) {
+        let wasComplete = progress.assembled
+        progress.synchronizeJigsaw()
+        if focusInventory, let selected, let index = state.inventory(progress: progress).firstIndex(of: selected) { inventoryPage = index / pageSize }
+        PrologueStore.shared.save()
+        rebuild(revealComplete: false)
+        if progress.assembled { showAssembled(animated: !wasComplete) }
+    }
+    private func message(_ text: String) {
+        canvas.childNode(withName: "statusMessage")?.removeFromParent()
+        let label = canvas.storyLabel(text, at: CGPoint(x: -165, y: -232), size: 13, width: 650)
+        label.name = "statusMessage"; label.zPosition = 100
+        let backing = SKShapeNode(rectOf: CGSize(width: 650, height: 27), cornerRadius: 6)
+        backing.fillColor = SKColor(red: 0.08, green: 0.12, blue: 0.14, alpha: 1); backing.strokeColor = .clear
+        backing.zPosition = -1; label.addChild(backing)
+        label.run(.sequence([.wait(forDuration: 3), .fadeOut(withDuration: 0.25), .removeFromParent()]))
+    }
+    private func showAssembled(animated: Bool) {
+        guard canvas.childNode(withName: "assembled") == nil else { return }
+        let photo = SKSpriteNode(imageNamed: PuzzleCatalog.imageName)
+        photo.name = "assembled"; photo.size = board.size
+        photo.position = CGPoint(x: board.midX, y: board.midY); photo.zPosition = 100; photo.alpha = animated ? 0 : 1
+        canvas.addChild(photo); photo.run(.fadeIn(withDuration: 1.5))
+        let caption = canvas.storyLabel("Kenangan tersusun · 48 keping", at: CGPoint(x: board.midX, y: -232), size: 21)
+        caption.zPosition = 101
+        for tile in tiles.values { tile.run(.sequence([.wait(forDuration: 1.5), .fadeOut(withDuration: 0.3)])) }
+    }
+    private func enterSelected() {
+        guard !enteringMemory, let view else { return }
+        guard let id = selected else { message("Pilih keping dari rangkaian yang ingin dimasuki."); return }
+        guard state.canEnter(id) else {
+            message("Sambungkan minimal 3 keping lewat sisinya, lalu tekan Masuk.")
+            return
         }
-    }
-
-    private func landscapeScatteredPosition(index: Int, pieceWidth: CGFloat, pieceHeight: CGFloat) -> CGPoint {
-        let topCount = min(12, PuzzleCatalog.pieces.count)
-        let bottomCount = min(12, PuzzleCatalog.pieces.count - topCount)
-        let leftCount = min(12, PuzzleCatalog.pieces.count - topCount - bottomCount)
-        let topCols = 6
-        let bottomCols = 6
-        let sideCols = 2
-        let referencePieceWidth = 380 * boardScale
-
-        if index < topCount {
-            let column = index % topCols
-            let row = index / topCols
-            let x = boardRect.minX + (CGFloat(column) + 0.5) * (boardRect.width / CGFloat(topCols))
-            let availableTopHeight = boardRect.minY + size.height / 2
-            let y = max(-size.height / 2 + pieceHeight / 2 + 10, -size.height / 2 + availableTopHeight / 2 + (row == 0 ? -10 : 12))
-            return CGPoint(x: x, y: y)
-        }
-
-        if index < topCount + bottomCount {
-            let localIndex = index - topCount
-            let column = localIndex % bottomCols
-            let row = localIndex / bottomCols
-            let x = boardRect.minX + (CGFloat(column) + 0.5) * (boardRect.width / CGFloat(bottomCols))
-            let remainingHeight = size.height / 2 - boardRect.maxY
-            let y = boardRect.maxY + remainingHeight / 2 + (row == 0 ? -12 : 12)
-            return CGPoint(x: x, y: min(size.height / 2 - pieceHeight / 2 - 8, y))
-        }
-
-        if index < topCount + bottomCount + leftCount {
-            let localIndex = index - topCount - bottomCount
-            let column = localIndex % sideCols
-            let row = localIndex / sideCols
-            let rows = max(1, (leftCount + sideCols - 1) / sideCols)
-            let x = boardRect.minX / 2 + (column == 0 ? -referencePieceWidth * 0.28 : referencePieceWidth * 0.28)
-            let y = boardRect.maxY - (CGFloat(row) + 0.5) * (boardRect.height / CGFloat(rows))
-            return CGPoint(x: max(-size.width / 2 + pieceWidth / 2 + 6, x), y: y)
-        }
-
-        let localIndex = index - topCount - bottomCount - leftCount
-        let rightCount = PuzzleCatalog.pieces.count - topCount - bottomCount - leftCount
-        let column = localIndex % sideCols
-        let row = localIndex / sideCols
-        let rows = max(1, (rightCount + sideCols - 1) / sideCols)
-        let remainingWidth = size.width / 2 - boardRect.maxX
-        let x = boardRect.maxX + remainingWidth / 2 + (column == 0 ? -referencePieceWidth * 0.28 : referencePieceWidth * 0.28)
-        let y = boardRect.maxY - (CGFloat(row) + 0.5) * (boardRect.height / CGFloat(rows))
-        return CGPoint(x: min(size.width / 2 - pieceWidth / 2 - 6, x), y: y)
-    }
-
-    private func portraitScatteredPosition(index: Int) -> CGPoint {
-        let topCount = PuzzleCatalog.pieces.count / 2
-        let columns = 6
-
-        if index < topCount {
-            let column = index % columns
-            let row = index / columns
-            let rows = max(1, (topCount + columns - 1) / columns)
-            let topAvailableHeight = max(boardRect.minY + size.height / 2 - 50, 100)
-            return CGPoint(
-                x: -size.width / 2 + (CGFloat(column) + 0.5) * (size.width / CGFloat(columns)),
-                y: -size.height / 2 + 55 + (CGFloat(row) + 0.5) * (topAvailableHeight / CGFloat(rows))
-            )
-        }
-
-        let bottomIndex = index - topCount
-        let bottomCount = PuzzleCatalog.pieces.count - topCount
-        let column = bottomIndex % columns
-        let row = bottomIndex / columns
-        let rows = max(1, (bottomCount + columns - 1) / columns)
-        let bottomAvailableHeight = max(size.height / 2 - boardRect.maxY - 30, 100)
-        return CGPoint(
-            x: -size.width / 2 + (CGFloat(column) + 0.5) * (size.width / CGFloat(columns)),
-            y: boardRect.maxY + 15 + (CGFloat(row) + 0.5) * (bottomAvailableHeight / CGFloat(rows))
-        )
-    }
-
-    func addDottedGridCanvas() {
-        let step: CGFloat = 26
-        let radius: CGFloat = 1.1
-        var x = -size.width / 2 + step / 2
-
-        while x < size.width / 2 {
-            var y = -size.height / 2 + step / 2
-            while y < size.height / 2 {
-                let dot = SKShapeNode(circleOfRadius: radius)
-                dot.fillColor = SKColor(white: 1.0, alpha: 0.12)
-                dot.strokeColor = .clear
-                dot.position = CGPoint(x: x, y: y)
-                dot.zPosition = -20
-                addChild(dot)
-                y += step
-            }
-            x += step
-        }
-    }
-
-    func addBoardBracket() {
-        let backing = SKShapeNode(rectOf: boardRect.size, cornerRadius: 6)
-        backing.fillColor = SKColor(white: 1.0, alpha: 0.025)
-        backing.strokeColor = .clear
-        backing.position = CGPoint(x: boardRect.midX, y: boardRect.midY)
-        backing.zPosition = -3
-        addChild(backing)
-        addDashedBoardBorder()
-    }
-
-    func addDashedBoardBorder() {
-        let dashLength: CGFloat = 8
-        let gapLength: CGFloat = 8
-        let halfWidth = boardRect.width / 2
-        let halfHeight = boardRect.height / 2
-        let corners = [
-            CGPoint(x: -halfWidth, y: halfHeight),
-            CGPoint(x: halfWidth, y: halfHeight),
-            CGPoint(x: halfWidth, y: -halfHeight),
-            CGPoint(x: -halfWidth, y: -halfHeight)
-        ]
-
-        for index in 0..<corners.count {
-            let start = corners[index]
-            let end = corners[(index + 1) % corners.count]
-            let vector = CGPoint(x: end.x - start.x, y: end.y - start.y)
-            let length = hypot(vector.x, vector.y)
-            let direction = CGPoint(x: vector.x / length, y: vector.y / length)
-            var traveled: CGFloat = 0
-
-            while traveled < length {
-                let segmentLength = min(dashLength, length - traveled)
-                let segmentStart = CGPoint(x: start.x + direction.x * traveled, y: start.y + direction.y * traveled)
-                let segmentEnd = CGPoint(x: segmentStart.x + direction.x * segmentLength, y: segmentStart.y + direction.y * segmentLength)
-                let path = CGMutablePath()
-                path.move(to: segmentStart)
-                path.addLine(to: segmentEnd)
-
-                let dash = SKShapeNode(path: path)
-                dash.strokeColor = SKColor(white: 1.0, alpha: 0.32)
-                dash.lineWidth = 1.5
-                dash.position = CGPoint(x: boardRect.midX, y: boardRect.midY)
-                dash.zPosition = -2
-                addChild(dash)
-
-                traveled += dashLength + gapLength
-            }
-        }
-    }
-
-    func addHUD() {
-        let title = makeLabel(text: "Puzzle Prologue", fontSize: 13, position: CGPoint(x: -size.width / 2 + 20, y: size.height / 2 - 26))
-        title.fontColor = SKColor(white: 1.0, alpha: 0.60)
-        title.horizontalAlignmentMode = .left
-        title.zPosition = 101
-        addChild(title)
-
-        hudCountLabel = makeLabel(text: "0 / 48", fontSize: 13, position: CGPoint(x: size.width / 2 - 130, y: size.height / 2 - 26))
-        hudCountLabel.fontColor = SKColor(white: 1.0, alpha: 0.85)
-        hudCountLabel.zPosition = 101
-        addChild(hudCountLabel)
-
-        addButton(name: "hintButton", text: "Hint", position: CGPoint(x: size.width / 2 - 74, y: size.height / 2 - 26))
-        addButton(name: "resetButton", text: "Reset", position: CGPoint(x: size.width / 2 - 25, y: size.height / 2 - 26))
-    }
-
-    func addButton(name: String, text: String, position: CGPoint) {
-        let button = SKShapeNode(rectOf: CGSize(width: 44, height: 30), cornerRadius: 15)
-        button.name = name
-        button.fillColor = SKColor(white: 1.0, alpha: 0.08)
-        button.strokeColor = SKColor(white: 1.0, alpha: 0.10)
-        button.position = position
-        button.zPosition = 101
-        addChild(button)
-
-        let label = makeLabel(text: text, fontSize: 10, position: .zero)
-        label.name = name
-        label.fontColor = SKColor(white: 1.0, alpha: 0.86)
-        button.addChild(label)
-    }
-
-    func solveOneHint() {
-        guard let entity = world.draggables.keys.sorted().first(where: { world.puzzlePieces[$0]?.isSnapped == false }),
-              let target = snapSystem.target(for: entity, world: world) else { return }
-        topZPosition += 1
-        world.transforms[entity]?.zPosition = topZPosition
-        snapSystem.snap(entity: entity, to: target, world: world)
-        addSnapFeedback(at: target.position)
-        updateHUD()
-        checkCompletion()
-    }
-
-    func resetGame() {
-        HapticsService.shared.playNotification(.warning)
-        completionOverlay?.removeFromParent()
-        completionOverlay = nil
-        finalPhotoNode?.removeFromParent()
-        finalPhotoNode = nil
-        topZPosition = 10
-
-        for (index, entity) in world.draggables.keys.sorted().enumerated() {
-            let startPosition = scatteredPosition(index: index)
-            world.transforms[entity]?.position = startPosition
-            world.transforms[entity]?.scale = 1.0
-            world.transforms[entity]?.zPosition = 0
-            world.puzzlePieces[entity]?.isSnapped = false
-            world.draggables[entity]?.homePosition = startPosition
-            world.draggables[entity]?.currentLoosePosition = startPosition
-        }
-
-        updateHUD()
-        renderSystem.update(world: world)
-    }
-
-    func updateHUD() {
-        hudCountLabel.text = "\(progressSystem.placedCount(world: world)) / \(progressSystem.totalCount(world: world))"
-    }
-
-    func checkCompletion() {
-        guard progressSystem.isCompleted(world: world), completionOverlay == nil else { return }
-        HapticsService.shared.playNotification(.success)
-        AudioService.shared.playSystemSound(id: 1025)
-        addFinalPhoto()
-        addCompletionOverlay()
-    }
-
-    func addFinalPhoto() {
-        let photo = SKSpriteNode(imageNamed: "final photo")
-        photo.size = boardRect.size
-        photo.position = CGPoint(x: boardRect.midX, y: boardRect.midY)
-        photo.zPosition = 100
-        photo.alpha = 0
-        addChild(photo)
-        photo.run(SKAction.fadeIn(withDuration: 1.0))
-        finalPhotoNode = photo
-    }
-
-    func addCompletionOverlay() {
-        let overlay = SKNode()
-        overlay.zPosition = 102
-
-        let shade = SKShapeNode(rectOf: CGSize(width: size.width * 1.2, height: size.height * 1.2))
-        shade.fillColor = SKColor(white: 0.0, alpha: 0.60)
-        shade.strokeColor = .clear
-        overlay.addChild(shade)
-
-        let panel = SKShapeNode(rectOf: CGSize(width: 300, height: 170), cornerRadius: 20)
-        panel.fillColor = SKColor(red: 0.14, green: 0.16, blue: 0.22, alpha: 1.0)
-        panel.strokeColor = SKColor(white: 1.0, alpha: 0.15)
-        overlay.addChild(panel)
-
-        let badge = makeLabel(text: "✓", fontSize: 42, position: CGPoint(x: 0, y: 50))
-        badge.fontColor = GameConstants.Colors.snapHighlight
-        overlay.addChild(badge)
-
-        let title = makeLabel(text: "Teka-Teki Selesai!", fontSize: 22, position: CGPoint(x: 0, y: 18))
-        overlay.addChild(title)
-
-        let subtitle = makeLabel(text: "Semua 48 kepingan telah terpasang.", fontSize: 13, position: CGPoint(x: 0, y: -12))
-        subtitle.fontColor = SKColor(white: 1.0, alpha: 0.75)
-        overlay.addChild(subtitle)
-
-        let resetButton = SKShapeNode(rectOf: CGSize(width: 92, height: 34), cornerRadius: 17)
-        resetButton.name = "resetButton"
-        resetButton.fillColor = GameConstants.Colors.snapHighlight
-        resetButton.strokeColor = .clear
-        resetButton.position = CGPoint(x: 0, y: -54)
-        overlay.addChild(resetButton)
-
-        let resetLabel = makeLabel(text: "Main Lagi", fontSize: 13, position: .zero)
-        resetLabel.name = "resetButton"
-        resetLabel.fontColor = .black
-        resetButton.addChild(resetLabel)
-
-        overlay.alpha = 0
-        overlay.setScale(0.92)
-        completionOverlay = overlay
-        addChild(overlay)
-        overlay.run(SKAction.sequence([
-            SKAction.wait(forDuration: 0.9),
-            SKAction.group([
-                SKAction.fadeIn(withDuration: 0.5),
-                SKAction.scale(to: 1.0, duration: 0.5)
+        enteringMemory = true; dragPiece = nil
+        progress.synchronizeJigsaw(); PrologueStore.shared.save()
+        let reduced = UIAccessibility.isReduceMotionEnabled
+        let duration: TimeInterval = reduced ? 0.18 : 0.65
+        let veil = SKSpriteNode(color: SKColor(red: 0.10, green: 0.14, blue: 0.12, alpha: 1), size: size)
+        veil.position = CGPoint(x: size.width / 2, y: size.height / 2); veil.alpha = 0; veil.zPosition = 500
+        addChild(veil); veil.run(.fadeAlpha(to: 0.9, duration: duration))
+        if !reduced, let tile = tiles[id] {
+            let data = JigsawCatalog.data(for: id)
+            let lift = SKSpriteNode(texture: textures.texture(for: data, dryVariant: id == JigsawCatalog.dryLakeID))
+            lift.size = CGSize(width: data.width * boardScale * canvas.xScale, height: data.height * boardScale * canvas.yScale)
+            lift.position = canvas.convert(tile.position, to: self)
+            lift.zRotation = tile.zRotation; lift.zPosition = 501; addChild(lift)
+            let zoom = max(size.width / lift.size.width, size.height / lift.size.height) * 1.6
+            let action = SKAction.group([
+                .move(to: CGPoint(x: size.width / 2, y: size.height / 2), duration: duration),
+                .scale(to: zoom, duration: duration), .rotate(toAngle: 0, duration: duration, shortestUnitArc: true)
             ])
-        ]))
+            action.timingMode = .easeInEaseOut; lift.run(action)
+            canvas.run(.fadeAlpha(to: 0.18, duration: duration))
+        }
+        run(.sequence([.wait(forDuration: duration), .run { [weak self, weak view] in
+            guard let self, let view, self.view === view else { return }
+            let exploration = ExplorationScene(size: self.size, entry: JigsawCatalog.location(for: id))
+            exploration.scaleMode = .resizeFill
+            let transition = SKTransition.fade(with: SKColor(red: 0.87, green: 0.83, blue: 0.68, alpha: 1), duration: reduced ? 0.18 : 0.38)
+            transition.pausesIncomingScene = false; transition.pausesOutgoingScene = false
+            view.presentScene(exploration, transition: transition)
+        }]), withKey: "enterMemory")
     }
-
-    func addSnapFeedback(at position: CGPoint) {
-        HapticsService.shared.playImpact(style: .medium)
-        AudioService.shared.playSystemSound(id: 1104)
-
-        let ring = SKShapeNode(circleOfRadius: 22)
-        ring.position = position
-        ring.strokeColor = GameConstants.Colors.snapHighlight
-        ring.fillColor = .clear
-        ring.lineWidth = 3
-        ring.zPosition = 80
-        addChild(ring)
-        ring.run(SKAction.sequence([
-            SKAction.group([
-                SKAction.scale(to: 1.35, duration: 0.26),
-                SKAction.fadeOut(withDuration: 0.26)
-            ]),
-            SKAction.removeFromParent()
-        ]))
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard !enteringMemory, let touch = touches.first else { return }
+        let point = touch.location(in: canvas)
+        let names = Set(canvas.nodes(at: point).compactMap(\.name))
+        if confirmingRestart {
+            if names.contains("confirmRestart") {
+                PrologueStore.shared.restart(); progress.prepareJigsaw()
+                selected = nil; inventoryPage = 0; confirmingRestart = false; changed()
+            } else if names.contains("cancelRestart") { confirmingRestart = false; rebuild() }
+            return
+        }
+        if names.contains("previousPage") { inventoryPage = max(0, inventoryPage - 1); rebuild(); return }
+        if names.contains("nextPage") {
+            let pages = max(1, (state.inventory(progress: progress).count + pageSize - 1) / pageSize)
+            inventoryPage = min(pages - 1, inventoryPage + 1); rebuild(); return
+        }
+        if names.contains("rotate") {
+            if let selected {
+                progress.jigsaw?.rotate(selected); changed(focusInventory: true)
+            }
+            return
+        }
+        if names.contains("store") {
+            if let selected { progress.jigsaw?.remove(selected); changed(focusInventory: true) }; return
+        }
+        if names.contains("enter") { enterSelected(); return }
+        if names.contains("restart") { confirmingRestart = true; rebuild(); return }
+        guard !progress.assembled else { return }
+        // Transparent margins and sockets never steal a neighbouring piece's tap.
+        let sorted = tiles.sorted { $0.value.zPosition > $1.value.zPosition }
+        guard let match = sorted.first(where: { id, node in
+            hitPaths[id]?.contains(node.convert(point, from: canvas)) == true
+        }) else { return }
+        dragPiece = match.key; dragStart = point; dragHome = match.value.position; moved = false
+        match.value.zPosition = 50
     }
-
-    func makeLabel(text: String, fontSize: CGFloat, position: CGPoint) -> SKLabelNode {
-        let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        label.text = text
-        label.fontSize = fontSize
-        label.fontColor = .white
-        label.verticalAlignmentMode = .center
-        label.horizontalAlignmentMode = .center
-        label.position = position
-        return label
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard !enteringMemory, let touch = touches.first, let id = dragPiece, let tile = tiles[id] else { return }
+        let point = touch.location(in: canvas)
+        if hypot(point.x - dragStart.x, point.y - dragStart.y) > 8 { moved = true }
+        if moved {
+            tile.setScale(boardScale / (renderScales[id] ?? boardScale))
+            tile.position = CGPoint(x: dragHome.x + point.x - dragStart.x, y: dragHome.y + point.y - dragStart.y)
+        }
     }
-
-    var effectiveSnapThreshold: CGFloat {
-        max(45.0, 120.0 * boardScale)
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard !enteringMemory, let id = dragPiece else { return }
+        defer { dragPiece = nil }
+        if moved, let point = tiles[id]?.position {
+            var accepted = true
+            if board.contains(point) {
+                let col = min(7, max(0, Int((point.x - board.minX) / cell.width)))
+                let row = min(5, max(0, Int((board.maxY - point.y) / cell.height)))
+                accepted = progress.placeJigsawPiece(id, at: row * 8 + col)
+            } else { progress.jigsaw?.remove(id) }
+            selected = id; changed(focusInventory: true)
+            if !accepted { message("Keping belum tersedia atau berada di luar papan.") }
+        } else { selected = id; rebuild() }
     }
-}
-
-struct StableRandom: RandomNumberGenerator {
-    private var state: UInt64
-
-    init(seed: UInt64) {
-        state = seed
-    }
-
-    mutating func next() -> UInt64 {
-        state = 2862933555777941757 &* state &+ 3037000493
-        return state
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard !enteringMemory else { return }
+        dragPiece = nil; rebuild()
     }
 }

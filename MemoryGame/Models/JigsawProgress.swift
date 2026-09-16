@@ -1,0 +1,222 @@
+import Foundation
+import CoreGraphics
+
+/// 48 actual photo fragments plus one alternate fragment for the same lake.
+/// Story locations remain independent from the physical photo-piece identity.
+enum JigsawCatalog {
+    static let count = PuzzleCatalog.rows * PuzzleCatalog.columns
+    static let dryLakeID = count
+    static let allIDs = Array(0...dryLakeID)
+    static let minimumConnectedPieces = 3
+    // An L-shaped opening: house above road, yard immediately to its left.
+    static let starterIDs: Set<Int> = [29, 36, 37]
+    static let bookReward: Set<Int> = [0, 1, 8, 19, 20, 27, 28, 21, 22, 30, 38, 48]
+    static let friendsReward: Set<Int> = [3, 4, 11, 12, 16, 17, 18, 24, 25, 26, 2, 9]
+    static let markerReward: Set<Int> = [5, 6, 7, 13, 14, 15, 10, 23, 31, 35, 43, 44]
+
+    static func location(for id: Int) -> MemoryPiece {
+        if id == dryLakeID { return .dryLake }
+        let row = id / PuzzleCatalog.columns
+        let col = id % PuzzleCatalog.columns
+        let band = col < 3 ? 0 : (col < 5 ? 1 : 2)
+        return MemoryPiece.main[(row / 2) * 3 + band]
+    }
+    static func primaryID(for location: MemoryPiece) -> Int {
+        if location == .dryLake { return dryLakeID }
+        if location == .house { return 29 }
+        if location == .yard { return 36 }
+        return (0..<count).first { self.location(for: $0) == location }!
+    }
+    static func data(for id: Int) -> PuzzlePieceData {
+        PuzzleCatalog.pieces[id == dryLakeID ? primaryID(for: .lake) : id]
+    }
+    static func availableIDs(progress: PrologueProgress) -> Set<Int> {
+        var available = starterIDs
+        if progress.hasBook { available.formUnion(bookReward) }
+        if progress.joined.count == 3 { available.formUnion(friendsReward) }
+        if progress.foundMarker { available.formUnion(markerReward) }
+        if progress.leftVillage { available.formUnion(allIDs) }
+        // Already earned pieces in an older save are never confiscated.
+        available.formUnion(progress.jigsaw?.legacyGrantedIDs ?? [])
+        return available
+    }
+    static func legacyAvailableIDs(progress: PrologueProgress) -> Set<Int> {
+        Set(allIDs.filter { id in
+            let location = location(for: id)
+            guard progress.discovered.contains(location) else { return false }
+            if [.house, .yard, .villageRoad].contains(location), !progress.hasBook {
+                return [21, 35, 37].contains(id)
+            }
+            return true
+        })
+    }
+    // Clockwise edge order: top, right, bottom, left. 0 = flat, +/-1 = tab/socket.
+    static func edges(for id: Int, turns: Int = 0) -> [Int] {
+        let data = data(for: id)
+        let row = data.row - 1, col = data.col - 1
+        let sign = (row + col).isMultiple(of: 2) ? 1 : -1
+        let original = [row == 0 ? 0 : sign, col == 7 ? 0 : sign,
+                        row == 5 ? 0 : sign, col == 0 ? 0 : sign]
+        let rotation = ((turns % 4) + 4) % 4
+        return (0..<4).map { original[($0 - rotation + 4) % 4] }
+    }
+    // Exploration accepts any earned fragment in any board cell, in any rotation.
+    static func canPlace(_ id: Int, at slot: Int) -> Bool {
+        allIDs.contains(id) && (0..<count).contains(slot)
+    }
+    static func fits(_ id: Int, at slot: Int, turns: Int) -> Bool {
+        guard allIDs.contains(id), (0..<count).contains(slot) else { return false }
+        // The photo's aspect ratio gives rectangular cells. A quarter-turn has
+        // different dimensions; a half-turn can fit if the physical edges match.
+        if turns % 2 != 0 && abs(PuzzleCatalog.cellWidth - PuzzleCatalog.cellHeight) > 0.01 { return false }
+        return edges(for: id, turns: turns) == edges(for: slot)
+    }
+}
+
+struct JigsawPlacement: Codable, Equatable {
+    let id: Int
+    let turns: Int
+}
+
+struct JigsawProgress: Codable {
+    var connectionRulesVersion: Int?
+    var legacyGrantedIDs: Set<Int>?
+    var placements: [Int: JigsawPlacement] = [:]
+    var rotations: [Int: Int] = [:]
+    var locationDrivers: [MemoryPiece: Int] = [:]
+
+    /// Connected means physically adjacent on this board, not merely discovered
+    /// or belonging to the same location. Separate components unlock independently.
+    func connectedIDs(to id: Int) -> Set<Int> {
+        guard let start = placements.first(where: { $0.value.id == id })?.key,
+              let seed = placements[start], JigsawCatalog.canPlace(seed.id, at: start) else { return [] }
+        var visited: Set<Int> = [start]
+        var queue = [start]
+        var head = 0
+        while head < queue.count {
+            let slot = queue[head]; head += 1
+            let column = slot % PuzzleCatalog.columns
+            let neighbors = [column > 0 ? slot - 1 : -1,
+                             column < PuzzleCatalog.columns - 1 ? slot + 1 : -1,
+                             slot - PuzzleCatalog.columns, slot + PuzzleCatalog.columns]
+            for neighbor in neighbors where (0..<JigsawCatalog.count).contains(neighbor) && !visited.contains(neighbor) {
+                guard let piece = placements[neighbor], JigsawCatalog.canPlace(piece.id, at: neighbor) else { continue }
+                visited.insert(neighbor); queue.append(neighbor)
+            }
+        }
+        return Set(visited.compactMap { placements[$0]?.id })
+    }
+    func canEnter(_ id: Int) -> Bool {
+        connectedIDs(to: id).count >= JigsawCatalog.minimumConnectedPieces
+    }
+
+    var installedIDs: Set<Int> { Set(placements.values.map(\.id)) }
+    var solved: Bool {
+        placements.count == JigsawCatalog.count && (0..<JigsawCatalog.count).allSatisfy {
+            placements[$0] == JigsawPlacement(id: $0, turns: 0)
+        }
+    }
+    func inventory(progress: PrologueProgress) -> [Int] {
+        // Deterministic shuffle rather than revealing the order of the final photo.
+        JigsawCatalog.availableIDs(progress: progress).subtracting(installedIDs).sorted {
+            (($0 * 29 + 17) % 53) < (($1 * 29 + 17) % 53)
+        }
+    }
+    @discardableResult
+    mutating func place(_ id: Int, at slot: Int, available: Set<Int>) -> Bool {
+        let turns = rotations[id] ?? 0
+        guard available.contains(id), JigsawCatalog.canPlace(id, at: slot) else { return false }
+        let location = JigsawCatalog.location(for: id)
+        placements = placements.filter { _, placement in
+            if placement.id == id { return false }
+            let other = JigsawCatalog.location(for: placement.id)
+            if location == .dryLake && other == .lake { return false }
+            if location == .lake && other == .dryLake { return false }
+            return true
+        }
+        placements[slot] = JigsawPlacement(id: id, turns: turns)
+        locationDrivers[location] = id
+        return true
+    }
+    mutating func remove(_ id: Int) { placements = placements.filter { $0.value.id != id } }
+    mutating func rotate(_ id: Int) {
+        let turns = ((rotations[id] ?? 0) + 1) % 4
+        rotations[id] = turns
+        locationDrivers[JigsawCatalog.location(for: id)] = id
+        if let slot = placements.first(where: { $0.value.id == id })?.key {
+            placements[slot] = JigsawPlacement(id: id, turns: turns)
+        }
+    }
+}
+
+extension PrologueProgress {
+    @discardableResult
+    func placeJigsawPiece(_ id: Int, at slot: Int) -> Bool {
+        // Resolve rewards before beginning exclusive mutation of jigsaw.
+        // availableIDs also reads jigsaw to preserve rewards from older saves.
+        let available = JigsawCatalog.availableIDs(progress: self)
+        return jigsaw?.place(id, at: slot, available: available) ?? false
+    }
+
+    func prepareJigsaw() {
+        if var existing = jigsaw {
+            if existing.connectionRulesVersion == nil {
+                if hasBook {
+                    existing.legacyGrantedIDs = JigsawCatalog.legacyAvailableIDs(progress: self)
+                } else {
+                    // Old starters were all sockets, so they could not form one
+                    // connected cluster. Swap only these unearned opening pieces.
+                    for (oldID, newID) in [21: 29, 35: 36] {
+                        existing.rotations[newID] = existing.rotations.removeValue(forKey: oldID) ?? 0
+                        if let slot = existing.placements.first(where: { $0.value.id == oldID })?.key {
+                            existing.placements.removeValue(forKey: slot)
+                            let turns = existing.rotations[newID] ?? 0
+                            if JigsawCatalog.fits(newID, at: slot, turns: turns) {
+                                existing.placements[slot] = JigsawPlacement(id: newID, turns: turns)
+                            }
+                        }
+                    }
+                }
+                existing.connectionRulesVersion = 1
+            }
+            jigsaw = existing
+            synchronizeJigsaw()
+            return
+        }
+        var state = JigsawProgress()
+        state.connectionRulesVersion = 1
+        if hasBook { state.legacyGrantedIDs = JigsawCatalog.legacyAvailableIDs(progress: self) }
+        for location in [MemoryPiece.house, .yard, .villageRoad] {
+            state.rotations[JigsawCatalog.primaryID(for: location)] = rotations[location] ?? 0
+        }
+        if assembled && leftVillage {
+            for id in 0..<JigsawCatalog.count { state.placements[id] = JigsawPlacement(id: id, turns: 0) }
+        } else {
+            // Upgrade the previous nine-tile save without erasing story progress.
+            // Each installed location becomes one matching fragment in the new grid.
+            for old in placements.values {
+                let id = JigsawCatalog.primaryID(for: old.piece)
+                let slot = old.piece == .dryLake ? JigsawCatalog.primaryID(for: .lake) : id
+                let turns = JigsawCatalog.fits(id, at: slot, turns: old.turns) ? old.turns : 0
+                state.rotations[id] = turns
+                state.placements[slot] = JigsawPlacement(id: id, turns: turns)
+                state.locationDrivers[old.piece] = id
+            }
+        }
+        jigsaw = state
+        synchronizeJigsaw()
+    }
+    func synchronizeJigsaw() {
+        guard let jigsaw else { return }
+        placements.removeAll()
+        for location in MemoryPiece.allCases {
+            let candidates = jigsaw.placements.values.filter { JigsawCatalog.location(for: $0.id) == location && jigsaw.canEnter($0.id) }.sorted { $0.id < $1.id }
+            let driver = candidates.first { $0.id == jigsaw.locationDrivers[location] } ?? candidates.first
+            if let driver {
+                placements[location.slot] = PhotoPlacement(piece: location, turns: driver.turns)
+                rotations[location] = driver.turns
+            }
+        }
+        assembled = leftVillage && jigsaw.solved
+    }
+}

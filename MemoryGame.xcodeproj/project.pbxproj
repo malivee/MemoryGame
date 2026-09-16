@@ -6,8 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		AAD4A30E305A9B4500F88A5D /* ArchitectureGuide.md in Resources */ = {isa = PBXBuildFile; fileRef = AAD4A30D305A9B4500F88A5D /* ArchitectureGuide.md */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		AAD4A1803059555300F88A5D /* MemoryGame.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MemoryGame.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AAD4A30D305A9B4500F88A5D /* ArchitectureGuide.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ArchitectureGuide.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -47,6 +52,7 @@
 			children = (
 				AAD4A1823059555300F88A5D /* MemoryGame */,
 				AAD4A1813059555300F88A5D /* Products */,
+				AAD4A30D305A9B4500F88A5D /* ArchitectureGuide.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -122,6 +128,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AAD4A30E305A9B4500F88A5D /* ArchitectureGuide.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

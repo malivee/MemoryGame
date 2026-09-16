@@ -89,12 +89,14 @@ final class BookScene: SKScene {
         let page = SKNode()
 
         let paper = SKShapeNode(rectOf: size, cornerRadius: 4)
-        paper.fillColor = SKColor(red: 0.86, green: 0.79, blue: 0.61, alpha: 1.0)
-        paper.strokeColor = SKColor(red: 0.51, green: 0.39, blue: 0.22, alpha: 0.95)
+        paper.fillColor = SKColor(red: 0.78, green: 0.68, blue: 0.46, alpha: 1.0)
+        paper.strokeColor = SKColor(red: 0.39, green: 0.26, blue: 0.12, alpha: 0.98)
         paper.lineWidth = 1.5
         page.addChild(paper)
 
         addAgedPageEdges(to: page, size: size)
+        addWaterStains(to: page, size: size)
+        addTornCorners(to: page, size: size, side: side)
         addParchmentFlecks(to: page, size: size)
         addPageEdgeLines(to: page, size: size, side: side)
         addMedievalBorder(to: page, size: size)
@@ -163,9 +165,9 @@ final class BookScene: SKScene {
     }
 
     func addParchmentFlecks(to page: SKNode, size: CGSize) {
-        for index in 0..<70 {
-            let fleck = SKShapeNode(circleOfRadius: CGFloat((index % 3) + 1) * 0.45)
-            fleck.fillColor = SKColor(red: 0.38, green: 0.27, blue: 0.13, alpha: 0.12)
+        for index in 0..<120 {
+            let fleck = SKShapeNode(circleOfRadius: CGFloat((index % 4) + 1) * 0.5)
+            fleck.fillColor = SKColor(red: 0.30, green: 0.19, blue: 0.08, alpha: 0.16)
             fleck.strokeColor = .clear
             let xSeed = CGFloat((index * 37) % 100) / 100
             let ySeed = CGFloat((index * 61) % 100) / 100
@@ -179,8 +181,8 @@ final class BookScene: SKScene {
     }
 
     func addAgedPageEdges(to page: SKNode, size: CGSize) {
-        let topBurnish = SKShapeNode(rectOf: CGSize(width: size.width * 0.94, height: size.height * 0.055), cornerRadius: 8)
-        topBurnish.fillColor = SKColor(red: 0.48, green: 0.34, blue: 0.16, alpha: 0.18)
+        let topBurnish = SKShapeNode(rectOf: CGSize(width: size.width * 0.94, height: size.height * 0.075), cornerRadius: 10)
+        topBurnish.fillColor = SKColor(red: 0.31, green: 0.19, blue: 0.08, alpha: 0.26)
         topBurnish.strokeColor = .clear
         topBurnish.position = CGPoint(x: 0, y: size.height * 0.455)
         topBurnish.zPosition = 2
@@ -192,15 +194,73 @@ final class BookScene: SKScene {
             page.addChild(bottomBurnish)
         }
 
-        for index in 0..<18 {
-            let nib = SKShapeNode(circleOfRadius: CGFloat(2 + (index % 3)))
-            nib.fillColor = SKColor(red: 0.33, green: 0.22, blue: 0.10, alpha: 0.14)
+        for index in 0..<30 {
+            let nib = SKShapeNode(circleOfRadius: CGFloat(2 + (index % 5)))
+            nib.fillColor = SKColor(red: 0.23, green: 0.13, blue: 0.05, alpha: 0.22)
             nib.strokeColor = .clear
-            let x = -size.width * 0.43 + CGFloat(index) * size.width * 0.05
+            let x = -size.width * 0.45 + CGFloat(index) * size.width * 0.031
             let y = index % 2 == 0 ? size.height * 0.46 : -size.height * 0.46
             nib.position = CGPoint(x: x, y: y)
             nib.zPosition = 3
             page.addChild(nib)
+        }
+    }
+
+    func addWaterStains(to page: SKNode, size: CGSize) {
+        let stainSeeds = [
+            CGPoint(x: -0.30, y: -0.24),
+            CGPoint(x: 0.25, y: 0.14),
+            CGPoint(x: 0.34, y: -0.34),
+            CGPoint(x: -0.12, y: 0.36)
+        ]
+
+        for (index, seed) in stainSeeds.enumerated() {
+            let stainSize = CGSize(
+                width: size.width * (0.12 + CGFloat(index % 2) * 0.05),
+                height: size.height * (0.08 + CGFloat(index % 3) * 0.025)
+            )
+            let stain = SKShapeNode(ellipseOf: stainSize)
+            stain.fillColor = SKColor(red: 0.25, green: 0.14, blue: 0.045, alpha: 0.13)
+            stain.strokeColor = SKColor(red: 0.25, green: 0.14, blue: 0.045, alpha: 0.08)
+            stain.lineWidth = 4
+            stain.position = CGPoint(x: seed.x * size.width, y: seed.y * size.height)
+            stain.zRotation = CGFloat(index) * 0.45
+            stain.zPosition = 2.5
+            page.addChild(stain)
+        }
+    }
+
+    func addTornCorners(to page: SKNode, size: CGSize, side: BookPageSide) {
+        let corners = [
+            CGPoint(x: -size.width * 0.47, y: size.height * 0.45),
+            CGPoint(x: size.width * 0.47, y: size.height * 0.45),
+            CGPoint(x: -size.width * 0.47, y: -size.height * 0.45),
+            CGPoint(x: size.width * 0.47, y: -size.height * 0.45)
+        ]
+
+        for (index, corner) in corners.enumerated() {
+            let bite = SKShapeNode(circleOfRadius: size.width * (index % 2 == 0 ? 0.025 : 0.018))
+            bite.fillColor = SKColor(red: 0.15, green: 0.105, blue: 0.065, alpha: 1.0)
+            bite.strokeColor = .clear
+            bite.position = CGPoint(
+                x: corner.x + CGFloat((index + (side == .left ? 1 : 0)) % 2) * 3,
+                y: corner.y - CGFloat(index % 2) * 4
+            )
+            bite.zPosition = 9
+            page.addChild(bite)
+        }
+
+        for index in 0..<10 {
+            let tear = SKShapeNode(rectOf: CGSize(width: size.width * 0.035, height: 1.2))
+            tear.fillColor = SKColor(red: 0.34, green: 0.21, blue: 0.08, alpha: 0.22)
+            tear.strokeColor = .clear
+            tear.position = CGPoint(
+                x: (side == .left ? -size.width * 0.455 : size.width * 0.455),
+                y: -size.height * 0.35 + CGFloat(index) * size.height * 0.075
+            )
+            tear.zRotation = CGFloat(index % 3) * 0.18
+            tear.zPosition = 4
+            page.addChild(tear)
         }
     }
 
@@ -418,30 +478,42 @@ final class BookScene: SKScene {
         flipPage.position = rightPageNode.position
         flipPage.zPosition = 20
         flipPage.setScale(1.0)
+        addFlipCurlEffects(to: flipPage, direction: .forward, pageSize: pageSize)
         bookNode.addChild(flipPage)
         flippingPageNode = flipPage
 
         let lift = SKAction.group([
-            SKAction.moveBy(x: -pageSize.width * 0.48, y: pageSize.height * 0.16, duration: 0.20),
-            SKAction.scaleX(to: 0.12, duration: 0.20),
-            SKAction.rotate(byAngle: -0.20, duration: 0.20)
+            eased(SKAction.moveBy(x: -pageSize.width * 0.22, y: pageSize.height * 0.10, duration: 0.18), mode: .easeOut),
+            eased(SKAction.scaleX(to: 0.72, duration: 0.18), mode: .easeOut),
+            eased(SKAction.scaleY(to: 1.025, duration: 0.18), mode: .easeOut),
+            eased(SKAction.rotate(byAngle: -0.10, duration: 0.18), mode: .easeOut)
         ])
 
-        let crossFold = SKAction.group([
-            SKAction.moveBy(x: -pageSize.width * 0.50, y: -pageSize.height * 0.10, duration: 0.20),
-            SKAction.scaleX(to: 0.86, duration: 0.20),
-            SKAction.rotate(toAngle: 0.08, duration: 0.20)
+        let curlOverSpine = SKAction.group([
+            eased(SKAction.moveBy(x: -pageSize.width * 0.34, y: pageSize.height * 0.08, duration: 0.16)),
+            eased(SKAction.scaleX(to: 0.08, duration: 0.16)),
+            eased(SKAction.scaleY(to: 1.06, duration: 0.16)),
+            eased(SKAction.rotate(toAngle: -0.22, duration: 0.16))
+        ])
+
+        let unfurl = SKAction.group([
+            eased(SKAction.moveBy(x: -pageSize.width * 0.36, y: -pageSize.height * 0.15, duration: 0.20)),
+            eased(SKAction.scaleX(to: 0.72, duration: 0.20), mode: .easeOut),
+            eased(SKAction.scaleY(to: 1.025, duration: 0.20), mode: .easeOut),
+            eased(SKAction.rotate(toAngle: 0.10, duration: 0.20), mode: .easeOut)
         ])
 
         let settle = SKAction.group([
-            SKAction.move(to: leftPageNode.position, duration: 0.16),
-            SKAction.scaleX(to: 1.0, duration: 0.16),
-            SKAction.rotate(toAngle: 0, duration: 0.16)
+            eased(SKAction.move(to: leftPageNode.position, duration: 0.18), mode: .easeOut),
+            eased(SKAction.scaleX(to: 1.0, duration: 0.18), mode: .easeOut),
+            eased(SKAction.scaleY(to: 1.0, duration: 0.18), mode: .easeOut),
+            eased(SKAction.rotate(toAngle: 0, duration: 0.18), mode: .easeOut)
         ])
 
         flipPage.run(SKAction.sequence([
             lift,
-            crossFold,
+            curlOverSpine,
+            unfurl,
             settle,
             SKAction.run { [weak self, weak flipPage] in
                 guard let self, let flipPage else { return }
@@ -475,30 +547,42 @@ final class BookScene: SKScene {
         flipPage.position = leftPageNode.position
         flipPage.zPosition = 20
         flipPage.setScale(1.0)
+        addFlipCurlEffects(to: flipPage, direction: .backward, pageSize: pageSize)
         bookNode.addChild(flipPage)
         flippingPageNode = flipPage
 
         let lift = SKAction.group([
-            SKAction.moveBy(x: pageSize.width * 0.48, y: pageSize.height * 0.16, duration: 0.20),
-            SKAction.scaleX(to: 0.12, duration: 0.20),
-            SKAction.rotate(byAngle: 0.20, duration: 0.20)
+            eased(SKAction.moveBy(x: pageSize.width * 0.22, y: pageSize.height * 0.10, duration: 0.18), mode: .easeOut),
+            eased(SKAction.scaleX(to: 0.72, duration: 0.18), mode: .easeOut),
+            eased(SKAction.scaleY(to: 1.025, duration: 0.18), mode: .easeOut),
+            eased(SKAction.rotate(byAngle: 0.10, duration: 0.18), mode: .easeOut)
         ])
 
-        let crossFold = SKAction.group([
-            SKAction.moveBy(x: pageSize.width * 0.50, y: -pageSize.height * 0.10, duration: 0.20),
-            SKAction.scaleX(to: 0.86, duration: 0.20),
-            SKAction.rotate(toAngle: -0.08, duration: 0.20)
+        let curlOverSpine = SKAction.group([
+            eased(SKAction.moveBy(x: pageSize.width * 0.34, y: pageSize.height * 0.08, duration: 0.16)),
+            eased(SKAction.scaleX(to: 0.08, duration: 0.16)),
+            eased(SKAction.scaleY(to: 1.06, duration: 0.16)),
+            eased(SKAction.rotate(toAngle: 0.22, duration: 0.16))
+        ])
+
+        let unfurl = SKAction.group([
+            eased(SKAction.moveBy(x: pageSize.width * 0.36, y: -pageSize.height * 0.15, duration: 0.20)),
+            eased(SKAction.scaleX(to: 0.72, duration: 0.20), mode: .easeOut),
+            eased(SKAction.scaleY(to: 1.025, duration: 0.20), mode: .easeOut),
+            eased(SKAction.rotate(toAngle: -0.10, duration: 0.20), mode: .easeOut)
         ])
 
         let settle = SKAction.group([
-            SKAction.move(to: rightPageNode.position, duration: 0.16),
-            SKAction.scaleX(to: 1.0, duration: 0.16),
-            SKAction.rotate(toAngle: 0, duration: 0.16)
+            eased(SKAction.move(to: rightPageNode.position, duration: 0.18), mode: .easeOut),
+            eased(SKAction.scaleX(to: 1.0, duration: 0.18), mode: .easeOut),
+            eased(SKAction.scaleY(to: 1.0, duration: 0.18), mode: .easeOut),
+            eased(SKAction.rotate(toAngle: 0, duration: 0.18), mode: .easeOut)
         ])
 
         flipPage.run(SKAction.sequence([
             lift,
-            crossFold,
+            curlOverSpine,
+            unfurl,
             settle,
             SKAction.run { [weak self, weak flipPage] in
                 guard let self, let flipPage else { return }
@@ -508,6 +592,42 @@ final class BookScene: SKScene {
                 self.refreshLeftPage()
             }
         ]))
+    }
+
+    func addFlipCurlEffects(to page: SKNode, direction: BookFlipDirection, pageSize: CGSize) {
+        let leadingX = direction == .forward ? -pageSize.width * 0.42 : pageSize.width * 0.42
+        let trailingX = direction == .forward ? pageSize.width * 0.34 : -pageSize.width * 0.34
+
+        let foldShade = SKShapeNode(rectOf: CGSize(width: pageSize.width * 0.10, height: pageSize.height * 0.95), cornerRadius: 8)
+        foldShade.fillColor = SKColor(white: 0.0, alpha: 0.12)
+        foldShade.strokeColor = .clear
+        foldShade.position = CGPoint(x: leadingX, y: 0)
+        foldShade.zPosition = 18
+        page.addChild(foldShade)
+
+        let liftedEdge = SKShapeNode(rectOf: CGSize(width: pageSize.width * 0.055, height: pageSize.height * 0.92), cornerRadius: 8)
+        liftedEdge.fillColor = SKColor(red: 0.95, green: 0.86, blue: 0.60, alpha: 0.28)
+        liftedEdge.strokeColor = .clear
+        liftedEdge.position = CGPoint(x: trailingX, y: 0)
+        liftedEdge.zPosition = 19
+        page.addChild(liftedEdge)
+
+        let curlLine = SKShapeNode(rectOf: CGSize(width: 1.4, height: pageSize.height * 0.88), cornerRadius: 1)
+        curlLine.fillColor = SKColor(red: 0.26, green: 0.15, blue: 0.055, alpha: 0.28)
+        curlLine.strokeColor = .clear
+        curlLine.position = CGPoint(x: trailingX * 0.82, y: 0)
+        curlLine.zPosition = 20
+        page.addChild(curlLine)
+
+        let fadeOut = eased(SKAction.fadeAlpha(to: 0.0, duration: 0.62), mode: .easeIn)
+        foldShade.run(fadeOut)
+        liftedEdge.run(fadeOut.copy() as? SKAction ?? SKAction.fadeOut(withDuration: 0.62))
+        curlLine.run(fadeOut.copy() as? SKAction ?? SKAction.fadeOut(withDuration: 0.62))
+    }
+
+    func eased(_ action: SKAction, mode: SKActionTimingMode = .easeInEaseOut) -> SKAction {
+        action.timingMode = mode
+        return action
     }
 
     func refreshLeftPage() {
@@ -552,4 +672,9 @@ final class BookScene: SKScene {
 enum BookPageSide {
     case left
     case right
+}
+
+enum BookFlipDirection {
+    case forward
+    case backward
 }

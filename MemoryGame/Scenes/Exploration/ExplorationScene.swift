@@ -36,6 +36,8 @@ final class ExplorationScene: SKScene {
     private var objective = SKLabelNode()
     private var suspicionLabel = SKLabelNode()
     private var interactionButton: SKShapeNode?
+    private var bookButton: SKShapeNode?
+    private var readingBook = false
 
     init(size: CGSize, entry: MemoryPiece) {
         self.entry = entry
@@ -45,6 +47,15 @@ final class ExplorationScene: SKScene {
 
     override func didMove(to view: SKView) {
         backgroundColor = SKColor(red: 0.08, green: 0.13, blue: 0.14, alpha: 1)
+        if stage.parent != nil {
+            // Resume the existing world after reading, without duplicating nodes
+            // or resetting Arthur, companions, and patrols.
+            readingBook = false
+            lastTime = 0
+            resizeStage()
+            updateBookAccess()
+            return
+        }
         addChild(stage)
         stage.addChild(world)
         world.position = CGPoint(x: 20, y: 65)
@@ -134,7 +145,7 @@ final class ExplorationScene: SKScene {
                 }
             }
         }
-        if let book = level.book { addBook(at: book) }
+        if let book = level.book, !progress.hasBook { addBook(at: book) }
         for (friend, point) in level.friends {
             let npc = MemoryCharacter(title: friend.rawValue, color: color(friend))
             npc.position = point; world.addChild(npc)
@@ -188,6 +199,7 @@ final class ExplorationScene: SKScene {
     private func addBook(at point: CGPoint) {
         let book = SKShapeNode(rectOf: CGSize(width: 32, height: 24), cornerRadius: 2)
         book.fillColor = SKColor(red: 0.84, green: 0.76, blue: 0.56, alpha: 1)
+        book.name = "bookPickup"
         book.position = point; book.zPosition = 15
         world.addChild(book)
         book.storyLabel("Buku lama", at: CGPoint(x: 0, y: 30), size: 11)
@@ -207,7 +219,12 @@ final class ExplorationScene: SKScene {
         stickKnob.position = stickCenter; stickKnob.fillColor = SKColor(white: 1, alpha: 0.32)
         stickKnob.strokeColor = .clear; hud.addChild(stickKnob)
         interactionButton = hud.storyButton("Interaksi", name: "interact", at: CGPoint(x: 902, y: 55), width: 145)
-        hud.storyButton("Buku", name: "book", at: CGPoint(x: 905, y: 111), width: 118)
+        bookButton = hud.storyButton("Buku", name: "book", at: CGPoint(x: 905, y: 111), width: 118)
+        updateBookAccess()
+    }
+    private func updateBookAccess() {
+        bookButton?.isHidden = !progress.hasBook
+        if progress.hasBook { world.childNode(withName: "bookPickup")?.removeFromParent() }
     }
     private func say(_ text: String, duration: TimeInterval = 4) {
         toast?.removeFromParent()
@@ -257,6 +274,7 @@ final class ExplorationScene: SKScene {
             if progress.hasBook { say("Buku sudah dibawa Arthur. Tunjukkan kepada ketiga teman."); return }
             startDialogue(PrologueDialogue.book) { [weak self] in
                 self?.progress.readBook()
+                self?.updateBookAccess()
                 self?.say("Keping baru: kebun, pegunungan, cekungan kering. Pasang di foto untuk membuka area.", duration: 6)
             }
             return
@@ -293,7 +311,7 @@ final class ExplorationScene: SKScene {
     override func update(_ currentTime: TimeInterval) {
         let dt = CGFloat(min(0.04, max(0, lastTime == 0 ? 0 : currentTime - lastTime)))
         lastTime = currentTime
-        guard navigation != nil, dialoguePanel == nil, !enteringMemory else { return }
+        guard navigation != nil, dialoguePanel == nil, !enteringMemory, !readingBook else { return }
         warningCooldown = max(0, warningCooldown - dt)
         catchGrace = max(0, catchGrace - dt)
         if hypot(stickVector.dx, stickVector.dy) > 0.05 {
@@ -399,17 +417,22 @@ final class ExplorationScene: SKScene {
         view?.presentScene(photo, transition: .fade(withDuration: 0.35))
     }
     private func openBook() {
+        guard progress.hasBook, !readingBook, let view else { return }
+        readingBook = true
+        PrologueStore.shared.save()
         arthur.route.removeAll()
         stickVector = .zero
         stickTouch = nil
         stickKnob.position = stickCenter
         let book = BookScene(size: size)
         book.scaleMode = .resizeFill
-        book.onClose = { [weak self] in
-            guard let self else { return }
-            self.view?.presentScene(self, transition: .fade(withDuration: 0.30))
+        // The book retains its return scene; an offscreen scene has no view.
+        // Capture the presenting view weakly to avoid a view/scene retain cycle.
+        book.onClose = { [self, weak view] in
+            guard let view else { return }
+            view.presentScene(self, transition: .fade(withDuration: 0.30))
         }
-        view?.presentScene(book, transition: .fade(withDuration: 0.30))
+        view.presentScene(book, transition: .fade(withDuration: 0.30))
     }
     private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }
     // Mengubah jarak sentuhan dari pusat stik menjadi arah dan kekuatan gerak terbatas.
@@ -423,7 +446,7 @@ final class ExplorationScene: SKScene {
     }
     // Mengarahkan sentuhan ke dialog, tombol, stik, atau pencarian rute menuju tanah yang diketuk.
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard !enteringMemory, let touch = touches.first else { return }
+        guard !enteringMemory, !readingBook, let touch = touches.first else { return }
         if dialoguePanel != nil { advanceDialogue(); return }
         let point = touch.location(in: stage)
         let names = Set(hud.nodes(at: touch.location(in: hud)).compactMap(\.name))

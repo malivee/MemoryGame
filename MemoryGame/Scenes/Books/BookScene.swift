@@ -171,7 +171,7 @@ final class BookScene: SKScene {
 
     private func addCloseButton() {
         let safe = view?.safeAreaInsets ?? .zero
-        let button = SKShapeNode(rectOf: CGSize(width: 94, height: 34), cornerRadius: 10)
+        let button = SKShapeNode(rectOf: CGSize(width: 104, height: 44), cornerRadius: 10)
         button.name = closeButtonName
         button.position = CGPoint(x: -size.width / 2 + safe.left + 70, y: size.height / 2 - max(36, safe.top + 18))
         button.fillColor = SKColor(red: 0.17, green: 0.12, blue: 0.07, alpha: 0.88)
@@ -180,7 +180,7 @@ final class BookScene: SKScene {
         button.zPosition = 200
         let label = SKLabelNode(fontNamed: "AvenirNext-Medium")
         label.name = closeButtonName
-        label.text = "Kembali"
+        label.text = "‹ Back"
         label.fontSize = 12
         label.fontColor = SKColor(red: 0.86, green: 0.78, blue: 0.58, alpha: 1)
         label.verticalAlignmentMode = .center
@@ -199,7 +199,12 @@ final class BookScene: SKScene {
             return false
         }
         if tappedClose {
-            onClose?()
+            trackedTouch = nil
+            touchStartPoint = nil
+            finishTurn()
+            let close = onClose
+            onClose = nil // A second tap during the transition must not reopen.
+            close?()
         }
         return tappedClose
     }

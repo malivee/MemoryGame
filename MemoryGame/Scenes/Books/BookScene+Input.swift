@@ -4,6 +4,7 @@ extension BookScene {
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard trackedTouch == nil, let touch = touches.first else { return }
         let point = touch.location(in: self)
+        if closeBookIfNeeded(at: point) { return }
         guard containsBookPoint(point) else { return }
         trackedTouch = touch
         touchStartPoint = point

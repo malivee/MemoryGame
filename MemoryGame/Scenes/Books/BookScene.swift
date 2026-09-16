@@ -4,6 +4,7 @@ import SpriteKit
 /// leaf can bend around the gutter without moving the rest of the book.
 final class BookScene: SKScene {
     let maximumFlipCount = 5
+    var onClose: (() -> Void)?
     private(set) var flipCount = 0
     var touchStartPoint: CGPoint?
     var trackedTouch: UITouch?
@@ -17,6 +18,7 @@ final class BookScene: SKScene {
     private let turnDuration: TimeInterval = 1.15
     private let counterLabel = SKLabelNode(fontNamed: "AvenirNext-Medium")
     private let promptLabel = SKLabelNode(fontNamed: "AvenirNext-Regular")
+    private let closeButtonName = "bookClose"
     private lazy var pageAtlas = SKTexture(imageNamed: "ManuscriptPages")
     private let turnAmount = SKUniform(name: "u_turn", float: 0)
     private lazy var paperShader = SKShader(source: """
@@ -161,7 +163,45 @@ final class BookScene: SKScene {
         promptLabel.position = CGPoint(x: 0, y: bottom)
         promptLabel.verticalAlignmentMode = .center
         addChild(promptLabel)
+        if onClose != nil {
+            addCloseButton()
+        }
         updateHUD()
+    }
+
+    private func addCloseButton() {
+        let safe = view?.safeAreaInsets ?? .zero
+        let button = SKShapeNode(rectOf: CGSize(width: 94, height: 34), cornerRadius: 10)
+        button.name = closeButtonName
+        button.position = CGPoint(x: -size.width / 2 + safe.left + 70, y: size.height / 2 - max(36, safe.top + 18))
+        button.fillColor = SKColor(red: 0.17, green: 0.12, blue: 0.07, alpha: 0.88)
+        button.strokeColor = SKColor(red: 0.72, green: 0.57, blue: 0.28, alpha: 0.68)
+        button.lineWidth = 1.2
+        button.zPosition = 200
+        let label = SKLabelNode(fontNamed: "AvenirNext-Medium")
+        label.name = closeButtonName
+        label.text = "Kembali"
+        label.fontSize = 12
+        label.fontColor = SKColor(red: 0.86, green: 0.78, blue: 0.58, alpha: 1)
+        label.verticalAlignmentMode = .center
+        button.addChild(label)
+        addChild(button)
+    }
+
+    func closeBookIfNeeded(at point: CGPoint) -> Bool {
+        guard onClose != nil else { return false }
+        let tappedClose = nodes(at: point).contains { node in
+            var current: SKNode? = node
+            while let inspected = current {
+                if inspected.name == closeButtonName { return true }
+                current = inspected.parent
+            }
+            return false
+        }
+        if tappedClose {
+            onClose?()
+        }
+        return tappedClose
     }
 
     private func updateHUD() {

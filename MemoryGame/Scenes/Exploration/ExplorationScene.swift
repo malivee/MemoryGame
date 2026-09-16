@@ -207,6 +207,7 @@ final class ExplorationScene: SKScene {
         stickKnob.position = stickCenter; stickKnob.fillColor = SKColor(white: 1, alpha: 0.32)
         stickKnob.strokeColor = .clear; hud.addChild(stickKnob)
         interactionButton = hud.storyButton("Interaksi", name: "interact", at: CGPoint(x: 902, y: 55), width: 145)
+        hud.storyButton("Buku", name: "book", at: CGPoint(x: 905, y: 111), width: 118)
     }
     private func say(_ text: String, duration: TimeInterval = 4) {
         toast?.removeFromParent()
@@ -397,6 +398,19 @@ final class ExplorationScene: SKScene {
         photo.scaleMode = .resizeFill
         view?.presentScene(photo, transition: .fade(withDuration: 0.35))
     }
+    private func openBook() {
+        arthur.route.removeAll()
+        stickVector = .zero
+        stickTouch = nil
+        stickKnob.position = stickCenter
+        let book = BookScene(size: size)
+        book.scaleMode = .resizeFill
+        book.onClose = { [weak self] in
+            guard let self else { return }
+            self.view?.presentScene(self, transition: .fade(withDuration: 0.30))
+        }
+        view?.presentScene(book, transition: .fade(withDuration: 0.30))
+    }
     private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }
     // Mengubah jarak sentuhan dari pusat stik menjadi arah dan kekuatan gerak terbatas.
     private func updateStick(_ touch: UITouch) {
@@ -414,6 +428,7 @@ final class ExplorationScene: SKScene {
         let point = touch.location(in: stage)
         let names = Set(hud.nodes(at: touch.location(in: hud)).compactMap(\.name))
         if names.contains("photo") { returnToPhoto(); return }
+        if names.contains("book") { openBook(); return }
         if names.contains("interact") { interact(); return }
         if distance(point, stickCenter) < 70 {
             stickTouch = touch; arthur.route.removeAll(); updateStick(touch); return

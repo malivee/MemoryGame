@@ -1,5 +1,5 @@
 // Penjelasan file: GameViewController.swift
-// Menghubungkan layar UIKit dengan SpriteKit dan langsung menampilkan GameScene.
+// Menghubungkan layar UIKit dengan SpriteKit dan memulai cutscene sebelum GameScene.
 // Mengatur ukuran scene, orientasi landscape, serta tampilan status bar dan indikator debug.
 
 //
@@ -18,7 +18,7 @@ class GameViewController: UIViewController {
         super.viewDidLoad()
         
         if let view = self.view as? SKView {
-            let scene = GameScene(size: view.bounds.size)
+            let scene = OpeningCutsceneScene(size: view.bounds.size)
             scene.scaleMode = .resizeFill
             view.presentScene(scene)
             

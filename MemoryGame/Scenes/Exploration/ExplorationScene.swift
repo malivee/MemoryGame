@@ -210,6 +210,11 @@ final class ExplorationScene: SKScene {
             npc.position = point
             friendNodes[friend] = npc
             world.addChild(npc)
+            if progress.joined.contains(friend) {
+                npc.setStatusBadge(icon: "✓", text: "Siap Ikut", color: SKColor(red: 0.42, green: 0.82, blue: 0.45, alpha: 1.0))
+            } else if progress.hasBook {
+                npc.setStatusBadge(icon: "💬", text: "Ajak Ikut", color: SKColor(red: 0.95, green: 0.82, blue: 0.42, alpha: 1.0))
+            }
         }
         if let marker = level.marker, worldInstalled(.oldPath) {
             let post = SKShapeNode(rectOf: CGSize(width: 13, height: 31), cornerRadius: 2)
@@ -259,13 +264,266 @@ final class ExplorationScene: SKScene {
         }
     }
     private func addBook(at point: CGPoint) {
-        let book = SKShapeNode(rectOf: CGSize(width: 32, height: 24), cornerRadius: 2)
-        book.fillColor = SKColor(red: 0.84, green: 0.76, blue: 0.56, alpha: 1)
-        book.name = "bookPickup"
-        book.position = point; book.zPosition = 15
-        world.addChild(book)
-        bookPickupNode = book
-        book.storyLabel("Buku lama", at: CGPoint(x: 0, y: 30), size: 11)
+        let bookContainer = SKNode()
+        bookContainer.name = "bookPickup"
+        bookContainer.position = point
+        bookContainer.zPosition = 35
+
+        // 1. Bayangan lembut di bawah buku
+        let shadow = SKShapeNode(ellipseOf: CGSize(width: 34, height: 13))
+        shadow.fillColor = SKColor(red: 0.12, green: 0.16, blue: 0.10, alpha: 0.38)
+        shadow.strokeColor = .clear
+        shadow.position = CGPoint(x: 0, y: -6)
+        bookContainer.addChild(shadow)
+
+        // 2. Halo cahaya emas lembut berdenyut (pulsing golden aura)
+        let aura = SKShapeNode(circleOfRadius: 26)
+        aura.fillColor = SKColor(red: 1.0, green: 0.88, blue: 0.45, alpha: 0.22)
+        aura.strokeColor = SKColor(red: 1.0, green: 0.92, blue: 0.55, alpha: 0.45)
+        aura.lineWidth = 1.2
+        aura.position = CGPoint(x: 0, y: 6)
+        bookContainer.addChild(aura)
+        aura.run(.repeatForever(.sequence([
+            .group([.scale(to: 1.22, duration: 1.1), .fadeAlpha(to: 0.15, duration: 1.1)]),
+            .group([.scale(to: 0.95, duration: 1.1), .fadeAlpha(to: 0.40, duration: 1.1)])
+        ])))
+
+        // 3. Badan buku kuno (Ancient Leather Tome Carto)
+        let bookBody = SKNode()
+        bookBody.position = CGPoint(x: 0, y: 6)
+        bookContainer.addChild(bookBody)
+
+        // Sampul kulit merah marun tebal
+        let cover = SKShapeNode(rectOf: CGSize(width: 32, height: 24), cornerRadius: 4)
+        cover.fillColor = SKColor(red: 0.54, green: 0.18, blue: 0.14, alpha: 1.0)
+        cover.strokeColor = SKColor(red: 0.32, green: 0.10, blue: 0.08, alpha: 1.0)
+        cover.lineWidth = 1.5
+        bookBody.addChild(cover)
+
+        // Tumpukan kertas kuno di tepi buku
+        let pages = SKShapeNode(rectOf: CGSize(width: 5, height: 20), cornerRadius: 1.5)
+        pages.fillColor = SKColor(red: 0.96, green: 0.92, blue: 0.80, alpha: 1.0)
+        pages.strokeColor = .clear
+        pages.position = CGPoint(x: 12, y: 0)
+        bookBody.addChild(pages)
+
+        // Lambang kompas emas di sampul
+        let emblem = SKShapeNode(circleOfRadius: 5)
+        emblem.fillColor = SKColor(red: 0.96, green: 0.84, blue: 0.42, alpha: 1.0)
+        emblem.strokeColor = SKColor(red: 0.76, green: 0.58, blue: 0.22, alpha: 1.0)
+        emblem.lineWidth = 1.0
+        bookBody.addChild(emblem)
+
+        // Sudut ornamen kuningan di 4 pojok buku
+        for (cx, cy) in [(-12.0, 8.0), (-12.0, -8.0), (9.0, 8.0), (9.0, -8.0)] {
+            let corner = SKShapeNode(rectOf: CGSize(width: 3.5, height: 3.5), cornerRadius: 0.8)
+            corner.fillColor = SKColor(red: 0.94, green: 0.80, blue: 0.38, alpha: 1.0)
+            corner.strokeColor = .clear
+            corner.position = CGPoint(x: cx, y: cy)
+            bookBody.addChild(corner)
+        }
+
+        // Pita pembatas merah menjuntai
+        let ribbon = SKShapeNode(rectOf: CGSize(width: 3, height: 8), cornerRadius: 1)
+        ribbon.fillColor = SKColor(red: 0.85, green: 0.22, blue: 0.22, alpha: 1.0)
+        ribbon.strokeColor = .clear
+        ribbon.position = CGPoint(x: 0, y: -14)
+        bookBody.addChild(ribbon)
+
+        // 4. Animasi melayang naik-turun lembut (floating bobbing)
+        bookBody.run(.repeatForever(.sequence([
+            .moveBy(x: 0, y: 4.5, duration: 1.2),
+            .moveBy(x: 0, y: -4.5, duration: 1.2)
+        ])))
+
+        // 5. Partikel kilau bintang kecil melayang
+        for i in 0..<3 {
+            let spark = SKLabelNode(text: "✨")
+            spark.fontSize = 11
+            spark.alpha = 0
+            spark.position = CGPoint(x: (i == 0 ? -16 : (i == 1 ? 16 : 0)), y: (i == 2 ? 18 : 6))
+            bookContainer.addChild(spark)
+            spark.run(.repeatForever(.sequence([
+                .wait(forDuration: Double(i) * 0.45),
+                .group([.fadeIn(withDuration: 0.5), .moveBy(x: 0, y: 8, duration: 0.8), .scale(to: 1.2, duration: 0.8)]),
+                .fadeOut(withDuration: 0.4),
+                .moveBy(x: 0, y: -8, duration: 0),
+                .scale(to: 0.8, duration: 0),
+                .wait(forDuration: 1.0)
+            ])))
+        }
+
+        // 6. Label mengambang bergaya storybook
+        let labelBg = SKShapeNode(rectOf: CGSize(width: 96, height: 20), cornerRadius: 10)
+        labelBg.fillColor = SKColor(red: 0.12, green: 0.16, blue: 0.14, alpha: 0.88)
+        labelBg.strokeColor = SKColor(red: 0.92, green: 0.82, blue: 0.52, alpha: 0.6)
+        labelBg.lineWidth = 1.0
+        labelBg.position = CGPoint(x: 0, y: 32)
+        bookContainer.addChild(labelBg)
+
+        let label = SKLabelNode(text: "📖 Buku Tua")
+        label.fontName = "AvenirNext-Bold"
+        label.fontSize = 10
+        label.fontColor = SKColor(red: 0.98, green: 0.94, blue: 0.82, alpha: 1.0)
+        label.verticalAlignmentMode = .center
+        labelBg.addChild(label)
+
+        world.addChild(bookContainer)
+        bookPickupNode = bookContainer
+    }
+
+    // MARK: - Banner Cerita & Kartu Perayaan (Carto Storyboards)
+
+    private func showAnnouncementBanner(icon: String, title: String, subtitle: String) {
+        let banner = SKNode()
+        banner.zPosition = 500
+        banner.position = CGPoint(x: size.width / 2, y: size.height - 76)
+
+        let bannerWidth = min(size.width - 40, 520)
+        let bg = SKShapeNode(rectOf: CGSize(width: bannerWidth, height: 50), cornerRadius: 25)
+        bg.fillColor = SKColor(red: 0.08, green: 0.10, blue: 0.12, alpha: 0.96)
+        bg.strokeColor = SKColor(red: 0.95, green: 0.82, blue: 0.42, alpha: 0.90)
+        bg.lineWidth = 1.6
+        banner.addChild(bg)
+
+        let iconLabel = SKLabelNode(text: icon)
+        iconLabel.fontSize = 22
+        iconLabel.position = CGPoint(x: -bannerWidth / 2 + 28, y: -8)
+        banner.addChild(iconLabel)
+
+        let titleLabel = SKLabelNode(text: title)
+        titleLabel.fontName = "AvenirNext-Bold"
+        titleLabel.fontSize = 13.5
+        titleLabel.fontColor = SKColor(red: 0.98, green: 0.92, blue: 0.65, alpha: 1.0)
+        titleLabel.horizontalAlignmentMode = .left
+        titleLabel.position = CGPoint(x: -bannerWidth / 2 + 54, y: 4)
+        banner.addChild(titleLabel)
+
+        let subLabel = SKLabelNode(text: subtitle)
+        subLabel.fontName = "AvenirNext-Medium"
+        subLabel.fontSize = 10.5
+        subLabel.fontColor = SKColor(red: 0.92, green: 0.92, blue: 0.88, alpha: 0.85)
+        subLabel.horizontalAlignmentMode = .left
+        subLabel.position = CGPoint(x: -bannerWidth / 2 + 54, y: -14)
+        banner.addChild(subLabel)
+
+        banner.setScale(0.7)
+        banner.alpha = 0
+        hud.addChild(banner)
+
+        let popIn = SKAction.group([
+            SKAction.scale(to: 1.0, duration: 0.35),
+            SKAction.fadeIn(withDuration: 0.25)
+        ])
+        popIn.timingMode = .easeOut
+
+        banner.run(SKAction.sequence([
+            popIn,
+            SKAction.wait(forDuration: 4.2),
+            SKAction.group([
+                SKAction.scale(to: 0.85, duration: 0.3),
+                SKAction.fadeOut(withDuration: 0.3)
+            ]),
+            SKAction.removeFromParent()
+        ]))
+    }
+
+    private func showUnlockCard(title: String, body: String) {
+        dismissUnlockCard()
+
+        let card = SKNode()
+        card.name = "unlockCard"
+        card.zPosition = 600
+        card.position = CGPoint(x: size.width / 2, y: size.height / 2)
+
+        let cardWidth = min(size.width - 50, 480)
+        let cardHeight: CGFloat = 195
+
+        // Latar redup di belakang kartu
+        let dim = SKShapeNode(rectOf: CGSize(width: size.width * 2, height: size.height * 2))
+        dim.fillColor = SKColor(white: 0, alpha: 0.58)
+        dim.strokeColor = .clear
+        dim.name = "unlockCard"
+        card.addChild(dim)
+
+        // Kartu kertas gaya buku cerita Carto
+        let bg = SKShapeNode(rectOf: CGSize(width: cardWidth, height: cardHeight), cornerRadius: 20)
+        bg.fillColor = SKColor(red: 0.10, green: 0.12, blue: 0.14, alpha: 0.98)
+        bg.strokeColor = SKColor(red: 0.96, green: 0.84, blue: 0.45, alpha: 1.0)
+        bg.lineWidth = 2.2
+        bg.name = "unlockCard"
+        card.addChild(bg)
+
+        // Garis dekoratif dalam
+        let inner = SKShapeNode(rectOf: CGSize(width: cardWidth - 14, height: cardHeight - 14), cornerRadius: 14)
+        inner.fillColor = .clear
+        inner.strokeColor = SKColor(red: 0.72, green: 0.60, blue: 0.35, alpha: 0.45)
+        inner.lineWidth = 1.0
+        inner.name = "unlockCard"
+        card.addChild(inner)
+
+        // Judul besar berwarna emas
+        let titleLabel = SKLabelNode(text: title)
+        titleLabel.fontName = "AvenirNext-Bold"
+        titleLabel.fontSize = 17
+        titleLabel.fontColor = SKColor(red: 0.98, green: 0.88, blue: 0.48, alpha: 1.0)
+        titleLabel.position = CGPoint(x: 0, y: cardHeight / 2 - 38)
+        titleLabel.name = "unlockCard"
+        card.addChild(titleLabel)
+
+        // Teks penjelasan cerita multiline
+        let bodyLabel = hud.storyLabel(body, at: CGPoint(x: 0, y: cardHeight / 2 - 72), size: 12.5, color: SKColor(red: 0.95, green: 0.95, blue: 0.90, alpha: 0.95), width: cardWidth - 48)
+        bodyLabel.name = "unlockCard"
+        card.addChild(bodyLabel)
+
+        // Tombol Lanjutkan di bagian bawah kartu
+        let okBtn = card.storyButton("Lanjutkan Petualangan", name: "unlockCardDismiss", at: CGPoint(x: 0, y: -cardHeight / 2 + 32), width: 220)
+        okBtn.fillColor = SKColor(red: 0.28, green: 0.22, blue: 0.12, alpha: 1.0)
+        okBtn.strokeColor = SKColor(red: 0.96, green: 0.84, blue: 0.45, alpha: 1.0)
+        okBtn.lineWidth = 1.8
+
+        card.setScale(0.75)
+        card.alpha = 0
+        hud.addChild(card)
+
+        let popIn = SKAction.group([
+            SKAction.scale(to: 1.0, duration: 0.32),
+            SKAction.fadeIn(withDuration: 0.22)
+        ])
+        popIn.timingMode = .easeOut
+        card.run(popIn)
+    }
+
+    private func dismissUnlockCard() {
+        guard let card = hud.childNode(withName: "unlockCard") else { return }
+        card.run(SKAction.sequence([
+            SKAction.group([
+                SKAction.scale(to: 0.8, duration: 0.2),
+                SKAction.fadeOut(withDuration: 0.2)
+            ]),
+            SKAction.removeFromParent()
+        ]))
+    }
+
+    private func spawnCelebrationSparks(at p: CGPoint) {
+        let symbols = ["✨", "⭐", "🎉", "🌟"]
+        for i in 0..<8 {
+            let spark = SKLabelNode(text: symbols[i % symbols.count])
+            spark.fontSize = 15
+            spark.position = p
+            spark.zPosition = 80
+            world.addChild(spark)
+            let angle = CGFloat(i) * (.pi / 4.0)
+            let dist: CGFloat = 28 + CGFloat(i * 3)
+            spark.run(SKAction.sequence([
+                SKAction.group([
+                    SKAction.moveBy(x: cos(angle) * dist, y: sin(angle) * dist, duration: 0.65),
+                    SKAction.scale(to: 1.4, duration: 0.25),
+                    SKAction.fadeOut(withDuration: 0.65)
+                ]),
+                SKAction.removeFromParent()
+            ]))
+        }
     }
     // Membuat tujuan misi, tombol kembali, indikator kecurigaan, stik, dan tombol interaksi dalam layout responsif Carto.
     private func buildHUD() {
@@ -425,40 +683,128 @@ final class ExplorationScene: SKScene {
         switch target {
         case .book:
             guard let book = bookPickupNode, !progress.hasBook else { return }
-            progress.readBook()
-            PrologueStore.shared.save()
             clearNearbyInteraction()
+            HapticsService.shared.playNotification(.success)
+
+            // Arthur berbalik menghadap buku
+            let dx = book.position.x - arthur.position.x
+            arthur.visualRoot.xScale = dx >= 0 ? 1.0 : -1.0
+
+            let liftPos = CGPoint(x: arthur.position.x + (dx >= 0 ? 16 : -16), y: arthur.position.y + 22)
+
+            // Animasi dramatis pengambilan buku: melayang ke Arthur, berputar, memancarkan bintang
             book.removeAllActions()
             book.run(.sequence([
-                .group([.move(to: arthur.position, duration: 0.22),
-                        .scale(to: 0.15, duration: 0.22),
-                        .fadeOut(withDuration: 0.22)]),
+                .group([
+                    .move(to: liftPos, duration: 0.40),
+                    .scale(to: 1.35, duration: 0.40),
+                    .rotate(byAngle: 0.15, duration: 0.40)
+                ]),
+                .wait(forDuration: 0.15),
+                .group([
+                    .move(to: CGPoint(x: arthur.position.x, y: arthur.position.y + 12), duration: 0.25),
+                    .scale(to: 0.2, duration: 0.25),
+                    .fadeOut(withDuration: 0.25)
+                ]),
                 .removeFromParent()
             ]))
+
+            spawnCelebrationSparks(at: liftPos)
+            showAnnouncementBanner(icon: "📖", title: "BUKU PETA TUA DITEMUKAN!", subtitle: "Sebuah catatan tua berisikan sketsa rute di luar lembah...")
+
+            progress.readBook()
+            PrologueStore.shared.save()
             bookPickupNode = nil
-            HapticsService.shared.playNotification(.success)
             objective.text = progress.objective
-            startDialogue(PrologueDialogue.book) { [weak self] in
-                self?.say("Buku masuk ke tas. 3 keping Desa terbuka! Kembali ke puzzle dan susun rangkaiannya.", duration: 6)
+
+            // Aktifkan lencana status teman di desa menjadi "Ajak Ikut"
+            for friend in FriendID.allCases {
+                if !progress.joined.contains(friend) {
+                    friendNodes[friend]?.setStatusBadge(icon: "💬", text: "Ajak Ikut", color: SKColor(red: 0.95, green: 0.82, blue: 0.42, alpha: 1.0))
+                }
             }
+
+            // Arthur memegang buku saat dialog bercerita
+            arthur.setHoldingBook(visible: true)
+
+            run(.sequence([
+                .wait(forDuration: 0.65),
+                .run { [weak self] in
+                    guard let self else { return }
+                    self.startDialogue(PrologueDialogue.book) { [weak self] in
+                        guard let self else { return }
+                        self.arthur.setHoldingBook(visible: false)
+                        self.showUnlockCard(
+                            title: "✨ 3 KEPING DESA TERBUKA!",
+                            body: "Buku telah tersimpan di Tas! Tekan 'Tas' kapan saja untuk membacanya. Sekarang kembalilah ke puzzle foto untuk menyusun kepingan jalan menuju Desa!"
+                        )
+                    }
+                }
+            ]))
+
         case .friend(let friend):
             guard progress.hasBook else {
                 startDialogue([.init(speaker: friend.rawValue, text: "Sampai nanti, Arthur. Aku masih di desa.")])
                 return
             }
             if progress.joined.contains(friend) {
+                if let node = friendNodes[friend] {
+                    node.wave()
+                }
                 startDialogue([.init(speaker: friend.rawValue, text: "Aku sudah bersedia ikut! (\(progress.joined.count)/3)")])
                 return
             }
+
+            // Arthur dan teman saling berhadapan
+            let fNode = friendNodes[friend]
+            if let fNode = fNode {
+                let dx = fNode.position.x - arthur.position.x
+                arthur.visualRoot.xScale = dx >= 0 ? 1.0 : -1.0
+                fNode.visualRoot.xScale = dx >= 0 ? -1.0 : 1.0
+            }
+
+            // Arthur memperlihatkan buku peta
+            arthur.setHoldingBook(visible: true)
+
             progress.shownBook.insert(friend)
             PrologueStore.shared.save()
+
             startDialogue(PrologueDialogue.friend(friend)) { [weak self] in
                 guard let self else { return }
+                self.arthur.setHoldingBook(visible: false)
                 self.progress.finishConversation(with: friend)
+                PrologueStore.shared.save()
+
+                // Teman melompat gembira merayakan kesediaan ikut
+                if let fNode = self.friendNodes[friend] {
+                    fNode.celebrate()
+                    fNode.setStatusBadge(icon: "✓", text: "Siap Ikut", color: SKColor(red: 0.42, green: 0.82, blue: 0.45, alpha: 1.0))
+                }
+
+                HapticsService.shared.playNotification(.success)
+                self.showAnnouncementBanner(
+                    icon: "🎉",
+                    title: "\(friend.rawValue) Bersedia Ikut!",
+                    subtitle: "Sekarang sudah ada \(self.progress.joined.count) dari 3 teman yang siap bertualang bersama."
+                )
+
+                // Jika ketiga teman sudah bergabung semuanya (3/3)
                 if self.progress.joined.count == 3 {
-                    self.say("Semua bersedia ikut. 3 keping Bukit terbuka! Susun di puzzle untuk menuju penanda.", duration: 6)
-                } else { self.say("\(friend.rawValue) bersedia ikut.") }
+                    self.run(.sequence([
+                        .wait(forDuration: 1.2),
+                        .run { [weak self] in
+                            guard let self else { return }
+                            for f in self.friendNodes.values { f.celebrate() }
+                            self.arthur.celebrate()
+                            self.showUnlockCard(
+                                title: "🎉 SEMUA TEMAN BERGABUNG! (3/3)",
+                                body: "Keneth, Roland, dan Anneth telah bersedia ikut! 3 keping Kaki Perbukitan terbuka. Susun keping bukit di puzzle foto untuk membuka jalur menuju penanda rahasia!"
+                            )
+                        }
+                    ]))
+                }
             }
+
         case .marker:
             guard progress.joined.count == 3 else {
                 startDialogue([.init(speaker: "Arthur", text: "Aku ingin membicarakan temuan ini dengan ketiga temanku dulu.")])
@@ -471,7 +817,10 @@ final class ExplorationScene: SKScene {
             startDialogue(PrologueDialogue.marker) { [weak self] in
                 guard let self else { return }
                 self.progress.readMarker()
-                self.say("3 keping Batas Desa terbuka! Kembali ke puzzle dan susun untuk melanjutkan.", duration: 6)
+                self.showUnlockCard(
+                    title: "✨ 3 KEPING BATAS DESA TERBUKA!",
+                    body: "Penanda mengarah ke gerbang batas desa! Susun keping batas di puzzle foto, lalu berkumpullah bersama ketiga temanmu di titik kumpul."
+                )
             }
         }
     }
@@ -521,8 +870,24 @@ final class ExplorationScene: SKScene {
             .group([.scale(to: 1, duration: 0.55), .fadeAlpha(to: 1, duration: 0.55)])
         ])))
 
-        let title = target == .book ? "Ambil" : "Interaksi"
-        let width: CGFloat = target == .book ? 82 : 112
+        let title: String
+        let width: CGFloat
+        switch target {
+        case .book:
+            title = "📖 Ambil Buku"
+            width = 120
+        case .friend(let friend):
+            if progress.joined.contains(friend) {
+                title = "💬 \(friend.rawValue)"
+                width = 125
+            } else {
+                title = "✨ Ajak \(friend.rawValue)"
+                width = 135
+            }
+        case .marker:
+            title = "🧭 Penanda"
+            width = 125
+        }
         let button = root.storyButton(title, name: "contextInteract", at: CGPoint(x: 0, y: 58), width: width)
         button.fillColor = SKColor(red: 0.24, green: 0.18, blue: 0.09, alpha: 0.97)
         button.strokeColor = SKColor(red: 1, green: 0.82, blue: 0.38, alpha: 1)
@@ -725,9 +1090,13 @@ final class ExplorationScene: SKScene {
     // Mengarahkan sentuhan ke dialog, tombol, stik, atau pencarian rute menuju tanah yang diketuk.
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard !enteringMemory, !readingBook, bag == nil, let touch = touches.first else { return }
-        if dialoguePanel != nil { advanceDialogue(); return }
         let hudPoint = touch.location(in: hud)
         let names = Set(hud.nodes(at: hudPoint).compactMap(\.name))
+        if names.contains("unlockCard") || names.contains("unlockCardDismiss") {
+            dismissUnlockCard()
+            return
+        }
+        if dialoguePanel != nil { advanceDialogue(); return }
         let worldNames = Set(world.nodes(at: touch.location(in: world)).compactMap { $0.namedAncestor(prefix: "contextInteract") })
         if names.contains("photo") { returnToPhoto(); return }
         if names.contains("bag") { openBag(); return }

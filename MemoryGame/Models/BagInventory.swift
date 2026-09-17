@@ -9,7 +9,7 @@ enum BagItem: Equatable {
     var title: String {
         switch self {
         case .book: return "Buku lama"
-        case .fragment(let id): return "Keping \(JigsawCatalog.location(for: id).title)"
+        case .fragment(let id): return "Keping \(PuzzleWorld.containing(id)?.title ?? JigsawCatalog.location(for: id).title)"
         }
     }
     var category: String {

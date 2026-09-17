@@ -15,9 +15,9 @@ enum JigsawCatalog {
     static let minimumConnectedPieces = 3
     // An L-shaped opening: house above road, yard immediately to its left.
     static let starterIDs: Set<Int> = [29, 36, 37]
-    static let bookReward: Set<Int> = [0, 1, 8, 19, 20, 27, 28, 21, 22, 30, 38, 48]
-    static let friendsReward: Set<Int> = [3, 4, 11, 12, 16, 17, 18, 24, 25, 26, 2, 9]
-    static let markerReward: Set<Int> = [5, 6, 7, 13, 14, 15, 10, 23, 31, 35, 43, 44]
+    static let bookReward = PuzzleWorld.village.pieceIDs
+    static let friendsReward = PuzzleWorld.hills.pieceIDs
+    static let markerReward = PuzzleWorld.boundary.pieceIDs
 
     static func location(for id: Int) -> MemoryPiece {
         if id == dryLakeID { return .dryLake }
@@ -37,14 +37,8 @@ enum JigsawCatalog {
     }
     // Menghitung keping yang diperoleh dari misi, termasuk hadiah yang sudah dimiliki pada save lama.
     static func availableIDs(progress: PrologueProgress) -> Set<Int> {
-        var available = starterIDs
-        if progress.hasBook { available.formUnion(bookReward) }
-        if progress.joined.count == 3 { available.formUnion(friendsReward) }
-        if progress.foundMarker { available.formUnion(markerReward) }
-        if progress.leftVillage { available.formUnion(allIDs) }
-        // Already earned pieces in an older save are never confiscated.
-        available.formUnion(progress.jigsaw?.legacyGrantedIDs ?? [])
-        return available
+        PuzzleWorld.allCases.filter { $0.isUnlocked(in: progress) }
+            .reduce(into: Set<Int>()) { $0.formUnion($1.pieceIDs) }
     }
     static func legacyAvailableIDs(progress: PrologueProgress) -> Set<Int> {
         Set(allIDs.filter { id in
@@ -87,6 +81,8 @@ struct JigsawPlacement: Codable, Equatable {
 }
 
 struct JigsawProgress: Codable {
+    // Keep retired layouts from older saves without exposing locked pieces.
+    var archivedPlacements: [Int: JigsawPlacement]?
     var connectionRulesVersion: Int?
     var legacyGrantedIDs: Set<Int>?
     var placements: [Int: JigsawPlacement] = [:]
@@ -134,7 +130,9 @@ struct JigsawProgress: Codable {
                              column < PuzzleCatalog.columns - 1 ? slot + 1 : -1,
                              slot - PuzzleCatalog.columns, slot + PuzzleCatalog.columns]
             for neighbor in neighbors where (0..<JigsawCatalog.count).contains(neighbor) && !visited.contains(neighbor) {
-                guard interlocks(from: slot, to: neighbor) else { continue }
+                guard let neighborPiece = placements[neighbor],
+                      PuzzleWorld.containing(neighborPiece.id) == PuzzleWorld.containing(id),
+                      interlocks(from: slot, to: neighbor) else { continue }
                 visited.insert(neighbor); queue.append(neighbor)
             }
         }
@@ -142,32 +140,24 @@ struct JigsawProgress: Codable {
     }
     // Membuka akses hanya jika kelompok keping terpilih berisi setidaknya tiga keping.
     func canEnter(_ id: Int) -> Bool {
-        connectedIDs(to: id).count >= JigsawCatalog.minimumConnectedPieces
+        guard let world = PuzzleWorld.containing(id) else { return false }
+        return world.pieceIDs.isSubset(of: connectedIDs(to: id))
     }
 
     // Semua keping dalam satu kelompok menghasilkan kumpulan lokasi dan pintu masuk yang sama.
     func worldLocations(for id: Int) -> Set<MemoryPiece> {
         guard canEnter(id) else { return [] }
-        return Set(connectedIDs(to: id).map { JigsawCatalog.location(for: $0) })
+        return PuzzleWorld.containing(id)?.locations ?? []
     }
     func worldEntry(for id: Int, progress: PrologueProgress) -> MemoryPiece? {
-        let locations = worldLocations(for: id)
-        // Tiga keping awal selalu mewakili Rumah, termasuk setelah buku ditemukan.
-        // Dunia berikutnya memerlukan rangkaian baru atau perluasan dengan hadiah misi.
-        if locations.contains(.house), connectedIDs(to: id).isSubset(of: JigsawCatalog.starterIDs) {
-            return .house
-        }
-        let priority: [MemoryPiece]
-        if !progress.hasBook { priority = [.house, .yard, .villageRoad] }
-        else if progress.joined.count < 3 { priority = [.yard, .villageRoad, .garden, .house] }
-        else { priority = [.boundary, .oldPath, .mountain, .lake, .dryLake] }
-        return (priority + MemoryPiece.allCases).first { locations.contains($0) }
+        guard let world = PuzzleWorld.containing(id), world.isUnlocked(in: progress), canEnter(id) else { return nil }
+        return world.entry
     }
 
     var installedIDs: Set<Int> { Set(placements.values.map(\.id)) }
     var solved: Bool {
-        placements.count == JigsawCatalog.count && (0..<JigsawCatalog.count).allSatisfy {
-            placements[$0] == JigsawPlacement(id: $0, turns: 0)
+        PuzzleWorld.allCases.allSatisfy { world in
+            world.pieceIDs.first.map { canEnter($0) } ?? false
         }
     }
     func inventory(progress: PrologueProgress) -> [Int] {
@@ -237,6 +227,14 @@ extension PrologueProgress {
                 }
                 existing.connectionRulesVersion = 1
             }
+            let available = JigsawCatalog.availableIDs(progress: self)
+            let retired = existing.placements.filter { !available.contains($0.value.id) }
+            if !retired.isEmpty {
+                var archive = existing.archivedPlacements ?? [:]
+                archive.merge(retired) { original, _ in original }
+                existing.archivedPlacements = archive
+                existing.placements = existing.placements.filter { available.contains($0.value.id) }
+            }
             jigsaw = existing
             synchronizeJigsaw()
             return
@@ -248,7 +246,7 @@ extension PrologueProgress {
             state.rotations[JigsawCatalog.primaryID(for: location)] = rotations[location] ?? 0
         }
         if assembled && leftVillage {
-            for id in 0..<JigsawCatalog.count { state.placements[id] = JigsawPlacement(id: id, turns: 0) }
+            for id in PuzzleWorld.allPieceIDs { state.placements[id] = JigsawPlacement(id: id, turns: 0) }
         } else {
             // Upgrade the previous nine-tile save without erasing story progress.
             // Each installed location becomes one matching fragment in the new grid.
@@ -262,18 +260,17 @@ extension PrologueProgress {
             }
         }
         jigsaw = state
-        synchronizeJigsaw()
+        prepareJigsaw()
     }
     // Menerjemahkan kelompok keping yang bisa dimasuki menjadi lokasi terbuka dan status penyelesaian cerita.
     func synchronizeJigsaw() {
         guard let jigsaw else { return }
         placements.removeAll()
-        for location in MemoryPiece.allCases {
-            let candidates = jigsaw.placements.values.filter { JigsawCatalog.location(for: $0.id) == location && jigsaw.canEnter($0.id) }.sorted { $0.id < $1.id }
-            let driver = candidates.first { $0.id == jigsaw.locationDrivers[location] } ?? candidates.first
-            if let driver {
-                placements[location.slot] = PhotoPlacement(piece: location, turns: driver.turns)
-                rotations[location] = driver.turns
+        for world in PuzzleWorld.allCases where world.isUnlocked(in: self) {
+            guard let id = world.pieceIDs.first, jigsaw.canEnter(id) else { continue }
+            for location in world.locations {
+                placements[location.slot] = PhotoPlacement(piece: location, turns: 0)
+                rotations[location] = 0
             }
         }
         assembled = leftVillage && jigsaw.solved

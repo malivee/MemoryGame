@@ -66,14 +66,20 @@ final class PrologueProgress: Codable {
         if assembled { return "Kenangan tersusun" }
         if !hasBook {
             if let jigsaw, !jigsaw.placements.values.contains(where: { JigsawCatalog.location(for: $0.id) == .house && jigsaw.canEnter($0.id) }) {
-                return "Taruh 3 keping berdampingan di mana saja untuk membuka rumah."
+                return "Susun 3 keping Rumah sesuai gambar untuk membuka map pertama."
             }
             return "Masuk ke rumah dan temukan buku lama."
         }
-        if joined.count < 3 { return "Tunjukkan buku kepada Keneth, Roland, dan Anneth (\(joined.count)/3)." }
-        if !foundMarker { return "Cari penanda jalan di kaki gunung." }
-        if !leftVillage { return "Berkumpul, lalu bawa keempat anak melewati batas desa." }
-        return "Rangkai 48 keping jigsaw sampai foto utuh."
+        if joined.count < 3 {
+            return installed(.yard) ? "Desa: tunjukkan buku kepada ketiga teman (\(joined.count)/3)." : "3 keping Desa terbuka! Susun untuk masuk ke map berikutnya."
+        }
+        if !foundMarker {
+            return installed(.oldPath) ? "Bukit: cari dan baca penanda jalan." : "3 keping Bukit terbuka! Susun untuk mencari penanda jalan."
+        }
+        if !leftVillage {
+            return installed(.boundary) ? "Batas Desa: berkumpul, lalu keluar bersama keempat anak." : "3 keping Batas Desa terbuka! Susun untuk melanjutkan perjalanan."
+        }
+        return "Lengkapi keempat rangkaian map, masing-masing 3 keping."
     }
     func placement(of piece: MemoryPiece) -> PhotoPlacement? {
         placements.values.first { $0.piece == piece }

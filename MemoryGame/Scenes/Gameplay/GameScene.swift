@@ -62,7 +62,7 @@ final class GameScene: SKScene {
         board = CGRect(x: -470, y: -182, width: 600, height: 400)
         boardScale = board.width / PuzzleCatalog.canvasWidth
         cell = CGSize(width: board.width / CGFloat(PuzzleCatalog.columns), height: board.height / CGFloat(PuzzleCatalog.rows))
-        canvas.storyLabel("KEPING KENANGAN  ·  JIGSAW 6 × 8", at: CGPoint(x: -110, y: 275), size: 22)
+        canvas.storyLabel("KEPING KENANGAN  ·  3 KEPING PER MAP", at: CGPoint(x: -110, y: 275), size: 22)
         canvas.storyLabel(progress.objective, at: CGPoint(x: -110, y: 243), size: 13, width: 760)
         let backing = SKShapeNode(rect: board, cornerRadius: 4)
         backing.fillColor = SKColor(white: 1, alpha: 0.025)
@@ -85,14 +85,16 @@ final class GameScene: SKScene {
         canvas.storyLabel("\(inventoryPage + 1) / \(pages)", at: CGPoint(x: 330, y: -215), size: 14)
         canvas.storyButton("›", name: "nextPage", at: CGPoint(x: 416, y: -215), width: 48)
         let installed = state.placements.count
-        canvas.storyLabel("\(installed) / 48 terpasang · Sambungkan gambar dengan benar · 3 keping untuk Jump In.",
+        canvas.storyLabel("\(installed) / \(JigsawCatalog.availableIDs(progress: progress).count) keping terbuka terpasang · Susun 3 keping dari map yang sama.",
                           at: CGPoint(x: -175, y: -204), size: 12, color: .lightGray, width: 660)
         let selectedText: String
         if let id = selected, let entry = state.worldEntry(for: id, progress: progress) {
-            let number = (worldGroups.firstIndex(where: { $0.contains(id) }) ?? 0) + 1
+            let number = (PuzzleWorld.containing(id)?.rawValue ?? 0) + 1
             selectedText = "Dipilih: Dunia \(number) · \(worldName(entry)) · \(state.connectedIDs(to: id).count) keping · Siap masuk"
         } else {
-            selectedText = "Ketuk kelompok atau label dunia untuk memilih tujuan"
+            if let id = selected, let world = PuzzleWorld.containing(id) {
+                selectedText = "Map \(world.rawValue + 1) · \(world.title) · Sambungan \(state.connectedIDs(to: id).count)/3"
+            } else { selectedText = "Pilih keping atau rangkaian map yang ingin dimasuki" }
         }
         canvas.storyLabel(selectedText, at: CGPoint(x: -170, y: -232), size: 14)
         canvas.storyButton("Putar 90°", name: "rotate", at: CGPoint(x: -310, y: -274))
@@ -119,6 +121,7 @@ final class GameScene: SKScene {
         return result
     }
     private func worldName(_ entry: MemoryPiece) -> String {
+        if entry == .boundary { return "Batas Desa" }
         switch entry.region {
         case .house: return "Rumah"
         case .village: return "Desa"
@@ -134,8 +137,9 @@ final class GameScene: SKScene {
     // Label dapat diketuk untuk memilih seluruh dunia. Nama dan nomor tetap membedakan
     // kelompok meskipun warnanya mirip atau pengguna sulit membedakan warna.
     private func addWorldLabels() {
-        for (index, group) in worldGroups.enumerated() {
+        for group in worldGroups {
             guard let id = group.min(), let entry = state.worldEntry(for: id, progress: progress) else { continue }
+            let index = PuzzleWorld.containing(id)?.rawValue ?? 0
             var bounds = CGRect.null
             for member in group {
                 if let tile = tiles[member] { bounds = bounds.union(tile.calculateAccumulatedFrame()) }
@@ -226,7 +230,7 @@ final class GameScene: SKScene {
         photo.name = "assembled"; photo.size = board.size
         photo.position = CGPoint(x: board.midX, y: board.midY); photo.zPosition = 100; photo.alpha = animated ? 0 : 1
         canvas.addChild(photo); photo.run(.fadeIn(withDuration: 1.5))
-        let caption = canvas.storyLabel("Kenangan tersusun · 48 keping", at: CGPoint(x: board.midX, y: -232), size: 21)
+        let caption = canvas.storyLabel("Kenangan tersusun · 4 map · 12 keping", at: CGPoint(x: board.midX, y: -232), size: 21)
         caption.zPosition = 101
         for tile in tiles.values { tile.run(.sequence([.wait(forDuration: 1.5), .fadeOut(withDuration: 0.3)])) }
     }
@@ -235,7 +239,7 @@ final class GameScene: SKScene {
         guard !enteringMemory, let view else { return }
         guard let id = selected else { message("Pilih keping dari rangkaian yang ingin dimasuki."); return }
         guard state.canEnter(id) else {
-            message("Susun minimal 3 keping sesuai gambar dan putar hingga tegak.")
+            message("Susun 3 keping dari map yang sama sesuai gambar dan putar hingga tegak.")
             return
         }
         guard let entry = state.worldEntry(for: id, progress: progress) else { return }

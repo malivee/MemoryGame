@@ -263,17 +263,69 @@ final class ExplorationScene: SKScene {
         dialogue = lines; dialogueIndex = 0; dialogueCompletion = completion
         showDialoguePage()
     }
+    // Mencari posisi karakter pembicara di koordinat dunia (world space)
+    private func resolveSpeakerPosition(named speaker: String) -> CGPoint {
+        if speaker == "Arthur" {
+            return arthur.position
+        }
+        if speaker == "Buku lama" {
+            return level.book ?? arthur.position
+        }
+        if speaker == "Penanda" {
+            return level.marker ?? arthur.position
+        }
+        // Cek teman yang sudah mengikuti Arthur sebagai companion
+        if let companion = companions.first(where: { $0.title == speaker }) {
+            return companion.position
+        }
+        // Cek teman yang masih berdiri di titik level
+        for friend in FriendID.allCases where friend.rawValue == speaker {
+            if let point = level.friends[friend] {
+                return point
+            }
+        }
+        return arthur.position
+    }
+
     private func showDialoguePage() {
         dialoguePanel?.removeFromParent()
-        let panel = SKShapeNode(rect: CGRect(x: 145, y: 80, width: 710, height: 155), cornerRadius: 15)
-        panel.fillColor = SKColor(red: 0.08, green: 0.13, blue: 0.15, alpha: 0.98)
-        panel.strokeColor = SKColor(red: 0.76, green: 0.69, blue: 0.49, alpha: 1)
-        panel.zPosition = 300
         let line = dialogue[dialogueIndex]
-        panel.storyLabel(line.speaker, at: CGPoint(x: 500, y: 207), size: 18, color: SKColor(red: 0.92, green: 0.80, blue: 0.50, alpha: 1))
-        panel.storyLabel(line.text, at: CGPoint(x: 500, y: 156), size: 17, width: 640)
-        panel.storyLabel("Ketuk untuk lanjut  ·  \(dialogueIndex + 1)/\(dialogue.count)", at: CGPoint(x: 500, y: 102), size: 12, color: .lightGray)
-        hud.addChild(panel); dialoguePanel = panel
+
+        // 1. Dapatkan posisi pembicara dalam koordinat panggung (HUD/Stage)
+        let speakerWorldPos = resolveSpeakerPosition(named: line.speaker)
+        let speakerScreenX = speakerWorldPos.x + world.position.x
+        let speakerScreenY = speakerWorldPos.y + world.position.y
+
+        // 2. Tentukan posisi Speech Bubble (clamped di dalam batas layar 1000 x 600)
+        let bubbleX = min(max(speakerScreenX, 220), 780)
+        var bubbleY = speakerScreenY + 115
+        var tailOffsetY: CGFloat = -58
+
+        // Jika karakter berada terlalu dekat ke atas layar, posisikan balon di bawahnya
+        if bubbleY > 500 {
+            bubbleY = max(speakerScreenY - 115, 110)
+            tailOffsetY = 58
+        }
+
+        let tailOffsetX = min(max(speakerScreenX - bubbleX, -130), 130)
+        let tailTip = CGPoint(x: tailOffsetX, y: tailOffsetY)
+
+        // 3. Konfigurasi SpeechBubbleNode bergaya krayon lilin hitam
+        let config = SpeechBubbleConfig(
+            text: line.text,
+            speaker: line.speaker,
+            pageIndicator: "Ketuk untuk lanjut  ·  \(dialogueIndex + 1)/\(dialogue.count)",
+            fontSize: 18,
+            padding: CGSize(width: 32, height: 20),
+            maxWidth: 440
+        )
+
+        let bubble = SpeechBubbleNode(config: config, tailTipOffset: tailTip)
+        bubble.position = CGPoint(x: bubbleX, y: bubbleY)
+        bubble.zPosition = 350
+        hud.addChild(bubble)
+        dialoguePanel = bubble
+        bubble.popIn()
     }
     // Melanjutkan halaman; setelah halaman terakhir, menjalankan hadiah atau perubahan cerita lalu menyimpan.
     private func advanceDialogue() {
@@ -308,27 +360,39 @@ final class ExplorationScene: SKScene {
             HapticsService.shared.playNotification(.success)
             objective.text = progress.objective
             startDialogue(PrologueDialogue.book) { [weak self] in
-                self?.say("Buku masuk ke tas. Keping baru: kebun, pegunungan, cekungan kering.", duration: 6)
+                self?.say("Buku masuk ke tas. 3 keping Desa terbuka! Kembali ke puzzle dan susun rangkaiannya.", duration: 6)
             }
         case .friend(let friend):
-            guard progress.hasBook else { say("\(friend.rawValue): Sampai nanti, Arthur. Aku masih di desa."); return }
-            if progress.joined.contains(friend) { say("\(friend.rawValue) sudah bersedia ikut. (\(progress.joined.count)/3)"); return }
+            guard progress.hasBook else {
+                startDialogue([.init(speaker: friend.rawValue, text: "Sampai nanti, Arthur. Aku masih di desa.")])
+                return
+            }
+            if progress.joined.contains(friend) {
+                startDialogue([.init(speaker: friend.rawValue, text: "Aku sudah bersedia ikut! (\(progress.joined.count)/3)")])
+                return
+            }
             progress.shownBook.insert(friend)
             PrologueStore.shared.save()
             startDialogue(PrologueDialogue.friend(friend)) { [weak self] in
                 guard let self else { return }
                 self.progress.finishConversation(with: friend)
                 if self.progress.joined.count == 3 {
-                    self.say("Semua bersedia ikut. Keping danau dan jalur lama masuk inventori.", duration: 6)
+                    self.say("Semua bersedia ikut. 3 keping Bukit terbuka! Susun di puzzle untuk menuju penanda.", duration: 6)
                 } else { self.say("\(friend.rawValue) bersedia ikut.") }
             }
         case .marker:
-            guard progress.joined.count == 3 else { say("Arthur: Aku ingin membicarakan temuan ini dengan ketiga temanku dulu."); return }
-            if progress.foundMarker { say("Penanda mengarah ke batas desa. Berkumpul bersama di sana."); return }
+            guard progress.joined.count == 3 else {
+                startDialogue([.init(speaker: "Arthur", text: "Aku ingin membicarakan temuan ini dengan ketiga temanku dulu.")])
+                return
+            }
+            if progress.foundMarker {
+                startDialogue([.init(speaker: "Arthur", text: "Penanda mengarah ke batas desa. Berkumpul bersama di sana.")])
+                return
+            }
             startDialogue(PrologueDialogue.marker) { [weak self] in
                 guard let self else { return }
                 self.progress.readMarker()
-                self.say("Keping batas desa diperoleh. Kembali ke foto dan pasang untuk melanjutkan.", duration: 6)
+                self.say("3 keping Batas Desa terbuka! Kembali ke puzzle dan susun untuk melanjutkan.", duration: 6)
             }
         }
     }
@@ -479,7 +543,7 @@ final class ExplorationScene: SKScene {
                 .init(speaker: "Roland", text: "Kita semua di sini. Sekarang ke mana?"),
                 .init(speaker: "Arthur", text: "Kita cari tahu bersama. Ini baru awal.")
             ]) { [weak self] in
-                self?.say("Keping penutup foto diperoleh. Kembali ke foto untuk merangkai kenangan utuh.", duration: 7)
+                self?.say("Keempat map selesai. Kembali ke puzzle untuk melihat kenangan utuh.", duration: 7)
             }
         } else if atExit.contains("Arthur") && warningCooldown == 0 {
             say("Tunggu teman merapat di titik keluar (\(atExit.count)/4).")

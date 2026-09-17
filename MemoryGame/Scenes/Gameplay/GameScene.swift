@@ -61,16 +61,10 @@ final class GameScene: SKScene {
         backing.strokeColor = SKColor(white: 1, alpha: 0.28)
         backing.lineWidth = 1.5
         canvas.addChild(backing)
-        // Neutral cell centres help dropping; they disclose no image or edge solution.
-        for slot in 0..<JigsawCatalog.count {
-            let dot = SKShapeNode(circleOfRadius: 1)
-            dot.position = center(slot); dot.strokeColor = .clear
-            dot.fillColor = SKColor(white: 1, alpha: 0.12)
-            canvas.addChild(dot)
-        }
         for (slot, placement) in state.placements.sorted(by: { $0.key < $1.key }) {
             addTile(placement.id, at: center(slot), inInventory: false)
         }
+        addWorldLabels()
         let inventory = state.inventory(progress: progress)
         let pages = max(1, (inventory.count + pageSize - 1) / pageSize)
         inventoryPage = min(inventoryPage, pages - 1)
@@ -83,20 +77,73 @@ final class GameScene: SKScene {
         canvas.storyLabel("\(inventoryPage + 1) / \(pages)", at: CGPoint(x: 330, y: -215), size: 14)
         canvas.storyButton("›", name: "nextPage", at: CGPoint(x: 416, y: -215), width: 48)
         let installed = state.placements.count
-        canvas.storyLabel("\(installed) / 48 terpasang · Taruh di mana saja · Dekatkan 3 keping lewat sisi, lalu Masuk.",
+        canvas.storyLabel("\(installed) / 48 terpasang · Sambungkan gambar dengan benar · 3 keping untuk Jump In.",
                           at: CGPoint(x: -175, y: -204), size: 12, color: .lightGray, width: 660)
-        let selectedText = selected.map {
-            "\(JigsawCatalog.location(for: $0).title) · \((state.rotations[$0] ?? 0) * 90)° · Sambungan \(state.connectedIDs(to: $0).count)/3"
-        } ?? "Pilih keping dari rangkaian yang ingin dimasuki"
+        let selectedText: String
+        if let id = selected, let entry = state.worldEntry(for: id, progress: progress) {
+            let number = (worldGroups.firstIndex(where: { $0.contains(id) }) ?? 0) + 1
+            selectedText = "Dipilih: Dunia \(number) · \(worldName(entry)) · \(state.connectedIDs(to: id).count) keping · Siap masuk"
+        } else {
+            selectedText = "Ketuk kelompok atau label dunia untuk memilih tujuan"
+        }
         canvas.storyLabel(selectedText, at: CGPoint(x: -170, y: -232), size: 14)
         canvas.storyButton("Putar 90°", name: "rotate", at: CGPoint(x: -310, y: -274))
         canvas.storyButton("Simpan", name: "store", at: CGPoint(x: -180, y: -274))
-        let ready = selected.map { state.canEnter($0) } ?? false
-        let enterButton = canvas.storyButton(ready ? "Masuk" : "Terkunci", name: "enter", at: CGPoint(x: -50, y: -274))
+        let destination = selected.flatMap { state.worldEntry(for: $0, progress: progress) }
+        let ready = destination != nil
+        let enterTitle = destination.map { "Masuk " + worldName($0) } ?? "Terkunci"
+        let enterButton = canvas.storyButton(enterTitle, name: "enter", at: CGPoint(x: -50, y: -274))
         enterButton.alpha = ready ? 1 : 0.42
         canvas.storyButton("Mulai ulang", name: "restart", at: CGPoint(x: 330, y: -274), width: 140)
         if confirmingRestart { addRestartConfirmation() }
         if progress.assembled && revealComplete { showAssembled(animated: false) }
+    }
+    // Kelompok dihitung dari sambungan gambar yang valid, bukan kedekatan visual saja.
+    private var worldGroups: [Set<Int>] {
+        var visited: Set<Int> = []
+        var result: [Set<Int>] = []
+        for id in state.installedIDs.sorted() where !visited.contains(id) {
+            let group = state.connectedIDs(to: id)
+            visited.formUnion(group)
+            if group.count >= JigsawCatalog.minimumConnectedPieces { result.append(group) }
+        }
+        return result
+    }
+    private func worldName(_ entry: MemoryPiece) -> String {
+        switch entry.region {
+        case .house: return "Rumah"
+        case .village: return "Desa"
+        case .foothills: return "Bukit"
+        }
+    }
+    private func worldColor(_ id: Int) -> SKColor {
+        // Warna menunjukkan pilihan aktif, bukan identitas dunia yang berbeda.
+        let active = selected.map { state.connectedIDs(to: id).contains($0) } ?? false
+        return active ? SKColor(red: 1, green: 0.53, blue: 0.15, alpha: 1)
+            : SKColor(white: 1, alpha: 0.72)
+    }
+    // Label dapat diketuk untuk memilih seluruh dunia. Nama dan nomor tetap membedakan
+    // kelompok meskipun warnanya mirip atau pengguna sulit membedakan warna.
+    private func addWorldLabels() {
+        for (index, group) in worldGroups.enumerated() {
+            guard let id = group.min(), let entry = state.worldEntry(for: id, progress: progress) else { continue }
+            var bounds = CGRect.null
+            for member in group {
+                if let tile = tiles[member] { bounds = bounds.union(tile.calculateAccumulatedFrame()) }
+            }
+            let active = selected.map { group.contains($0) } ?? false
+            let text = "\(active ? "✓ " : "")\(index + 1) · \(worldName(entry)) · \(group.count) keping"
+            let y = bounds.minY - 18 >= board.minY + 15 ? bounds.minY - 18 : bounds.maxY + 18
+            let badge = SKShapeNode(rectOf: CGSize(width: 168, height: 26), cornerRadius: 8)
+            badge.position = CGPoint(x: min(board.maxX - 86, max(board.minX + 86, bounds.midX)),
+                                     y: min(board.maxY - 15, max(board.minY + 15, y)))
+            badge.name = "world-\(id)"; badge.zPosition = 60
+            badge.fillColor = SKColor(red: 0.07, green: 0.12, blue: 0.14, alpha: 0.96)
+            badge.strokeColor = worldColor(id); badge.lineWidth = active ? 1.4 : 0.7
+            let label = badge.storyLabel(text, at: .zero, size: 12, color: worldColor(id))
+            label.name = badge.name
+            canvas.addChild(badge)
+        }
     }
     private func addRestartConfirmation() {
         let shade = SKShapeNode(rectOf: CGSize(width: 990, height: 590), cornerRadius: 10)
@@ -128,8 +175,18 @@ final class GameScene: SKScene {
         var transform = CGAffineTransform(a: scale, b: 0, c: 0, d: -scale, tx: -coreX * scale, ty: coreY * scale)
         let path = JigsawOutline.path(for: data).copy(using: &transform)!
         let outline = SKShapeNode(path: path)
-        outline.strokeColor = selected == id ? SKColor(red: 0.98, green: 0.80, blue: 0.42, alpha: 1) : SKColor(white: 1, alpha: 0.58)
-        outline.lineWidth = selected == id ? 2.2 : 0.85
+        // Inventori abu-abu; sambungan siap berwarna putih tipis; pilihan di papan oranye.
+        let connected = !inInventory && state.connectedIDs(to: id).count >= 2
+        let activeGroup = !inInventory && (selected.map { state.connectedIDs(to: id).contains($0) } ?? false)
+        if inInventory {
+            outline.strokeColor = SKColor(white: selected == id ? 0.65 : 0.48, alpha: 0.85)
+        } else if activeGroup {
+            outline.strokeColor = SKColor(red: 1, green: 0.53, blue: 0.15, alpha: 1)
+        } else {
+            outline.strokeColor = connected ? SKColor(white: 1, alpha: 0.72) : SKColor(white: 0.65, alpha: 0.7)
+        }
+        outline.lineWidth = activeGroup ? 1.8 : (selected == id ? 1.2 : 0.85)
+        outline.glowWidth = 0
         outline.fillColor = .clear; outline.zPosition = 1
         tile.addChild(outline)
         canvas.addChild(tile)
@@ -169,33 +226,44 @@ final class GameScene: SKScene {
         guard !enteringMemory, let view else { return }
         guard let id = selected else { message("Pilih keping dari rangkaian yang ingin dimasuki."); return }
         guard state.canEnter(id) else {
-            message("Sambungkan minimal 3 keping lewat sisinya, lalu tekan Masuk.")
+            message("Susun minimal 3 keping sesuai gambar dan putar hingga tegak.")
             return
         }
+        guard let entry = state.worldEntry(for: id, progress: progress) else { return }
+        let locations = state.worldLocations(for: id)
+        let connected = state.connectedIDs(to: id)
         enteringMemory = true; dragPiece = nil
         progress.synchronizeJigsaw(); PrologueStore.shared.save()
         let reduced = UIAccessibility.isReduceMotionEnabled
-        let duration: TimeInterval = reduced ? 0.18 : 0.65
+        let duration: TimeInterval = reduced ? 0.22 : 1.25
         let veil = SKSpriteNode(color: SKColor(red: 0.10, green: 0.14, blue: 0.12, alpha: 1), size: size)
         veil.position = CGPoint(x: size.width / 2, y: size.height / 2); veil.alpha = 0; veil.zPosition = 500
         addChild(veil); veil.run(.fadeAlpha(to: 0.9, duration: duration))
-        if !reduced, let tile = tiles[id] {
-            let data = JigsawCatalog.data(for: id)
-            let lift = SKSpriteNode(texture: textures.texture(for: data, dryVariant: id == JigsawCatalog.dryLakeID))
-            lift.size = CGSize(width: data.width * boardScale * canvas.xScale, height: data.height * boardScale * canvas.yScale)
-            lift.position = canvas.convert(tile.position, to: self)
-            lift.zRotation = tile.zRotation; lift.zPosition = 501; addChild(lift)
-            let zoom = max(size.width / lift.size.width, size.height / lift.size.height) * 1.6
+        // Angkat seluruh rangkaian agar portal terasa berasal dari satu dunia, bukan satu keping.
+        let members = connected.compactMap { tiles[$0] }
+        let count = CGFloat(max(1, members.count))
+        let center = CGPoint(x: members.reduce(CGFloat(0)) { $0 + $1.position.x } / count,
+                             y: members.reduce(CGFloat(0)) { $0 + $1.position.y } / count)
+        let origin = canvas.convert(center, to: self)
+        if !reduced {
+            let lift = SKNode(); lift.position = origin; lift.zPosition = 501
+            lift.setScale(canvas.xScale); addChild(lift)
+            for member in members {
+                let copy = member.copy() as! SKNode
+                copy.position = CGPoint(x: member.position.x - center.x, y: member.position.y - center.y)
+                lift.addChild(copy)
+            }
             let action = SKAction.group([
                 .move(to: CGPoint(x: size.width / 2, y: size.height / 2), duration: duration),
-                .scale(to: zoom, duration: duration), .rotate(toAngle: 0, duration: duration, shortestUnitArc: true)
+                .scale(to: canvas.xScale * 2.6, duration: duration), .fadeOut(withDuration: duration)
             ])
             action.timingMode = .easeInEaseOut; lift.run(action)
-            canvas.run(.fadeAlpha(to: 0.18, duration: duration))
+            canvas.run(.fadeAlpha(to: 0.1, duration: duration))
         }
+        MemoryPortal.play(on: self, origin: origin, inward: true, duration: duration)
         run(.sequence([.wait(forDuration: duration), .run { [weak self, weak view] in
             guard let self, let view, self.view === view else { return }
-            let exploration = ExplorationScene(size: self.size, entry: JigsawCatalog.location(for: id))
+            let exploration = ExplorationScene(size: self.size, entry: entry, worldLocations: locations)
             exploration.scaleMode = .resizeFill
             let transition = SKTransition.fade(with: SKColor(red: 0.87, green: 0.83, blue: 0.68, alpha: 1), duration: reduced ? 0.18 : 0.38)
             transition.pausesIncomingScene = false; transition.pausesOutgoingScene = false
@@ -213,6 +281,10 @@ final class GameScene: SKScene {
                 selected = nil; inventoryPage = 0; confirmingRestart = false; changed()
             } else if names.contains("cancelRestart") { confirmingRestart = false; rebuild() }
             return
+        }
+        if let name = names.first(where: { $0.hasPrefix("world-") }),
+           let id = Int(name.dropFirst(6)), state.canEnter(id) {
+            selected = id; dragPiece = nil; rebuild(); return
         }
         if names.contains("previousPage") { inventoryPage = max(0, inventoryPage - 1); rebuild(); return }
         if names.contains("nextPage") {

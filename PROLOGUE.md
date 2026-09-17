@@ -17,8 +17,8 @@ The game opens directly on three loose jigsaw fragments on a 6-row × 8-column b
 - Inventory pages hold ten fragments; use ‹ / › to browse the available pieces.
 - Tap to select, then “Putar 90°”. Rotation keeps installed pieces on the board.
   “Simpan” returns the selected fragment to the inventory.
-- During exploration, side-adjacent occupied cells count as connected even when
-  their physical tabs or image content do not match. Final completion still
+- During exploration, side-adjacent occupied cells count as connected only when
+  their facing tabs and sockets match and the upright photo fragments are true neighbors. Final completion still
   requires the original photo in its correct positions and rotations.
 - Tapping a fragment only selects it, even on repeated taps. Enter exclusively
   through “Masuk”. That button stays dimmed/locked until the selected fragment
@@ -142,3 +142,26 @@ from scratch. No saved game is automatically reset.
 Validation covers one/two/three-piece gates, diagonal exclusion, row-boundary
 wrapping, bridge removal, independent components, world fog synchronization,
 solvability of the opening and every reward pack, and save migration/reload.
+
+## Shared worlds and Jump In
+
+Actual jigsaw outlines turn orange on every installed piece in a physically
+connected group of two or more. There is no rectangular group frame or cell grid.
+Jump In requires at least three upright pieces connected in the correct photo
+order, with complementary tab/socket edges. Flat edges, diagonal contact, overlapping tabs, and quarter-turned
+rectangular cells do not count. Placement is still free: incorrect arrangements
+stay on the board, but cannot open a world. Rotate or move pieces to connect them.
+
+All members of a valid group share one destination. The starter group represents
+House; mission rewards can expand it for the next world. No region travel buttons
+appear inside exploration. Mist and golden particles remain on Jump In.
+
+## Correct photo connections
+
+A connection must join actual neighbors from the source photograph, in the
+correct direction and upright rotation. Matching tabs alone are insufficient.
+The entire correct arrangement can be translated anywhere on the board; no
+absolute target cell is required for Jump In. The initial three pieces form an L,
+with piece 29 above 37 and piece 36 to the left of 37. Incorrect saved placements
+remain movable, but no longer unlock a world. Final completion still requires
+all 48 original pieces in their final cells.

@@ -1,6 +1,6 @@
 // Penjelasan file: JigsawProgress.swift
 // Mengatur 48 keping utama, varian danau kering, hadiah misi, posisi, dan rotasi keping.
-// Keping boleh berada di slot mana pun; minimal tiga slot bertetangga lewat sisi membuka akses eksplorasi.
+// Keping boleh berada di slot mana pun; minimal tiga keping dengan tonjolan dan cekungan cocok membuka akses eksplorasi.
 // Penyelesaian akhir tetap memerlukan foto yang benar. File ini juga menjembatani puzzle dengan progres cerita.
 
 import Foundation
@@ -93,7 +93,32 @@ struct JigsawProgress: Codable {
     var rotations: [Int: Int] = [:]
     var locationDrivers: [MemoryPiece: Int] = [:]
 
-    /// Connected means physically adjacent on this board, not merely discovered
+    // Sambungan harus mengikuti tetangga pada foto sumber; posisi seluruh rangkaian di papan bebas.
+    // Bentuk tepi cocok saja tidak cukup: isi foto dan orientasi juga harus benar.
+    func interlocks(from slot: Int, to neighbor: Int) -> Bool {
+        guard (0..<JigsawCatalog.count).contains(slot), (0..<JigsawCatalog.count).contains(neighbor),
+              let first = placements[slot], let second = placements[neighbor],
+              JigsawCatalog.allIDs.contains(first.id), JigsawCatalog.allIDs.contains(second.id) else { return false }
+        // Gambar harus tegak dan menyambung, bukan hanya memiliki bentuk tepi serupa.
+        guard first.turns % 4 == 0, second.turns % 4 == 0 else { return false }
+        let firstPhoto = JigsawCatalog.data(for: first.id)
+        let secondPhoto = JigsawCatalog.data(for: second.id)
+        let boardRowDelta = neighbor / PuzzleCatalog.columns - slot / PuzzleCatalog.columns
+        let boardColDelta = neighbor % PuzzleCatalog.columns - slot % PuzzleCatalog.columns
+        guard secondPhoto.row - firstPhoto.row == boardRowDelta,
+              secondPhoto.col - firstPhoto.col == boardColDelta else { return false }
+        let direction: Int
+        if neighbor == slot - 8 { direction = 0 }
+        else if neighbor == slot + 1 && slot % 8 < 7 { direction = 1 }
+        else if neighbor == slot + 8 { direction = 2 }
+        else if neighbor == slot - 1 && slot % 8 > 0 { direction = 3 }
+        else { return false }
+        let edge = JigsawCatalog.edges(for: first.id, turns: first.turns)[direction]
+        let opposite = JigsawCatalog.edges(for: second.id, turns: second.turns)[(direction + 2) % 4]
+        return edge != 0 && edge == -opposite
+    }
+
+    /// Connected means correctly ordered upright photo neighbors with matching edges, not merely discovered
     /// or belonging to the same location. Separate components unlock independently.
     // Menelusuri slot bertetangga lewat sisi; diagonal dan sambungan melintasi ujung baris tidak dihitung.
     func connectedIDs(to id: Int) -> Set<Int> {
@@ -109,7 +134,7 @@ struct JigsawProgress: Codable {
                              column < PuzzleCatalog.columns - 1 ? slot + 1 : -1,
                              slot - PuzzleCatalog.columns, slot + PuzzleCatalog.columns]
             for neighbor in neighbors where (0..<JigsawCatalog.count).contains(neighbor) && !visited.contains(neighbor) {
-                guard let piece = placements[neighbor], JigsawCatalog.canPlace(piece.id, at: neighbor) else { continue }
+                guard interlocks(from: slot, to: neighbor) else { continue }
                 visited.insert(neighbor); queue.append(neighbor)
             }
         }
@@ -118,6 +143,25 @@ struct JigsawProgress: Codable {
     // Membuka akses hanya jika kelompok keping terpilih berisi setidaknya tiga keping.
     func canEnter(_ id: Int) -> Bool {
         connectedIDs(to: id).count >= JigsawCatalog.minimumConnectedPieces
+    }
+
+    // Semua keping dalam satu kelompok menghasilkan kumpulan lokasi dan pintu masuk yang sama.
+    func worldLocations(for id: Int) -> Set<MemoryPiece> {
+        guard canEnter(id) else { return [] }
+        return Set(connectedIDs(to: id).map { JigsawCatalog.location(for: $0) })
+    }
+    func worldEntry(for id: Int, progress: PrologueProgress) -> MemoryPiece? {
+        let locations = worldLocations(for: id)
+        // Tiga keping awal selalu mewakili Rumah, termasuk setelah buku ditemukan.
+        // Dunia berikutnya memerlukan rangkaian baru atau perluasan dengan hadiah misi.
+        if locations.contains(.house), connectedIDs(to: id).isSubset(of: JigsawCatalog.starterIDs) {
+            return .house
+        }
+        let priority: [MemoryPiece]
+        if !progress.hasBook { priority = [.house, .yard, .villageRoad] }
+        else if progress.joined.count < 3 { priority = [.yard, .villageRoad, .garden, .house] }
+        else { priority = [.boundary, .oldPath, .mountain, .lake, .dryLake] }
+        return (priority + MemoryPiece.allCases).first { locations.contains($0) }
     }
 
     var installedIDs: Set<Int> { Set(placements.values.map(\.id)) }

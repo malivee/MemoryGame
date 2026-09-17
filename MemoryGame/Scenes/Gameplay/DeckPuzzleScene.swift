@@ -43,6 +43,7 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
     private var cameraOffset = CGPoint.zero
     private var gestures: [UIGestureRecognizer] = []
     private var halfWidth: CGFloat = 500
+    private var deckBounds = CGRect.zero
     private var entryVisible = false
     private var rotatingPiece: Int?
     private var rotationStart: CGFloat = 0
@@ -90,12 +91,30 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
         canvas.removeAllChildren()
         tiles.removeAll(); hitPaths.removeAll(); renderScales.removeAll()
         halfWidth = size.width / canvas.xScale / 2
-        viewport = CGRect(x: -halfWidth, y: -108, width: halfWidth * 2, height: 408)
-        board = CGRect(x: -halfWidth, y: -halfWidth * 2 / 3, width: halfWidth * 2, height: halfWidth * 4 / 3)
+        let insets = view?.safeAreaInsets ?? .zero
+        let unit = canvas.xScale
+        let halfHeight = size.height / unit / 2
+        let width = halfWidth * 2
+        let bottomPadding = insets.bottom / unit + 12
+        deckBounds = CGRect(x: -halfWidth, y: -halfHeight, width: width, height: 138 + bottomPadding)
+        viewport = CGRect(x: -halfWidth, y: deckBounds.maxY + 6, width: width,
+                          height: max(1, halfHeight - deckBounds.maxY - 6))
+        // Edge-to-edge viewport adapts to the screen; the source image stays undistorted.
+        let boardHeight = width * PuzzleCatalog.canvasHeight / PuzzleCatalog.canvasWidth
+        board = CGRect(x: -width / 2, y: -boardHeight / 2, width: width, height: boardHeight)
         boardScale = board.width / PuzzleCatalog.canvasWidth
         cell = CGSize(width: board.width / CGFloat(PuzzleCatalog.columns), height: board.height / CGFloat(PuzzleCatalog.rows))
         let crop = SKCropNode()
-        let mask = SKShapeNode(rect: viewport)
+        let shadow = SKShapeNode(rect: viewport.offsetBy(dx: 0, dy: -5).insetBy(dx: -7, dy: -7), cornerRadius: 13)
+        shadow.fillColor = SKColor(red: 0.26, green: 0.20, blue: 0.13, alpha: 0.15)
+        shadow.strokeColor = .clear
+        canvas.safeAddChild(shadow)
+        let frame = SKShapeNode(rect: viewport.insetBy(dx: -6, dy: -6), cornerRadius: 12)
+        frame.fillColor = SKColor(red: 0.48, green: 0.37, blue: 0.24, alpha: 1)
+        frame.strokeColor = SKColor(red: 0.68, green: 0.55, blue: 0.36, alpha: 1)
+        frame.lineWidth = 2
+        canvas.safeAddChild(frame)
+        let mask = SKShapeNode(rect: viewport, cornerRadius: 7)
         mask.fillColor = .white; mask.strokeColor = .clear
         crop.maskNode = mask
         canvas.safeAddChild(crop); crop.safeAddChild(boardLayer)
@@ -125,32 +144,52 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
             addTile(placement.id, at: center(slot), inInventory: false)
         }
         
-        // Ukuran deck diperkecil: height 140, posisi y disesuaikan (-250)
-        let deck = SKShapeNode(rect: CGRect(x: -halfWidth, y: -250, width: halfWidth * 2, height: 140))
+        let currentWorld = selected.flatMap { PuzzleWorld.containing($0) }
+            ?? PuzzleWorld.allCases.last(where: { $0.isUnlocked(in: progress) }) ?? .house
+        let worldBadge = SKShapeNode(rectOf: CGSize(width: 180, height: 32), cornerRadius: 16)
+        worldBadge.position = CGPoint(x: 0, y: viewport.maxY - insets.top / unit - 28)
+        worldBadge.zPosition = 100
+        worldBadge.fillColor = SKColor(red: 0.22, green: 0.25, blue: 0.22, alpha: 0.88)
+        worldBadge.strokeColor = SKColor(red: 0.81, green: 0.72, blue: 0.52, alpha: 0.6)
+        worldBadge.storyLabel(currentWorld.title, at: .zero, size: 14,
+                              color: SKColor(red: 0.96, green: 0.92, blue: 0.81, alpha: 1))
+        canvas.safeAddChild(worldBadge)
+
+        let deck = SKShapeNode(rect: deckBounds)
         deck.zPosition = 65
-        deck.fillColor = SKColor(red: 0.35, green: 0.28, blue: 0.20, alpha: 1)
+        deck.fillColor = SKColor(red: 0.25, green: 0.20, blue: 0.15, alpha: 1)
         deck.strokeColor = SKColor(red: 0.65, green: 0.52, blue: 0.35, alpha: 1)
         canvas.safeAddChild(deck)
+        let deckTitle = canvas.storyLabel("Kepingan Puzzle", at: CGPoint(x: 0, y: deckBounds.maxY - 20), size: 15,
+                                         color: SKColor(red: 0.92, green: 0.84, blue: 0.67, alpha: 1))
+        deckTitle.zPosition = 70
         
         // HUD sits above the cropped board but below a dragged piece.
         let inventory = state.inventory(progress: progress)
         
-        if inventory.isEmpty {
-            let emptyLabel = canvas.storyLabel("Semua keping sudah dipasang di papan", at: CGPoint(x: 0, y: -180), size: 14, width: 500)
-            emptyLabel.name = "emptyDeckPrompt"
-            emptyLabel.zPosition = 66
-            canvas.safeAddChild(emptyLabel)
-        } else {
+        if !inventory.isEmpty {
             let pages = max(1, (inventory.count + pageSize - 1) / pageSize)
             inventoryPage = min(inventoryPage, pages - 1)
             let page = Array(inventory.dropFirst(inventoryPage * pageSize).prefix(pageSize))
             for (index, id) in page.enumerated() {
-                let x = CGFloat(index) * 106 - CGFloat(page.count - 1) * 53
+                let safeWidth = (size.width - insets.left - insets.right) / unit - 36
+                let spacing = min(116, safeWidth / CGFloat(max(1, page.count)))
+                let x = deckBounds.midX + CGFloat(index) * spacing - CGFloat(page.count - 1) * spacing / 2
                 // Ukuran kartu dikurangi sedikit agar muat sempurna di deck baru (width: 86, height: 80)
-                let card = SKShapeNode(rectOf: CGSize(width: 86, height: 80), cornerRadius: 8)
-                card.position = CGPoint(x: x, y: -180); card.zPosition = 66
-                card.fillColor = SKColor(red: 0.48, green: 0.39, blue: 0.29, alpha: 1)
-                card.strokeColor = selected == id ? .orange : SKColor(red: 0.70, green: 0.58, blue: 0.42, alpha: 1)
+                let cardSize = CGSize(width: min(98, spacing - 12), height: 88)
+                let card = SKShapeNode(rectOf: cardSize, cornerRadius: 10)
+                card.position = CGPoint(x: x, y: deckBounds.maxY - 82); card.zPosition = 67
+                let shadow = SKShapeNode(rectOf: cardSize, cornerRadius: 10)
+                shadow.position = CGPoint(x: x, y: card.position.y - 4); shadow.zPosition = 66
+                shadow.fillColor = SKColor(white: 0, alpha: 0.28); shadow.strokeColor = .clear
+                canvas.safeAddChild(shadow)
+                card.fillColor = SKColor(red: 0.44, green: 0.37, blue: 0.28, alpha: 1)
+                card.strokeColor = selected == id ? SKColor(red: 1, green: 0.79, blue: 0.40, alpha: 1) : SKColor(red: 0.65, green: 0.54, blue: 0.37, alpha: 1)
+                card.lineWidth = selected == id ? 2.5 : 1
+                let inset = SKShapeNode(rectOf: CGSize(width: cardSize.width - 8, height: cardSize.height - 8), cornerRadius: 7)
+                inset.fillColor = .clear
+                inset.strokeColor = SKColor(white: 1, alpha: 0.08)
+                card.safeAddChild(inset)
                 canvas.safeAddChild(card)
                 addTile(id, at: card.position, inInventory: true)
             }
@@ -183,7 +222,7 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
                                                     y: min(viewport.maxY - 28, top.y + 30)), width: 180)
         button.name = "entryPrompt"
         button.zPosition = 110
-        canvas.safeAddChild(button)
+        // storyButton already attaches the button to canvas.
         // The parent and label both resolve to the entry action.
         button.children.forEach { $0.name = "enter" }
     }
@@ -214,17 +253,44 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
         // Inventori abu-abu; sambungan siap berwarna putih tipis; pilihan di papan oranye.
         let connected = !inInventory && state.connectedIDs(to: id).count >= 2
         let activeGroup = !inInventory && (selected.map { state.connectedIDs(to: id).contains($0) } ?? false)
+        let raisedGroup = activeGroup && entryVisible && rotatingPiece == nil
+            && (selected.flatMap { state.worldEntry(for: $0, progress: progress) } != nil)
         if inInventory {
             outline.strokeColor = SKColor(white: selected == id ? 0.85 : 0.65, alpha: 0.85)
+        } else if raisedGroup {
+            outline.strokeColor = SKColor(red: 1, green: 0.82, blue: 0.37, alpha: 1)
         } else if activeGroup {
             outline.strokeColor = SKColor(red: 1, green: 0.53, blue: 0.15, alpha: 1)
         } else {
             outline.strokeColor = connected ? SKColor(white: 1, alpha: 0.72) : SKColor(white: 0.65, alpha: 0.7)
         }
-        outline.lineWidth = activeGroup ? 1.8 : (selected == id ? 1.2 : 0.85)
-        outline.glowWidth = 0
+        outline.lineWidth = raisedGroup ? 4 : (activeGroup ? 1.8 : (selected == id ? 1.2 : 0.85))
+        outline.glowWidth = raisedGroup ? 2.5 : 0
         outline.fillColor = .clear; outline.zPosition = 1
         tile.safeAddChild(outline)
+        if raisedGroup {
+            // Lift the artwork equally across all three pieces, preserving their joins
+            // and the logical slot coordinates used for dragging and saving.
+            tile.zPosition = 45
+            let shadow = SKShapeNode(path: path)
+            shadow.position = CGPoint(x: 2, y: -4)
+            shadow.fillColor = SKColor(white: 0, alpha: 0.28)
+            shadow.strokeColor = SKColor(white: 0, alpha: 0.12)
+            shadow.lineWidth = 5
+            shadow.glowWidth = 3
+            shadow.zPosition = -1
+            tile.safeAddChild(shadow)
+            let lift: CGFloat = 6
+            if UIAccessibility.isReduceMotionEnabled {
+                image.position.y += lift
+                outline.position.y = lift
+            } else {
+                let action = SKAction.moveBy(x: 0, y: lift, duration: 0.16)
+                action.timingMode = .easeOut
+                image.run(action)
+                outline.run(action)
+            }
+        }
         (inInventory ? canvas : boardLayer).safeAddChild(tile)
         if inInventory { tile.zPosition = 75 }
         tiles[id] = tile; hitPaths[id] = path; renderScales[id] = scale
@@ -247,7 +313,6 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
         let backing = SKShapeNode(rectOf: CGSize(width: 650, height: 27), cornerRadius: 6)
         backing.fillColor = SKColor(red: 0.25, green: 0.20, blue: 0.15, alpha: 1); backing.strokeColor = .clear
         backing.zPosition = -1; label.safeAddChild(backing)
-        canvas.safeAddChild(label)
         label.run(.sequence([.wait(forDuration: 3), .fadeOut(withDuration: 0.25), .removeFromParent()]))
     }
     

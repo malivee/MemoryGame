@@ -28,6 +28,7 @@ final class GameScene: SKScene {
     private var confirmingRestart = false
     private var enteringMemory = false
     private var bag: BagOverlay?
+    private var qte: QuickTimeEventNode?
     var bagSelectedPiece: Int?
 
     // Memuat progres, menyiapkan puzzle, lalu membangun papan saat scene dibuka.
@@ -44,6 +45,7 @@ final class GameScene: SKScene {
         layoutPhoto()
     }
     override func didChangeSize(_ oldSize: CGSize) {
+        qte?.position = CGPoint(x: size.width / 2, y: size.height / 2)
         guard canvas.parent != nil, !enteringMemory else { return }
         dragPiece = nil
         layoutPhoto()
@@ -104,6 +106,7 @@ final class GameScene: SKScene {
         let enterTitle = destination.map { "Masuk " + worldName($0) } ?? "Terkunci"
         let enterButton = canvas.storyButton(enterTitle, name: "enter", at: CGPoint(x: -50, y: -274))
         enterButton.alpha = ready ? 1 : 0.42
+        canvas.storyButton("Uji QTE", name: "qte", at: CGPoint(x: 80, y: -274), width: 105)
         canvas.storyButton("Mulai ulang", name: "restart", at: CGPoint(x: 330, y: -274), width: 140)
         canvas.storyButton("Tas", name: "bag", at: CGPoint(x: 330, y: 267), width: 140)
         if confirmingRestart { addRestartConfirmation() }
@@ -236,7 +239,7 @@ final class GameScene: SKScene {
     }
     // Memastikan keping terhubung minimal tiga, kemudian menjalankan transisi ke area kenangannya.
     private func enterSelected() {
-        guard !enteringMemory, let view else { return }
+        guard !enteringMemory, qte == nil, let view else { return }
         guard let id = selected else { message("Pilih keping dari rangkaian yang ingin dimasuki."); return }
         guard state.canEnter(id) else {
             message("Susun 3 keping dari map yang sama sesuai gambar dan putar hingga tegak.")
@@ -284,7 +287,7 @@ final class GameScene: SKScene {
         }]), withKey: "enterMemory")
     }
     private func openBag() {
-        guard bag == nil, !enteringMemory else { return }
+        guard bag == nil, qte == nil, !enteringMemory else { return }
         dragPiece = nil
         rebuild()
         let overlay = BagOverlay(progress: progress, sceneSize: size)
@@ -314,9 +317,28 @@ final class GameScene: SKScene {
         bag?.removeFromParent()
         bag = nil
     }
+    // QTE berjalan sebagai overlay di layar puzzle supaya interaksi papan berhenti sementara.
+    private func openQTE() {
+        guard qte == nil, bag == nil, !enteringMemory else { return }
+        dragPiece = nil
+        let event = QuickTimeEventNode(config: QuickTimeEventConfig(requiredTaps: 15))
+        event.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        event.onComplete = { [weak self] success in
+            self?.message(success ? "Kamu lolos dari bayangan itu." : "Bayangan itu semakin dekat.")
+        }
+        event.onDismiss = { [weak self, weak event] in
+            guard let self, self.qte === event else { return }
+            self.qte = nil
+            self.canvas.run(.fadeAlpha(to: 1, duration: 0.18))
+        }
+        qte = event
+        canvas.run(.fadeAlpha(to: 0.32, duration: 0.15))
+        addChild(event)
+        event.start()
+    }
     // Membedakan tombol dan pemilihan keping, lalu menyiapkan posisi awal drag.
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard !enteringMemory, bag == nil, let touch = touches.first else { return }
+        guard !enteringMemory, bag == nil, qte == nil, let touch = touches.first else { return }
         let point = touch.location(in: canvas)
         let names = Set(canvas.nodes(at: point).compactMap(\.name))
         if confirmingRestart {
@@ -327,6 +349,7 @@ final class GameScene: SKScene {
             return
         }
         if names.contains("bag") { openBag(); return }
+        if names.contains("qte") { openQTE(); return }
         if let name = names.first(where: { $0.hasPrefix("world-") }),
            let id = Int(name.dropFirst(6)), state.canEnter(id) {
             selected = id; dragPiece = nil; rebuild(); return
@@ -358,7 +381,7 @@ final class GameScene: SKScene {
     }
     // Memindahkan keping mengikuti sentuhan dan membedakan drag dari ketukan biasa.
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard !enteringMemory, bag == nil, let touch = touches.first, let id = dragPiece, let tile = tiles[id] else { return }
+        guard !enteringMemory, bag == nil, qte == nil, let touch = touches.first, let id = dragPiece, let tile = tiles[id] else { return }
         let point = touch.location(in: canvas)
         if hypot(point.x - dragStart.x, point.y - dragStart.y) > 8 { moved = true }
         if moved {
@@ -368,7 +391,7 @@ final class GameScene: SKScene {
     }
     // Mengubah posisi lepas menjadi slot; drop di luar papan mengembalikan keping ke inventori.
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard !enteringMemory, bag == nil, let id = dragPiece else { return }
+        guard !enteringMemory, bag == nil, qte == nil, let id = dragPiece else { return }
         defer { dragPiece = nil }
         if moved, let point = tiles[id]?.position {
             var accepted = true
@@ -383,7 +406,7 @@ final class GameScene: SKScene {
     }
     // Membatalkan drag ketika sentuhan terputus dan memulihkan tampilan dari state.
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard !enteringMemory else { return }
+        guard !enteringMemory, qte == nil else { return }
         dragPiece = nil; rebuild()
     }
 }

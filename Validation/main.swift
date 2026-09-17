@@ -281,20 +281,90 @@ for id in JigsawCatalog.starterIDs {
 }
 let freeStart = PrologueProgress()
 freeStart.prepareJigsaw()
-for (id, slot) in [(29, 0), (36, 1), (37, 2)] {
+for (id, slot) in [(29, 1), (37, 9), (36, 8)] {
+    freeStart.jigsaw?.rotations[id] = 0
     expect(freeStart.placeJigsawPiece(id, at: slot), "Opening works at arbitrary cells with default rotations")
 }
 freeStart.synchronizeJigsaw()
 expect(freeStart.installed(.house) && freeStart.jigsaw!.canEnter(29), "Arbitrary adjacent starter cluster opens house")
 expect(!freeStart.correctlyAssembled, "Free placement does not count as solved photo")
 freeStart.jigsaw?.rotate(29)
-expect(freeStart.jigsaw!.canEnter(29), "Rotation preserves adjacency")
+expect(!freeStart.jigsaw!.canEnter(29), "Quarter-turn breaks physical alignment")
+freeStart.jigsaw?.rotate(29)
 expect(freeStart.placeJigsawPiece(37, at: 47), "Placed piece moves freely")
 freeStart.synchronizeJigsaw()
 expect(!freeStart.installed(.house), "Moving piece away relocks the cluster")
-expect(freeStart.placeJigsawPiece(37, at: 1), "Occupied cell accepts replacement")
+expect(freeStart.placeJigsawPiece(37, at: 8), "Occupied cell accepts replacement")
 expect(!freeStart.jigsaw!.installedIDs.contains(36) && freeStart.jigsaw!.inventory(progress: freeStart).contains(36), "Displaced piece returns to inventory")
 let reloadedFree = try JSONDecoder().decode(PrologueProgress.self, from: JSONEncoder().encode(freeStart))
 reloadedFree.prepareJigsaw()
 expect(reloadedFree.jigsaw!.placements == freeStart.jigsaw!.placements, "Arbitrary placements survive reload")
+// Satu rangkaian mempunyai pintu masuk dan daftar area yang sama untuk semua anggotanya.
+let portalProgress = PrologueProgress()
+portalProgress.prepareJigsaw()
+for id in JigsawCatalog.starterIDs { portalProgress.jigsaw?.rotations[id] = 0 }
+expect(portalProgress.jigsaw!.worldEntry(for: 29, progress: portalProgress) == nil, "Inventory has no world")
+_ = portalProgress.placeJigsawPiece(29, at: 1)
+_ = portalProgress.placeJigsawPiece(36, at: 8)
+expect(portalProgress.jigsaw!.worldLocations(for: 29).isEmpty, "Two pieces do not create a world")
+_ = portalProgress.placeJigsawPiece(37, at: 9)
+portalProgress.synchronizeJigsaw()
+for id in [29, 36, 37] {
+    expect(portalProgress.jigsaw!.worldEntry(for: id, progress: portalProgress) == .house, "Every starter enters the same house world")
+    expect(portalProgress.jigsaw!.worldLocations(for: id) == [.house, .yard, .villageRoad], "Cluster shares all its areas")
+}
+portalProgress.readBook()
+for id in [29, 36, 37] {
+    expect(portalProgress.jigsaw!.worldEntry(for: id, progress: portalProgress) == .house, "Original starter world stays House after reading book")
+}
+_ = portalProgress.placeJigsawPiece(28, at: 0)
+expect(portalProgress.jigsaw!.worldEntry(for: 29, progress: portalProgress) == .yard, "Mission rewards can expand the group into the next world")
+portalProgress.jigsaw?.remove(28)
+portalProgress.jigsaw?.remove(36)
+expect(portalProgress.jigsaw!.worldEntry(for: 29, progress: portalProgress) == nil, "Broken cluster loses its portal")
+expect(separate.worldLocations(for: 0).isDisjoint(with: separate.worldLocations(for: 29)), "Separate clusters do not share world areas")
+expect(separate.worldLocations(for: 12).isEmpty, "Isolated piece cannot borrow another world's portal")
+// Bertetangga saja tidak cukup: dua tonjolan atau dua cekungan tidak saling mengunci.
+var falseCluster = JigsawProgress()
+for (id, slot) in [(29, 0), (36, 1), (21, 2)] {
+    _ = falseCluster.place(id, at: slot, available: Set(JigsawCatalog.allIDs))
+}
+expect(!falseCluster.interlocks(from: 0, to: 1), "Two tabs cannot interlock")
+expect(!falseCluster.canEnter(29), "Mere adjacency never unlocks Jump In")
+var trueCluster = JigsawProgress()
+for (id, slot) in [(29, 1), (37, 9), (36, 8)] {
+    _ = trueCluster.place(id, at: slot, available: Set(JigsawCatalog.allIDs))
+}
+expect(trueCluster.canEnter(29), "Complementary edges connect away from photo solution")
+expect(trueCluster.interlocks(from: 1, to: 9) && trueCluster.interlocks(from: 9, to: 1), "Connection is symmetric")
+trueCluster.rotate(36)
+expect(!trueCluster.canEnter(29), "Rotating bridge breaks the world gate")
+trueCluster.rotate(36)
+expect(!trueCluster.canEnter(29), "Upside-down photo cannot reconnect despite matching edges")
+trueCluster.rotate(36); trueCluster.rotate(36)
+expect(trueCluster.canEnter(29), "Upright photo reconnects")
+var flatEdges = JigsawProgress()
+_ = flatEdges.place(7, at: 0, available: Set(JigsawCatalog.allIDs))
+_ = flatEdges.place(0, at: 1, available: Set(JigsawCatalog.allIDs))
+expect(!flatEdges.interlocks(from: 0, to: 1), "Flat edges do not form a jigsaw joint")
+// Regresi dua screenshot: baris lurus salah, L sesuai foto benar di lokasi papan bebas.
+var screenshotWrong = JigsawProgress()
+for (id, slot) in [(36, 18), (37, 19), (29, 20)] {
+    _ = screenshotWrong.place(id, at: slot, available: Set(JigsawCatalog.allIDs))
+}
+for id in [29, 36, 37] { expect(!screenshotWrong.canEnter(id), "Wrong photo order never opens Jump In") }
+for row in 0..<5 {
+    for col in 0..<7 {
+        var translated = JigsawProgress()
+        for (id, slot) in [(29, row * 8 + col + 1), (36, (row + 1) * 8 + col), (37, (row + 1) * 8 + col + 1)] {
+            _ = translated.place(id, at: slot, available: Set(JigsawCatalog.allIDs))
+        }
+        for id in [29, 36, 37] { expect(translated.canEnter(id), "Correct L works anywhere within board bounds") }
+    }
+}
+let wrongSave = PrologueProgress()
+wrongSave.jigsaw = screenshotWrong
+wrongSave.prepareJigsaw()
+expect(!wrongSave.installed(.house), "Reloading old incorrect arrangement re-locks world without deleting pieces")
+expect(wrongSave.jigsaw!.placements.count == 3, "Incorrect saved pieces remain movable")
 print("Passed \(checks) progression, connectivity and jigsaw checks")

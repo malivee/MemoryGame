@@ -9,6 +9,7 @@ import UIKit
 final class ExplorationScene: SKScene {
     private var enteringMemory = true
     private let entry: MemoryPiece
+    private let worldLocations: Set<MemoryPiece>
     private var progress: PrologueProgress { PrologueStore.shared.progress }
     private var level: PrologueLevel!
     private var navigation: MemoryNavigation!
@@ -43,8 +44,10 @@ final class ExplorationScene: SKScene {
     private var nearbyInteraction: MemoryInteractionTarget?
     private var nearbyPrompt: SKNode?
 
-    init(size: CGSize, entry: MemoryPiece) {
+    init(size: CGSize, entry: MemoryPiece, worldLocations: Set<MemoryPiece>) {
         self.entry = entry
+        // Satu kunjungan hanya membuka satu wilayah, tanpa pilihan dunia kedua.
+        self.worldLocations = Set(worldLocations.filter { $0.region == entry.region })
         super.init(size: size)
     }
     required init?(coder aDecoder: NSCoder) { fatalError("init(coder:) is not supported") }
@@ -82,6 +85,7 @@ final class ExplorationScene: SKScene {
     private func animateArrival() {
         let reduced = UIAccessibility.isReduceMotionEnabled
         let duration: TimeInterval = reduced ? 0.22 : 1.0
+        MemoryPortal.play(on: self, origin: CGPoint(x: size.width / 2, y: size.height / 2), inward: false, duration: duration)
         hud.alpha = 0
         let finalPosition = world.position
         world.alpha = reduced ? 0 : 0.35
@@ -114,9 +118,11 @@ final class ExplorationScene: SKScene {
     }
     // Membuat peta, kabut, objek interaksi, karakter, dan patroli dari progres yang sedang tersimpan.
     private func buildWorld() {
-        level = PrologueLevel.make(region: entry.region, progress: progress)
-        navigation = MemoryNavigation(bounds: PrologueLevel.bounds, solids: level.obstacles.map(\.rect), fog: level.fog(progress: progress))
-        if let texture = SceneryTextures.texture(level: level, progress: progress) {
+        let local = PrologueProgress()
+        local.placements = progress.placements.filter { worldLocations.contains($0.value.piece) }
+        level = PrologueLevel.make(region: entry.region, progress: local)
+        navigation = MemoryNavigation(bounds: PrologueLevel.bounds, solids: level.obstacles.map(\.rect), fog: level.fog(progress: local))
+        if let texture = SceneryTextures.texture(level: level, progress: local) {
             let scenery = SKSpriteNode(texture: texture)
             scenery.anchorPoint = .zero
             scenery.size = PrologueLevel.bounds.size
@@ -125,7 +131,7 @@ final class ExplorationScene: SKScene {
         }
         MemoryAtmosphere.add(to: world, level: level)
         for zone in level.zones {
-            let available = level.available(zone, progress: progress)
+            let available = level.available(zone, progress: local)
             let base = SKShapeNode(rect: zone.rect)
             base.fillColor = .clear
             base.strokeColor = .clear
@@ -159,14 +165,14 @@ final class ExplorationScene: SKScene {
             friendNodes[friend] = npc
             world.addChild(npc)
         }
-        if let marker = level.marker, progress.installed(.oldPath) {
+        if let marker = level.marker, worldInstalled(.oldPath) {
             let post = SKShapeNode(rectOf: CGSize(width: 13, height: 31), cornerRadius: 2)
             post.fillColor = SKColor(red: 0.73, green: 0.61, blue: 0.40, alpha: 1)
             post.position = marker; post.zPosition = 15; world.addChild(post)
             post.storyLabel("Penanda", at: CGPoint(x: 0, y: 32), size: 11)
             markerNode = post
         }
-        if progress.installed(.boundary) {
+        if worldInstalled(.boundary) {
             if let gathering = level.gathering {
                 let ring = SKShapeNode(circleOfRadius: 54)
                 ring.position = gathering
@@ -425,7 +431,7 @@ final class ExplorationScene: SKScene {
         if suspicion >= 1 { caught(); return }
         updateNearbyInteraction()
         if progress.joined.count == 3 && !progress.noticedChangedRoute && entry.region == .foothills,
-           progress.installed(.oldPath), distance(arthur.position, CGPoint(x: 465, y: 350)) < 150 && !watched {
+           worldInstalled(.oldPath), distance(arthur.position, CGPoint(x: 465, y: 350)) < 150 && !watched {
             progress.noticedChangedRoute = true
             startDialogue(PrologueDialogue.changedRoute)
             return
@@ -451,7 +457,7 @@ final class ExplorationScene: SKScene {
     // Memastikan keempat anak berkumpul dan berada di pintu keluar sebelum melanjutkan misi.
     private func checkGroupProgress() {
         guard progress.foundMarker, !progress.leftVillage, companions.count == 3,
-              progress.installed(.boundary), let gathering = level.gathering, let exit = level.exit else { return }
+              worldInstalled(.boundary), let gathering = level.gathering, let exit = level.exit else { return }
         let actors = [arthur] + companions
         if !progress.groupGathered && actors.allSatisfy({ distance($0.position, gathering) < 70 }) && !watched {
             startDialogue(PrologueDialogue.gathering) { [weak self] in
@@ -549,6 +555,10 @@ final class ExplorationScene: SKScene {
             view.presentScene(self, transition: .fade(withDuration: 0.30))
         }
         view.presentScene(book, transition: .fade(withDuration: 0.30))
+    }
+    // Area dari rangkaian lain tetap tertutup walaupun sudah terpasang di papan.
+    private func worldInstalled(_ location: MemoryPiece) -> Bool {
+        worldLocations.contains(location) && progress.installed(location)
     }
     private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }
     // Mengubah jarak sentuhan dari pusat stik menjadi arah dan kekuatan gerak terbatas.

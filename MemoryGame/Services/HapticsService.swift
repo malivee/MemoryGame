@@ -9,7 +9,9 @@
 //  Created by Daffa Burane Nugraha on 16/09/26.
 //
 
+#if canImport(UIKit)
 import UIKit
+#endif
 
 final class HapticsService {
     static let shared = HapticsService()
@@ -17,9 +19,12 @@ final class HapticsService {
     private init() {}
 
     func playSelection() {
+        #if canImport(UIKit)
         UISelectionFeedbackGenerator().selectionChanged()
+        #endif
     }
 
+    #if canImport(UIKit)
     func playImpact(style: UIImpactFeedbackGenerator.FeedbackStyle) {
         UIImpactFeedbackGenerator(style: style).impactOccurred()
     }
@@ -27,4 +32,9 @@ final class HapticsService {
     func playNotification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
         UINotificationFeedbackGenerator().notificationOccurred(type)
     }
+    #else
+    func playImpact(style: Any = 0) {}
+    func playNotification(_ type: Any = 0) {}
+    #endif
 }
+

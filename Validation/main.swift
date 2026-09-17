@@ -367,4 +367,70 @@ wrongSave.jigsaw = screenshotWrong
 wrongSave.prepareJigsaw()
 expect(!wrongSave.installed(.house), "Reloading old incorrect arrangement re-locks world without deleting pieces")
 expect(wrongSave.jigsaw!.placements.count == 3, "Incorrect saved pieces remain movable")
-print("Passed \(checks) progression, connectivity and jigsaw checks")
+
+// MARK: - QuickTimeEvent Reusable Component Validation
+let qteZone1 = QTETargetZone(start: 0.60, end: 0.85, greatStart: 0.70, greatEnd: 0.75)
+expect(qteZone1.evaluate(progress: 0.50) == .miss, "QTE tap before zone is a miss")
+expect(qteZone1.evaluate(progress: 0.65) == .good, "QTE tap inside good zone returns good")
+expect(qteZone1.evaluate(progress: 0.72) == .great, "QTE tap inside sweet spot returns great")
+expect(qteZone1.evaluate(progress: 0.86) == .miss, "QTE tap after zone is a miss")
+
+// Two-stage directional timing: Left-to-Right then Right-to-Left
+var qteLogic = QuickTimeEventLogic(config: QuickTimeEventConfig(
+    stage1Duration: 1.0,
+    stage2Duration: 1.0,
+    stage1Zone: qteZone1,
+    stage2Zone: QTETargetZone(start: 0.20, end: 0.40, greatStart: 0.28, greatEnd: 0.32)
+))
+expect(qteLogic.currentStage == 1 && qteLogic.currentDirection == .leftToRight, "Initial stage starts at 1, moving Left to Right")
+
+// Progress needle forward in Phase 1 to Good zone (0.65)
+_ = qteLogic.update(deltaTime: 0.65)
+expect(abs(qteLogic.currentProgress - 0.65) < 0.001, "Progress moves forward with delta time")
+
+// Tap at 0.65 (Good hit -> transitions to Stage 2 in reverse direction)
+let goodTap = qteLogic.registerTap()
+expect(goodTap.result == .good, "Tap at 0.65 returns good")
+expect(!goodTap.completed, "Good hit in Stage 1 moves to Stage 2")
+expect(qteLogic.currentStage == 2 && qteLogic.currentDirection == .rightToLeft, "Direction flips to Right to Left for Stage 2")
+expect(qteLogic.currentProgress == 1.0, "Progress resets to 1.0 for Right to Left sweep")
+
+// Progress needle backwards in Phase 2
+_ = qteLogic.update(deltaTime: 0.70) // 1.0 - 0.70 = 0.30 (inside Great zone 0.28...0.32)
+expect(abs(qteLogic.currentProgress - 0.30) < 0.001, "Stage 2 progress moves backwards (Right to Left)")
+
+// Tap at 0.30 (Stage 2 completion)
+let secondTap = qteLogic.registerTap()
+expect(secondTap.result == .great, "Second tap hits great zone")
+expect(secondTap.completed && secondTap.isSuccess, "Second successful tap completes the QTE with success")
+expect(qteLogic.isCompleted && qteLogic.isSuccess, "QTE state reflects completion and success")
+
+// Direct Great win in Stage 1
+var directWinLogic = QuickTimeEventLogic(config: QuickTimeEventConfig(
+    stage1Duration: 1.0, stage2Duration: 1.0,
+    stage1Zone: qteZone1
+))
+_ = directWinLogic.update(deltaTime: 0.72) // Great zone (0.70...0.75)
+let instantWinTap = directWinLogic.registerTap()
+expect(instantWinTap.result == .great && instantWinTap.completed && instantWinTap.isSuccess, "Great tap in Stage 1 instantly wins in 1 stage")
+
+
+// Failure case: timeout in stage 1
+var failTimeout = QuickTimeEventLogic(config: QuickTimeEventConfig(stage1Duration: 1.0, stage2Duration: 1.0))
+let timedOut = failTimeout.update(deltaTime: 1.05)
+expect(timedOut && failTimeout.isCompleted && !failTimeout.isSuccess, "Expiring stage 1 duration without tap triggers failure")
+
+// Failure case: miss tap in stage 2
+var failStage2 = QuickTimeEventLogic(config: QuickTimeEventConfig(
+    stage1Duration: 1.0, stage2Duration: 1.0,
+    stage1Zone: QTETargetZone(start: 0.4, end: 0.6),
+    stage2Zone: QTETargetZone(start: 0.2, end: 0.4)
+))
+failStage2.currentProgress = 0.50
+let stage1Pass = failStage2.registerTap()
+expect(!stage1Pass.completed && failStage2.currentStage == 2, "Passes stage 1")
+failStage2.currentProgress = 0.70 // outside stage 2 zone (0.2...0.4)
+let stage2Miss = failStage2.registerTap()
+expect(stage2Miss.result == .miss && stage2Miss.completed && !stage2Miss.isSuccess, "Miss in stage 2 triggers failure")
+
+print("Passed \(checks) progression, connectivity, jigsaw and QTE checks")

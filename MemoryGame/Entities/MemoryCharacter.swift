@@ -22,6 +22,9 @@ final class MemoryCharacter: SKNode {
     private var idlePhase: CGFloat = 0
     private var isWalking: Bool = false
 
+    private var holdingBookNode: SKNode?
+    private var statusBadgeNode: SKNode?
+
     init(title: String, color: SKColor) {
         self.title = title
 
@@ -232,6 +235,121 @@ final class MemoryCharacter: SKNode {
     func updateDepth() {
         // Objek dengan koordinat Y lebih rendah berada lebih di depan (nilai zPosition lebih tinggi)
         zPosition = 30 + (480 - position.y) * 0.08
+    }
+
+    // Animasi melompat gembira saat bersedia ikut / merayakan keberhasilan cerita
+    func celebrate() {
+        let jumpUp = SKAction.moveBy(x: 0, y: 15, duration: 0.18)
+        jumpUp.timingMode = .easeOut
+        let fallDown = SKAction.moveBy(x: 0, y: -15, duration: 0.18)
+        fallDown.timingMode = .easeIn
+        let squash = SKAction.scaleX(to: 1.18, y: 0.82, duration: 0.08)
+        let stretch = SKAction.scaleX(to: 0.88, y: 1.18, duration: 0.12)
+        let restore = SKAction.scale(to: 1.0, duration: 0.10)
+
+        let jumpSeq = SKAction.sequence([squash, stretch, jumpUp, fallDown, squash, restore])
+        visualRoot.run(SKAction.sequence([jumpSeq, SKAction.wait(forDuration: 0.05), jumpSeq]))
+
+        // Semburan partikel bintang perayaan kecil di atas kepala
+        let sparks = ["✨", "⭐", "🎉"]
+        for i in 0..<5 {
+            let spark = SKLabelNode(text: sparks[i % sparks.count])
+            spark.fontSize = 12
+            spark.position = CGPoint(x: CGFloat(i - 2) * 8, y: 35)
+            spark.zPosition = 50
+            addChild(spark)
+            let driftX = (CGFloat(i) - 2.0) * 12
+            let driftY = 22 + CGFloat(i * 5)
+            spark.run(SKAction.sequence([
+                SKAction.group([
+                    SKAction.moveBy(x: driftX, y: driftY, duration: 0.65),
+                    SKAction.scale(to: 1.3, duration: 0.3),
+                    SKAction.fadeOut(withDuration: 0.65)
+                ]),
+                SKAction.removeFromParent()
+            ]))
+        }
+    }
+
+    // Animasi lambaian ramah saat disapa
+    func wave() {
+        let hop = SKAction.sequence([
+            SKAction.moveBy(x: 0, y: 5, duration: 0.13),
+            SKAction.moveBy(x: 0, y: -5, duration: 0.13)
+        ])
+        visualRoot.run(SKAction.sequence([hop, hop]))
+    }
+
+    // Menampilkan buku kuno di tangan karakter saat memperlihatkan sketsa peta
+    func setHoldingBook(visible: Bool) {
+        if !visible {
+            holdingBookNode?.removeFromParent()
+            holdingBookNode = nil
+            return
+        }
+        guard holdingBookNode == nil else { return }
+        let book = SKNode()
+        book.position = CGPoint(x: 8, y: 14)
+        book.zPosition = 15
+
+        let cover = SKShapeNode(rectOf: CGSize(width: 14, height: 11), cornerRadius: 2)
+        cover.fillColor = SKColor(red: 0.55, green: 0.20, blue: 0.16, alpha: 1.0)
+        cover.strokeColor = SKColor(red: 0.96, green: 0.84, blue: 0.42, alpha: 1.0)
+        cover.lineWidth = 1.0
+        book.addChild(cover)
+
+        let page = SKShapeNode(rectOf: CGSize(width: 11, height: 8), cornerRadius: 1)
+        page.fillColor = SKColor(red: 0.96, green: 0.92, blue: 0.80, alpha: 1.0)
+        page.strokeColor = .clear
+        book.addChild(page)
+
+        let sketch = SKShapeNode(rectOf: CGSize(width: 6, height: 1.5), cornerRadius: 0.5)
+        sketch.fillColor = SKColor(red: 0.40, green: 0.30, blue: 0.22, alpha: 0.8)
+        sketch.strokeColor = .clear
+        book.addChild(sketch)
+
+        let glow = SKShapeNode(circleOfRadius: 10)
+        glow.fillColor = SKColor(red: 1.0, green: 0.90, blue: 0.50, alpha: 0.3)
+        glow.strokeColor = .clear
+        book.addChild(glow)
+        glow.run(SKAction.repeatForever(SKAction.sequence([
+            SKAction.scale(to: 1.25, duration: 0.6),
+            SKAction.scale(to: 0.95, duration: 0.6)
+        ])))
+
+        visualRoot.addChild(book)
+        holdingBookNode = book
+    }
+
+    // Menampilkan lencana status mengambang di atas karakter
+    func setStatusBadge(icon: String, text: String, color: SKColor) {
+        statusBadgeNode?.removeFromParent()
+        statusBadgeNode = nil
+
+        let badge = SKNode()
+        badge.position = CGPoint(x: 0, y: 56)
+        badge.zPosition = 25
+
+        let bg = SKShapeNode(rectOf: CGSize(width: 76, height: 18), cornerRadius: 9)
+        bg.fillColor = SKColor(red: 0.12, green: 0.16, blue: 0.14, alpha: 0.92)
+        bg.strokeColor = color
+        bg.lineWidth = 1.2
+        badge.addChild(bg)
+
+        let label = SKLabelNode(text: "\(icon) \(text)")
+        label.fontName = "AvenirNext-Bold"
+        label.fontSize = 9.5
+        label.fontColor = color
+        label.verticalAlignmentMode = .center
+        bg.addChild(label)
+
+        badge.run(SKAction.repeatForever(SKAction.sequence([
+            SKAction.moveBy(x: 0, y: 3, duration: 0.9),
+            SKAction.moveBy(x: 0, y: -3, duration: 0.9)
+        ])))
+
+        addChild(badge)
+        statusBadgeNode = badge
     }
 
     // Memperbarui arah pandang dan animasi langkah/diam

@@ -89,7 +89,7 @@ final class OpeningCutsceneScene: SKScene {
         changingShot = true
         if index == shots.count - 1 {
             leaving = true
-            let puzzle = GameScene(size: size)
+            let puzzle = DeckPuzzleScene(size: size)
             puzzle.scaleMode = .resizeFill
             hint.run(.fadeOut(withDuration: 0.25))
             subtitle.run(.fadeOut(withDuration: 0.4))

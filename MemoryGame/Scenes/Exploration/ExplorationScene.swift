@@ -32,7 +32,7 @@ final class ExplorationScene: SKScene {
     private var toast: SKLabelNode?
     private var stickTouch: UITouch?
     private var stickVector = CGVector.zero
-    private let stickCenter = CGPoint(x: 98, y: 113)
+    private var stickCenter: CGPoint { CGPoint(x: 88, y: 88) }
     private var stickKnob = SKShapeNode(circleOfRadius: 18)
     private var objective = SKLabelNode()
     private var suspicionLabel = SKLabelNode()
@@ -52,59 +52,99 @@ final class ExplorationScene: SKScene {
     }
     required init?(coder aDecoder: NSCoder) { fatalError("init(coder:) is not supported") }
 
+    private var worldScale: CGFloat {
+        // Skala kamera zoom-in dekat bergaya Carto (~15% tinggi layar untuk karakter)
+        return max(1.45, min(1.85, size.height / 250))
+    }
+
+    private func targetCameraPosition(for actorPos: CGPoint) -> CGPoint {
+        let scale = worldScale
+        let targetX = size.width / 2 - actorPos.x * scale
+        let targetY = size.height / 2 - actorPos.y * scale
+
+        let worldW = 960 * scale
+        let worldH = 480 * scale
+
+        let clampedX: CGFloat
+        if worldW > size.width {
+            let minX = size.width - worldW
+            let maxX: CGFloat = 0
+            clampedX = min(maxX, max(minX, targetX))
+        } else {
+            clampedX = (size.width - worldW) / 2
+        }
+
+        let clampedY: CGFloat
+        if worldH > size.height {
+            let minY = size.height - worldH
+            let maxY: CGFloat = 0
+            clampedY = min(maxY, max(minY, targetY))
+        } else {
+            clampedY = (size.height - worldH) / 2
+        }
+        return CGPoint(x: clampedX, y: clampedY)
+    }
+
+    private func updateCamera(dt: CGFloat, immediate: Bool = false) {
+        let scale = worldScale
+        world.setScale(scale)
+        let target = targetCameraPosition(for: arthur.position)
+        if immediate {
+            world.position = target
+        } else {
+            let lerpSpeed = min(1.0, dt * 7.5)
+            world.position.x += (target.x - world.position.x) * lerpSpeed
+            world.position.y += (target.y - world.position.y) * lerpSpeed
+        }
+    }
+
     override func didMove(to view: SKView) {
-        backgroundColor = SKColor(red: 0.08, green: 0.13, blue: 0.14, alpha: 1)
+        backgroundColor = SKColor(red: 0.12, green: 0.16, blue: 0.18, alpha: 1)
         if stage.parent != nil {
-            // Resume the existing world after reading, without duplicating nodes
-            // or resetting Arthur, companions, and patrols.
             readingBook = false
             lastTime = 0
-            resizeStage()
+            buildHUD()
+            updateCamera(dt: 0, immediate: true)
             updateBookAccess()
             return
         }
         addChild(stage)
         stage.addChild(world)
-        world.position = CGPoint(x: 20, y: 65)
-        stage.addChild(hud)
+        addChild(hud)
         hud.zPosition = 100
-        resizeStage()
         buildWorld()
         buildHUD()
+        updateCamera(dt: 0, immediate: true)
         animateArrival()
     }
     override func didChangeSize(_ oldSize: CGSize) {
-        if stage.parent != nil { resizeStage() }
+        buildHUD()
+        updateCamera(dt: 0, immediate: true)
         bag?.resize(to: size)
-    }
-    private func resizeStage() {
-        stage.setScale(min(size.width / 1000, size.height / 600))
-        stage.position = CGPoint(x: (size.width - 1000 * stage.xScale) / 2, y: (size.height - 600 * stage.yScale) / 2)
     }
     // Menampilkan animasi masuk dan menunda input sampai transisi selesai; mengikuti pengaturan Reduce Motion.
     private func animateArrival() {
         let reduced = UIAccessibility.isReduceMotionEnabled
-        let duration: TimeInterval = reduced ? 0.22 : 1.0
+        let duration: TimeInterval = reduced ? 0.22 : 0.85
         MemoryPortal.play(on: self, origin: CGPoint(x: size.width / 2, y: size.height / 2), inward: false, duration: duration)
         hud.alpha = 0
+        updateCamera(dt: 0, immediate: true)
         let finalPosition = world.position
         world.alpha = reduced ? 0 : 0.35
         if !reduced {
-            world.setScale(1.10)
-            world.position = CGPoint(x: finalPosition.x - 48, y: finalPosition.y - 24)
+            world.setScale(worldScale * 1.10)
+            world.position = CGPoint(x: finalPosition.x - 24, y: finalPosition.y - 12)
         }
         let settle = SKAction.group([
-            .scale(to: 1, duration: duration), .move(to: finalPosition, duration: duration),
+            .scale(to: worldScale, duration: duration), .move(to: finalPosition, duration: duration),
             .fadeIn(withDuration: duration * 0.8)
         ])
         settle.timingMode = .easeOut
         world.run(settle)
-        let title = hud.storyLabel(entry.region == .house ? "Rumah di lembah" : (entry.region == .village ? "Desa di lembah" : "Kaki perbukitan"),
-                                   at: CGPoint(x: 500, y: 310), size: 30,
-                                   color: SKColor(red: 0.98, green: 0.91, blue: 0.72, alpha: 1))
+        let title = storyLabel(entry.region == .house ? "Rumah di lembah" : (entry.region == .village ? "Desa di lembah" : "Kaki perbukitan"),
+                               at: CGPoint(x: size.width / 2, y: size.height / 2), size: 28,
+                               color: SKColor(red: 0.98, green: 0.91, blue: 0.72, alpha: 1))
         title.zPosition = 350
-        // Title is separate from the fading controls so its reveal remains legible.
-        title.removeFromParent(); stage.addChild(title)
         title.alpha = 0
         title.run(.sequence([.fadeIn(withDuration: duration * 0.35), .wait(forDuration: duration * 0.35),
                              .fadeOut(withDuration: duration * 0.35), .removeFromParent()]))
@@ -142,19 +182,25 @@ final class ExplorationScene: SKScene {
                                  color: SKColor(white: 1, alpha: 0.4))
 
             } else {
-                let fog = SKShapeNode(rect: zone.rect.insetBy(dx: 2, dy: 2), cornerRadius: 8)
-                fog.fillColor = SKColor(red: 0.37, green: 0.43, blue: 0.43, alpha: 1)
-                fog.strokeColor = .clear
+                let fog = SKShapeNode(rect: zone.rect.insetBy(dx: 2, dy: 2), cornerRadius: 10)
+                fog.fillColor = SKColor(red: 0.83, green: 0.87, blue: 0.78, alpha: 0.90)
+                fog.strokeColor = SKColor(red: 0.60, green: 0.68, blue: 0.52, alpha: 0.5)
+                fog.lineWidth = 1.5
                 fog.zPosition = 30
                 world.addChild(fog)
-                let label = fog.storyLabel("Kabut kenangan", at: CGPoint(x: zone.rect.midX, y: zone.rect.midY), size: 16, color: .white)
+                let label = fog.storyLabel("Kabut kenangan", at: CGPoint(x: zone.rect.midX, y: zone.rect.midY), size: 15, color: SKColor(red: 0.28, green: 0.35, blue: 0.26, alpha: 0.9))
                 label.zPosition = 1
                 for index in 0..<7 {
-                    let cloud = SKShapeNode(ellipseOf: CGSize(width: zone.rect.width * 0.72, height: 40))
-                    cloud.fillColor = SKColor(white: 0.85, alpha: 0.055)
+                    let cloud = SKShapeNode(ellipseOf: CGSize(width: zone.rect.width * 0.65, height: 42))
+                    cloud.fillColor = SKColor(white: 1.0, alpha: 0.38)
                     cloud.strokeColor = .clear
-                    cloud.position = CGPoint(x: zone.rect.midX, y: zone.rect.minY + 38 + CGFloat(index) * zone.rect.height / 8)
+                    cloud.position = CGPoint(x: zone.rect.midX + (index % 2 == 0 ? -12 : 12),
+                                            y: zone.rect.minY + 36 + CGFloat(index) * zone.rect.height / 8)
                     fog.addChild(cloud)
+                    cloud.run(.repeatForever(.sequence([
+                        .moveBy(x: index % 2 == 0 ? 12 : -12, y: 3, duration: 2.2 + Double(index) * 0.2),
+                        .moveBy(x: index % 2 == 0 ? -12 : 12, y: -3, duration: 2.2 + Double(index) * 0.2)
+                    ])))
                 }
             }
         }
@@ -221,21 +267,53 @@ final class ExplorationScene: SKScene {
         bookPickupNode = book
         book.storyLabel("Buku lama", at: CGPoint(x: 0, y: 30), size: 11)
     }
-    // Membuat tujuan misi, tombol kembali, indikator kecurigaan, stik, dan tombol interaksi.
+    // Membuat tujuan misi, tombol kembali, indikator kecurigaan, stik, dan tombol interaksi dalam layout responsif Carto.
     private func buildHUD() {
-        let top = SKShapeNode(rect: CGRect(x: 0, y: 548, width: 1000, height: 52))
-        top.fillColor = SKColor(white: 0.06, alpha: 0.96); top.strokeColor = .clear
-        hud.addChild(top)
-        objective = hud.storyLabel(progress.objective, at: CGPoint(x: 450, y: 577), size: 15, width: 710)
-        hud.storyButton("Kembali ke foto", name: "photo", at: CGPoint(x: 898, y: 577), width: 165)
-        hud.storyLabel("Berlindung di balik benda • Bidang kuning = pandangan warga", at: CGPoint(x: 500, y: 27), size: 12, color: .lightGray)
-        suspicionLabel = hud.storyLabel("Aman", at: CGPoint(x: 495, y: 550), size: 12, color: .lightGray)
-        let stick = SKShapeNode(circleOfRadius: 47)
-        stick.position = stickCenter; stick.fillColor = SKColor(white: 0.05, alpha: 0.34)
-        stick.strokeColor = SKColor(white: 1, alpha: 0.22); hud.addChild(stick)
-        stickKnob.position = stickCenter; stickKnob.fillColor = SKColor(white: 1, alpha: 0.32)
-        stickKnob.strokeColor = .clear; hud.addChild(stickKnob)
-        hud.storyButton("Tas", name: "bag", at: CGPoint(x: 905, y: 111), width: 118)
+        hud.removeAllChildren()
+
+        // 1. Kapsul tujuan misi melayang di atas tengah (Carto floating pill)
+        let objWidth = min(size.width * 0.52, 460)
+        let objBg = SKShapeNode(rectOf: CGSize(width: objWidth, height: 36), cornerRadius: 18)
+        objBg.fillColor = SKColor(red: 0.12, green: 0.16, blue: 0.14, alpha: 0.88)
+        objBg.strokeColor = SKColor(red: 0.88, green: 0.80, blue: 0.55, alpha: 0.45)
+        objBg.lineWidth = 1.2
+        objBg.position = CGPoint(x: size.width / 2, y: size.height - 34)
+        hud.addChild(objBg)
+
+        objective = hud.storyLabel(progress.objective, at: CGPoint(x: size.width / 2, y: size.height - 34), size: 13, width: objWidth - 28)
+        objective.fontColor = SKColor(red: 0.98, green: 0.94, blue: 0.82, alpha: 1)
+
+        // 2. Tombol kembali ke foto floating di kanan atas
+        let photoBtn = hud.storyButton("Kembali ke foto", name: "photo", at: CGPoint(x: size.width - 92, y: size.height - 34), width: 145)
+        photoBtn.fillColor = SKColor(red: 0.12, green: 0.16, blue: 0.14, alpha: 0.88)
+        photoBtn.strokeColor = SKColor(red: 0.88, green: 0.80, blue: 0.55, alpha: 0.5)
+
+        // 3. Tombol tas floating di kanan bawah
+        let bagBtn = hud.storyButton("Tas", name: "bag", at: CGPoint(x: size.width - 65, y: 55), width: 90)
+        bagBtn.fillColor = SKColor(red: 0.12, green: 0.16, blue: 0.14, alpha: 0.88)
+        bagBtn.strokeColor = SKColor(red: 0.88, green: 0.80, blue: 0.55, alpha: 0.5)
+
+        // 4. Stik analog floating di kiri bawah
+        let stick = SKShapeNode(circleOfRadius: 44)
+        stick.position = stickCenter
+        stick.fillColor = SKColor(white: 0.08, alpha: 0.45)
+        stick.strokeColor = SKColor(white: 1, alpha: 0.28)
+        stick.lineWidth = 1.5
+        hud.addChild(stick)
+
+        stickKnob = SKShapeNode(circleOfRadius: 18)
+        stickKnob.position = stickCenter
+        stickKnob.fillColor = SKColor(white: 1, alpha: 0.45)
+        stickKnob.strokeColor = .clear
+        hud.addChild(stickKnob)
+
+        // 5. Indikator kecurigaan di bawah kapsul misi
+        suspicionLabel = hud.storyLabel("Aman", at: CGPoint(x: size.width / 2, y: size.height - 58), size: 11, color: .lightGray)
+
+        // 6. Petunjuk kontrol halus di bagian bawah
+        let hint = hud.storyLabel("Berlindung di balik benda • Bidang kuning = pandangan warga",
+                                  at: CGPoint(x: size.width / 2, y: 18), size: 11, color: SKColor(white: 1, alpha: 0.5))
+        hint.zPosition = 10
         updateBookAccess()
     }
     private func updateBookAccess() {
@@ -247,11 +325,14 @@ final class ExplorationScene: SKScene {
     }
     private func say(_ text: String, duration: TimeInterval = 4) {
         toast?.removeFromParent()
-        let label = hud.storyLabel(text, at: CGPoint(x: 500, y: 510), size: 16, width: 830)
+        let toastWidth = min(size.width - 60, 620)
+        let label = hud.storyLabel(text, at: CGPoint(x: size.width / 2, y: size.height - 82), size: 14, width: toastWidth - 32)
         label.zPosition = 110
-        let background = SKShapeNode(rectOf: CGSize(width: 870, height: 47), cornerRadius: 10)
-        background.fillColor = SKColor(white: 0.04, alpha: 0.87); background.strokeColor = .clear
-        background.zPosition = -1; label.addChild(background)
+        let background = SKShapeNode(rectOf: CGSize(width: toastWidth, height: 42), cornerRadius: 10)
+        background.fillColor = SKColor(white: 0.08, alpha: 0.92)
+        background.strokeColor = SKColor(white: 1, alpha: 0.18)
+        background.zPosition = -1
+        label.addChild(background)
         toast = label
         label.run(.sequence([.wait(forDuration: duration), .fadeOut(withDuration: 0.4), .removeFromParent()]))
     }
@@ -291,33 +372,31 @@ final class ExplorationScene: SKScene {
         dialoguePanel?.removeFromParent()
         let line = dialogue[dialogueIndex]
 
-        // 1. Dapatkan posisi pembicara dalam koordinat panggung (HUD/Stage)
+        // 1. Dapatkan posisi pembicara dalam koordinat layar saat ini (mengikuti pergerakan kamera dunia)
         let speakerWorldPos = resolveSpeakerPosition(named: line.speaker)
-        let speakerScreenX = speakerWorldPos.x + world.position.x
-        let speakerScreenY = speakerWorldPos.y + world.position.y
+        let screenPos = world.convert(speakerWorldPos, to: self)
 
-        // 2. Tentukan posisi Speech Bubble (clamped di dalam batas layar 1000 x 600)
-        let bubbleX = min(max(speakerScreenX, 220), 780)
-        var bubbleY = speakerScreenY + 115
+        // 2. Tentukan posisi Speech Bubble (clamped di dalam batas layar)
+        let bubbleX = min(max(screenPos.x, 220), size.width - 220)
+        var bubbleY = screenPos.y + 115
         var tailOffsetY: CGFloat = -58
 
-        // Jika karakter berada terlalu dekat ke atas layar, posisikan balon di bawahnya
-        if bubbleY > 500 {
-            bubbleY = max(speakerScreenY - 115, 110)
+        if bubbleY > size.height - 90 {
+            bubbleY = max(screenPos.y - 115, 90)
             tailOffsetY = 58
         }
 
-        let tailOffsetX = min(max(speakerScreenX - bubbleX, -130), 130)
+        let tailOffsetX = min(max(screenPos.x - bubbleX, -130), 130)
         let tailTip = CGPoint(x: tailOffsetX, y: tailOffsetY)
 
-        // 3. Konfigurasi SpeechBubbleNode bergaya krayon lilin hitam
+        // 3. Konfigurasi SpeechBubbleNode bergaya krayon lilin hitam Carto
         let config = SpeechBubbleConfig(
             text: line.text,
             speaker: line.speaker,
             pageIndicator: "Ketuk untuk lanjut  ·  \(dialogueIndex + 1)/\(dialogue.count)",
-            fontSize: 18,
-            padding: CGSize(width: 32, height: 20),
-            maxWidth: 440
+            fontSize: 17,
+            padding: CGSize(width: 30, height: 18),
+            maxWidth: min(420, size.width - 60)
         )
 
         let bubble = SpeechBubbleNode(config: config, tailTipOffset: tailTip)
@@ -468,17 +547,22 @@ final class ExplorationScene: SKScene {
         nearbyPrompt = nil
         nearbyInteraction = nil
     }
-    // Memperbarui gerak dan kecurigaan setiap frame; dunia dijeda selama dialog dan transisi masuk.
+    // Memperbarui gerak dan kecurigaan setiap frame; kamera mengikuti Arthur secara halus ala Carto.
     override func update(_ currentTime: TimeInterval) {
         let dt = CGFloat(min(0.04, max(0, lastTime == 0 ? 0 : currentTime - lastTime)))
         lastTime = currentTime
+        updateCamera(dt: dt)
         guard navigation != nil, dialoguePanel == nil, !enteringMemory, !readingBook, bag == nil else { return }
         warningCooldown = max(0, warningCooldown - dt)
         catchGrace = max(0, catchGrace - dt)
         if hypot(stickVector.dx, stickVector.dy) > 0.05 {
             let movement = CGVector(dx: stickVector.dx * 140 * dt, dy: stickVector.dy * 140 * dt)
             let attempted = CGPoint(x: arthur.position.x + movement.dx, y: arthur.position.y + movement.dy)
+            let previous = arthur.position
             arthur.position = navigation.moved(from: arthur.position, by: movement)
+            let stepX = arthur.position.x - previous.x
+            let stepY = arthur.position.y - previous.y
+            arthur.applyMovement(dx: stepX, dy: stepY, dt: dt)
             arthur.body.zRotation = atan2(movement.dy, movement.dx) - .pi / 2
             checkFog(at: attempted)
         } else { arthur.walk(dt: dt, speed: 140, navigation: navigation) }
@@ -560,9 +644,12 @@ final class ExplorationScene: SKScene {
         clearNearbyInteraction()
         arthur.position = checkpoint; arthur.route.removeAll()
         stickVector = .zero; stickTouch = nil; stickKnob.position = stickCenter
+        arthur.applyMovement(dx: 0, dy: 0, dt: 0.1)
+        updateCamera(dt: 0, immediate: true)
         for (index, actor) in companions.enumerated() {
             actor.position = navigation.nearestOpen(to: CGPoint(x: checkpoint.x + CGFloat(index) * 16, y: checkpoint.y + 18))
             actor.route.removeAll()
+            actor.applyMovement(dx: 0, dy: 0, dt: 0.1)
         }
         for patrol in patrols { patrol.suspicion = 0 }
         catchGrace = 3; watched = false
@@ -627,24 +714,25 @@ final class ExplorationScene: SKScene {
     private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }
     // Mengubah jarak sentuhan dari pusat stik menjadi arah dan kekuatan gerak terbatas.
     private func updateStick(_ touch: UITouch) {
-        let point = touch.location(in: stage)
-        let dx = point.x - stickCenter.x, dy = point.y - stickCenter.y
+        let point = touch.location(in: hud)
+        let center = stickCenter
+        let dx = point.x - center.x, dy = point.y - center.y
         let length = max(1, hypot(dx, dy))
         let magnitude = min(1, length / 40)
         stickVector = CGVector(dx: dx / length * magnitude, dy: dy / length * magnitude)
-        stickKnob.position = CGPoint(x: stickCenter.x + stickVector.dx * 34, y: stickCenter.y + stickVector.dy * 34)
+        stickKnob.position = CGPoint(x: center.x + stickVector.dx * 30, y: center.y + stickVector.dy * 30)
     }
     // Mengarahkan sentuhan ke dialog, tombol, stik, atau pencarian rute menuju tanah yang diketuk.
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard !enteringMemory, !readingBook, bag == nil, let touch = touches.first else { return }
         if dialoguePanel != nil { advanceDialogue(); return }
-        let point = touch.location(in: stage)
-        let names = Set(hud.nodes(at: touch.location(in: hud)).compactMap(\.name))
+        let hudPoint = touch.location(in: hud)
+        let names = Set(hud.nodes(at: hudPoint).compactMap(\.name))
         let worldNames = Set(world.nodes(at: touch.location(in: world)).compactMap { $0.namedAncestor(prefix: "contextInteract") })
         if names.contains("photo") { returnToPhoto(); return }
         if names.contains("bag") { openBag(); return }
         if worldNames.contains("contextInteract") { interact(); return }
-        if distance(point, stickCenter) < 70 {
+        if distance(hudPoint, stickCenter) < 70 {
             stickTouch = touch; arthur.route.removeAll(); updateStick(touch); return
         }
         let destination = touch.location(in: world)

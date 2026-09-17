@@ -1,39 +1,292 @@
 // Penjelasan file: MemoryCharacter.swift
-// Membuat karakter sederhana untuk Arthur, teman, dan warga.
-// MemoryCharacter berjalan mengikuti rute; MemoryPatrol mengelola patroli, bidang pandang, dan tingkat kecurigaan.
+// Membuat karakter bergaya storybook 2.5D Carto (Arthur, teman, dan warga).
+// Menampilkan tubuh tegak (billboard), bayangan tanah, pakaian khas, animasi melangkah (bobbing), dan arah hadap kiri/kanan.
+// MemoryPatrol mengelola rute patroli, bidang pandang visual, dan tingkat kecurigaan.
 
 import SpriteKit
 
 final class MemoryCharacter: SKNode {
     let title: String
     var route: [CGPoint] = []
-    let body: SKShapeNode
+
+    // Node legacy untuk kompatibilitas properti
+    let body = SKShapeNode()
+
+    // Komponen visual 2.5D bergaya Carto
+    let visualRoot = SKNode()
+    private let shadowNode: SKShapeNode
+    private let characterBodyNode: SKNode
+    private let headNode: SKNode
+
+    private var walkPhase: CGFloat = 0
+    private var idlePhase: CGFloat = 0
+    private var isWalking: Bool = false
+
     init(title: String, color: SKColor) {
         self.title = title
-        body = SKShapeNode(circleOfRadius: 12)
+
+        // Bayangan lembut di atas tanah
+        shadowNode = SKShapeNode(ellipseOf: CGSize(width: 22, height: 9))
+        shadowNode.fillColor = SKColor(red: 0.16, green: 0.22, blue: 0.14, alpha: 0.28)
+        shadowNode.strokeColor = .clear
+        shadowNode.position = CGPoint(x: 0, y: 0)
+        shadowNode.zPosition = 0
+
+        characterBodyNode = SKNode()
+        headNode = SKNode()
+
         super.init()
-        body.fillColor = color
-        body.strokeColor = SKColor(white: 0.1, alpha: 0.7)
-        body.lineWidth = 2
+
+        // Pasang bayangan dan visual root
+        addChild(shadowNode)
+        addChild(visualRoot)
+
+        // Sembunyikan body legacy tapi tetap aktif untuk rotasi internal bila diakses
+        body.fillColor = .clear
+        body.strokeColor = .clear
         addChild(body)
-        let face = SKShapeNode(circleOfRadius: 3)
-        face.fillColor = .white; face.strokeColor = .clear
-        face.position = CGPoint(x: 0, y: 6)
-        body.addChild(face)
-        storyLabel(title, at: CGPoint(x: 0, y: 25), size: 11)
-        zPosition = 20
+
+        setupCartoIllustration(title: title, tintColor: color)
+
+        // Label nama karakter di atas kepala
+        let nameTag = storyLabel(title, at: CGPoint(x: 0, y: 44), size: 10, color: SKColor(white: 0.96, alpha: 0.95))
+        nameTag.zPosition = 10
+
+        updateDepth()
     }
+
     required init?(coder aDecoder: NSCoder) { fatalError("init(coder:) is not supported") }
-    // Mengikuti titik rute dengan kecepatan berbasis waktu sambil memeriksa tabrakan melalui navigasi.
+
+    // Membangun ilustrasi karakter bertumpuk bergaya paper-cutout Carto
+    private func setupCartoIllustration(title: String, tintColor: SKColor) {
+        visualRoot.addChild(characterBodyNode)
+
+        // 1. Kaki / Sepatu
+        let leftShoe = SKShapeNode(ellipseOf: CGSize(width: 5.5, height: 4))
+        leftShoe.fillColor = SKColor(red: 0.32, green: 0.24, blue: 0.18, alpha: 1)
+        leftShoe.strokeColor = .clear
+        leftShoe.position = CGPoint(x: -3.5, y: 2)
+        characterBodyNode.addChild(leftShoe)
+
+        let rightShoe = SKShapeNode(ellipseOf: CGSize(width: 5.5, height: 4))
+        rightShoe.fillColor = SKColor(red: 0.32, green: 0.24, blue: 0.18, alpha: 1)
+        rightShoe.strokeColor = .clear
+        rightShoe.position = CGPoint(x: 3.5, y: 2)
+        characterBodyNode.addChild(rightShoe)
+
+        // 2. Celana / Rok
+        let legs = SKShapeNode(rectOf: CGSize(width: 9, height: 6), cornerRadius: 2)
+        legs.fillColor = SKColor(red: 0.22, green: 0.26, blue: 0.28, alpha: 1)
+        legs.strokeColor = .clear
+        legs.position = CGPoint(x: 0, y: 6)
+        characterBodyNode.addChild(legs)
+
+        // 3. Jubah / Tunik (Baju Poncho ala Carto)
+        let tunicColor: SKColor
+        let trimColor: SKColor
+        let scarfColor: SKColor?
+
+        switch title {
+        case "Arthur":
+            // Carto poncho: warna krem hangat dengan syal leher toska cerah
+            tunicColor = SKColor(red: 0.94, green: 0.92, blue: 0.83, alpha: 1)
+            trimColor = SKColor(red: 0.58, green: 0.38, blue: 0.22, alpha: 1)
+            scarfColor = SKColor(red: 0.24, green: 0.65, blue: 0.72, alpha: 1)
+        case "Keneth":
+            tunicColor = SKColor(red: 0.78, green: 0.40, blue: 0.26, alpha: 1)
+            trimColor = SKColor(red: 0.44, green: 0.23, blue: 0.14, alpha: 1)
+            scarfColor = SKColor(red: 0.92, green: 0.80, blue: 0.58, alpha: 1)
+        case "Roland":
+            tunicColor = SKColor(red: 0.89, green: 0.68, blue: 0.27, alpha: 1)
+            trimColor = SKColor(red: 0.48, green: 0.35, blue: 0.16, alpha: 1)
+            scarfColor = SKColor(red: 0.75, green: 0.35, blue: 0.22, alpha: 1)
+        case "Anneth":
+            tunicColor = SKColor(red: 0.35, green: 0.55, blue: 0.76, alpha: 1)
+            trimColor = SKColor(red: 0.20, green: 0.36, blue: 0.52, alpha: 1)
+            scarfColor = SKColor(red: 0.96, green: 0.91, blue: 0.78, alpha: 1)
+        default:
+            // Warga / Patroli
+            tunicColor = tintColor
+            trimColor = SKColor(red: 0.30, green: 0.24, blue: 0.18, alpha: 1)
+            scarfColor = SKColor(red: 0.88, green: 0.76, blue: 0.50, alpha: 1)
+        }
+
+        // Bentuk jubah melingkar sedikit melebar ke bawah
+        let tunicPath = CGMutablePath()
+        tunicPath.move(to: CGPoint(x: -6, y: 20))
+        tunicPath.addLine(to: CGPoint(x: 6, y: 20))
+        tunicPath.addLine(to: CGPoint(x: 8.5, y: 8))
+        tunicPath.addLine(to: CGPoint(x: -8.5, y: 8))
+        tunicPath.closeSubpath()
+
+        let tunic = SKShapeNode(path: tunicPath)
+        tunic.fillColor = tunicColor
+        tunic.strokeColor = SKColor(white: 0.15, alpha: 0.3)
+        tunic.lineWidth = 1
+        characterBodyNode.addChild(tunic)
+
+        // Sabuk & detail bawah tunik
+        let hem = SKShapeNode(rectOf: CGSize(width: 17, height: 2.5), cornerRadius: 1)
+        hem.fillColor = trimColor
+        hem.strokeColor = .clear
+        hem.position = CGPoint(x: 0, y: 9.5)
+        characterBodyNode.addChild(hem)
+
+        // Syal / kerah leher jika ada
+        if let scarf = scarfColor {
+            let collar = SKShapeNode(ellipseOf: CGSize(width: 8, height: 4.5))
+            collar.fillColor = scarf
+            collar.strokeColor = .clear
+            collar.position = CGPoint(x: 0, y: 19)
+            characterBodyNode.addChild(collar)
+        }
+
+        // Tas selempang kecil di punggung / samping (khas Carto)
+        if title == "Arthur" {
+            let satchel = SKShapeNode(rectOf: CGSize(width: 4.5, height: 6), cornerRadius: 1.5)
+            satchel.fillColor = SKColor(red: 0.52, green: 0.33, blue: 0.19, alpha: 1)
+            satchel.strokeColor = .clear
+            satchel.position = CGPoint(x: -7, y: 13)
+            characterBodyNode.addChild(satchel)
+
+            let strap = SKShapeNode(rectOf: CGSize(width: 1.5, height: 12))
+            strap.fillColor = SKColor(red: 0.38, green: 0.24, blue: 0.14, alpha: 0.8)
+            strap.strokeColor = .clear
+            strap.zRotation = -0.55
+            strap.position = CGPoint(x: -2, y: 15)
+            characterBodyNode.addChild(strap)
+        }
+
+        // 4. Kepala & Wajah (HeadNode)
+        headNode.position = CGPoint(x: 0, y: 23)
+        characterBodyNode.addChild(headNode)
+
+        // Kulit kepala hangat khas Carto
+        let skin = SKShapeNode(ellipseOf: CGSize(width: 16, height: 14.5))
+        skin.fillColor = SKColor(red: 0.98, green: 0.88, blue: 0.79, alpha: 1)
+        skin.strokeColor = .clear
+        headNode.addChild(skin)
+
+        // Rambut biru tua / gelap khas Carto
+        let hairColor = (title == "Keneth") ? SKColor(red: 0.28, green: 0.20, blue: 0.15, alpha: 1) :
+                        (title == "Roland") ? SKColor(red: 0.35, green: 0.25, blue: 0.18, alpha: 1) :
+                        SKColor(red: 0.14, green: 0.19, blue: 0.28, alpha: 1)
+
+        let hairCap = CGMutablePath()
+        hairCap.addArc(center: CGPoint(x: 0, y: 2), radius: 8.2, startAngle: 0, endAngle: .pi, clockwise: false)
+        hairCap.closeSubpath()
+        let hair = SKShapeNode(path: hairCap)
+        hair.fillColor = hairColor
+        hair.strokeColor = .clear
+        headNode.addChild(hair)
+
+        // Poni rambut di samping
+        let sideHair = SKShapeNode(ellipseOf: CGSize(width: 4, height: 6))
+        sideHair.fillColor = hairColor
+        sideHair.strokeColor = .clear
+        sideHair.position = CGPoint(x: -7, y: 2)
+        headNode.addChild(sideHair)
+
+        // Kuncir atas (topknot tuft khas Carto)
+        let topknot = SKShapeNode(ellipseOf: CGSize(width: 5, height: 6.5))
+        topknot.fillColor = hairColor
+        topknot.strokeColor = .clear
+        topknot.position = CGPoint(x: 0, y: 10.5)
+        headNode.addChild(topknot)
+
+        let knotBand = SKShapeNode(rectOf: CGSize(width: 3.5, height: 1.5))
+        knotBand.fillColor = SKColor(red: 0.85, green: 0.45, blue: 0.28, alpha: 1)
+        knotBand.strokeColor = .clear
+        knotBand.position = CGPoint(x: 0, y: 8)
+        headNode.addChild(knotBand)
+
+        // Mata lucu (dua titik hitam khas ekspresif Carto)
+        let leftEye = SKShapeNode(ellipseOf: CGSize(width: 1.8, height: 2.2))
+        leftEye.fillColor = SKColor(red: 0.12, green: 0.14, blue: 0.18, alpha: 1)
+        leftEye.strokeColor = .clear
+        leftEye.position = CGPoint(x: 1.5, y: 0.5)
+        headNode.addChild(leftEye)
+
+        let rightEye = SKShapeNode(ellipseOf: CGSize(width: 1.8, height: 2.2))
+        rightEye.fillColor = SKColor(red: 0.12, green: 0.14, blue: 0.18, alpha: 1)
+        rightEye.strokeColor = .clear
+        rightEye.position = CGPoint(x: 5.5, y: 0.5)
+        headNode.addChild(rightEye)
+
+        // Pipi merona lembut (blush)
+        let blush = SKShapeNode(ellipseOf: CGSize(width: 2.6, height: 1.5))
+        blush.fillColor = SKColor(red: 0.94, green: 0.60, blue: 0.56, alpha: 0.55)
+        blush.strokeColor = .clear
+        blush.position = CGPoint(x: 6.0, y: -2.2)
+        headNode.addChild(blush)
+
+        // Mulut senyum kecil
+        let smile = SKShapeNode(ellipseOf: CGSize(width: 2.0, height: 1.0))
+        smile.fillColor = SKColor(red: 0.65, green: 0.35, blue: 0.30, alpha: 0.8)
+        smile.strokeColor = .clear
+        smile.position = CGPoint(x: 3.5, y: -3)
+        headNode.addChild(smile)
+    }
+
+    // Perbarui urutan zPosition berdasarkan posisi Y (depth sorting 2.5D)
+    func updateDepth() {
+        // Objek dengan koordinat Y lebih rendah berada lebih di depan (nilai zPosition lebih tinggi)
+        zPosition = 30 + (480 - position.y) * 0.08
+    }
+
+    // Memperbarui arah pandang dan animasi langkah/diam
+    func applyMovement(dx: CGFloat, dy: CGFloat, dt: CGFloat) {
+        let speed = hypot(dx, dy)
+        if speed > 0.5 {
+            isWalking = true
+            walkPhase += dt * 14
+
+            // Arah hadap kiri / kanan (flip xScale)
+            if dx > 0.3 {
+                visualRoot.xScale = 1.0
+            } else if dx < -0.3 {
+                visualRoot.xScale = -1.0
+            }
+
+            // Animasi langkah: waddle naik-turun dan sedikit bergoyang
+            characterBodyNode.position.y = abs(sin(walkPhase)) * 2.5
+            characterBodyNode.zRotation = sin(walkPhase) * 0.07
+            shadowNode.setScale(1.0 - (abs(sin(walkPhase)) * 0.1))
+        } else {
+            isWalking = false
+            idlePhase += dt * 3
+            // Animasi bernapas santai saat diam
+            characterBodyNode.position.y = sin(idlePhase) * 0.6
+            characterBodyNode.zRotation = 0
+            shadowNode.setScale(1.0)
+        }
+        updateDepth()
+    }
+
+    // Mengikuti rute dengan navigasi dan memperbarui visual 2.5D
     func walk(dt: CGFloat, speed: CGFloat, navigation: MemoryNavigation) {
-        guard let next = route.first else { return }
+        guard let next = route.first else {
+            applyMovement(dx: 0, dy: 0, dt: dt)
+            return
+        }
         let dx = next.x - position.x, dy = next.y - position.y
         let length = hypot(dx, dy)
-        if length < 5 { route.removeFirst(); return }
+        if length < 5 {
+            route.removeFirst()
+            applyMovement(dx: 0, dy: 0, dt: dt)
+            return
+        }
         let amount = min(length, speed * dt)
+        let stepX = dx / length * amount
+        let stepY = dy / length * amount
         let previous = position
-        position = navigation.moved(from: position, by: CGVector(dx: dx / length * amount, dy: dy / length * amount))
-        if hypot(position.x - previous.x, position.y - previous.y) < 0.01 { route.removeAll() }
+        position = navigation.moved(from: position, by: CGVector(dx: stepX, dy: stepY))
+        if hypot(position.x - previous.x, position.y - previous.y) < 0.01 {
+            route.removeAll()
+            applyMovement(dx: 0, dy: 0, dt: dt)
+        } else {
+            applyMovement(dx: stepX, dy: stepY, dt: dt)
+        }
         body.zRotation = atan2(dy, dx) - .pi / 2
     }
 }
@@ -50,32 +303,48 @@ final class MemoryPatrol {
 
     init(_ definition: PatrolDefinition) {
         self.definition = definition
-        character = MemoryCharacter(title: definition.title, color: SKColor(red: 0.71, green: 0.48, blue: 0.37, alpha: 1))
+        character = MemoryCharacter(title: definition.title, color: SKColor(red: 0.65, green: 0.44, blue: 0.32, alpha: 1))
         character.position = definition.points[0]
         field.fillColor = SKColor(red: 0.98, green: 0.81, blue: 0.42, alpha: 0.14)
         field.strokeColor = SKColor(white: 1, alpha: 0.07)
         field.zPosition = 8
     }
-    // Menggerakkan patroli, menguji jarak dan arah pandang, lalu menaikkan atau menurunkan kecurigaan.
+
+    // Menggerakkan patroli, memperbarui animasi dan arah hadap Carto, serta menguji bidang pandang
     func update(dt: CGFloat, player: CGPoint, navigation: MemoryNavigation) -> Bool {
         let goal = definition.points[waypoint]
         let dx = goal.x - character.position.x, dy = goal.y - character.position.y
         let length = hypot(dx, dy)
-        if pause > 0 { pause -= dt }
-        else if length < 6 { waypoint = (waypoint + 1) % definition.points.count; pause = 1.1 }
-        else {
+        var movedDelta = CGVector.zero
+
+        if pause > 0 {
+            pause -= dt
+            character.applyMovement(dx: 0, dy: 0, dt: dt)
+        } else if length < 6 {
+            waypoint = (waypoint + 1) % definition.points.count
+            pause = 1.1
+            character.applyMovement(dx: 0, dy: 0, dt: dt)
+        } else {
             angle = atan2(dy, dx)
             let delta = CGVector(dx: cos(angle) * definition.speed * dt, dy: sin(angle) * definition.speed * dt)
             let next = navigation.moved(from: character.position, by: delta)
             if hypot(next.x - character.position.x, next.y - character.position.y) < 0.01 {
-                waypoint = (waypoint + 1) % definition.points.count; pause = 0.8
-            } else { character.position = next }
+                waypoint = (waypoint + 1) % definition.points.count
+                pause = 0.8
+                character.applyMovement(dx: 0, dy: 0, dt: dt)
+            } else {
+                movedDelta = CGVector(dx: next.x - character.position.x, dy: next.y - character.position.y)
+                character.position = next
+                character.applyMovement(dx: movedDelta.dx, dy: movedDelta.dy, dt: dt)
+            }
         }
         character.body.zRotation = angle - .pi / 2
+
         let offset = CGPoint(x: player.x - character.position.x, y: player.y - character.position.y)
         let difference = atan2(sin(atan2(offset.y, offset.x) - angle), cos(atan2(offset.y, offset.x) - angle))
         let seen = hypot(offset.x, offset.y) < definition.range && abs(difference) < halfAngle && navigation.visible(from: character.position, to: player)
         suspicion = max(0, min(1, suspicion + dt * (seen ? 0.65 : -0.6)))
+
         let path = CGMutablePath()
         path.move(to: character.position)
         for index in 0...40 {

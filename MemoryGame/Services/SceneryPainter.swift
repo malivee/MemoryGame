@@ -1,21 +1,27 @@
 // Penjelasan file: SceneryPainter.swift
-// Menggambar latar bergaya lukisan dengan CoreGraphics: tanah, rumah, pepohonan, air, dan perabot.
-// Mengikuti posisi rintangan dari PrologueLevel. Detail dekoratif tidak menambah aturan tabrakan.
-// Angka acak memakai seed tetap agar detail latar konsisten saat dibuat ulang.
+// Melukis latar dunia dalam perspektif 3/4 oblique bergaya storybook Carto dengan CoreGraphics:
+// Rumput kertas hangat (sage/lime), pondok panggung beratap jerami, pohon cemara berlapis,
+// semak rimbun dengan buah beri/bunga, pantai & laut biru dalam, serta interior kabin kayu yang kaya detail.
+// Menjaga kotak tabrakan PrologueLevel tetap konsisten tanpa mengubah aturan fisika/navigasi.
 
 import CoreGraphics
 import Foundation
 
-/// Painted scenery in world coordinates. Solid silhouettes use the level's exact
-/// collision rectangles; grass, flowers and worn paths are walkable surface detail.
 final class SceneryPainter {
     private var seed: UInt64 = 1937
     private var c: CGContext!
-    private let grass = CGColor(red: 0.38, green: 0.43, blue: 0.25, alpha: 1)
-    private let cream = CGColor(red: 0.85, green: 0.78, blue: 0.59, alpha: 1)
-    private let dark = CGColor(red: 0.20, green: 0.24, blue: 0.17, alpha: 1)
 
-    // Membuat bitmap peta, melukis permukaan serta rintangan, lalu menambahkan pencahayaan dekoratif.
+    // Palet warna hangat khas Carto (paper-cutout storybook)
+    private let grassLight = CGColor(red: 0.82, green: 0.89, blue: 0.60, alpha: 1)
+    private let grassBase  = CGColor(red: 0.77, green: 0.85, blue: 0.53, alpha: 1)
+    private let grassDark  = CGColor(red: 0.67, green: 0.77, blue: 0.44, alpha: 1)
+    private let creamPath  = CGColor(red: 0.91, green: 0.87, blue: 0.75, alpha: 1)
+    private let woodDark   = CGColor(red: 0.32, green: 0.23, blue: 0.16, alpha: 1)
+    private let woodWarm   = CGColor(red: 0.56, green: 0.42, blue: 0.26, alpha: 1)
+    private let oceanNavy  = CGColor(red: 0.08, green: 0.18, blue: 0.26, alpha: 1)
+    private let waterTeal  = CGColor(red: 0.26, green: 0.58, blue: 0.62, alpha: 1)
+
+    // Membuat bitmap peta dalam sudut pandang 3/4 oblique
     func image(level: PrologueLevel, progress: PrologueProgress, scale: CGFloat = 2) -> CGImage? {
         seed = 1937
         guard let context = CGContext(data: nil, width: Int(960 * scale), height: Int(480 * scale),
@@ -24,306 +30,555 @@ final class SceneryPainter {
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
         c = context
         c.scaleBy(x: scale, y: scale)
-        fill(PrologueLevel.bounds, grass)
-        if level.region == .house { interior() }
-        else { landscape(level: level, progress: progress) }
-        for obstacle in level.obstacles { paint(obstacle) }
-        if level.region != .house { borderStones() }
-        // Soft warm light, without affecting stealth visibility or collision.
+
+        // Dasar rumput cerah bertekstur kertas
+        fill(PrologueLevel.bounds, grassBase)
+
+        if level.region == .house {
+            interior()
+        } else {
+            landscape(level: level, progress: progress)
+        }
+
+        // Urutkan rintangan dari atas ke bawah (Y tertinggi ke terendah) untuk depth sorting 3/4
+        let sortedObstacles = level.obstacles.sorted { $0.rect.maxY > $1.rect.maxY }
+        for obstacle in sortedObstacles {
+            paint(obstacle)
+        }
+
+        if level.region != .house {
+            borderStones()
+        }
+
+        // Pencahayaan lembut hangat matahari khas Carto
         c.saveGState()
         let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-            color(1, 0.90, 0.61, 0.12), color(0.14, 0.23, 0.23, 0.05)
+            color(1.0, 0.96, 0.82, 0.12),
+            color(0.35, 0.55, 0.45, 0.03)
         ] as CFArray, locations: [0, 1])!
-        c.drawLinearGradient(gradient, start: CGPoint(x: 90, y: 460), end: CGPoint(x: 840, y: 0), options: [])
+        c.drawLinearGradient(gradient, start: CGPoint(x: 100, y: 470), end: CGPoint(x: 880, y: 10), options: [])
         c.restoreGState()
+
         return c.makeImage()
     }
-    // Menghasilkan variasi deterministik agar posisi detail kecil tidak berubah setiap kunjungan.
+
     private func random() -> CGFloat {
         seed = seed &* 6364136223846793005 &+ 1442695040888963407
         return CGFloat((seed >> 32) & 0xffff) / 65535
     }
+
     private func color(_ r: CGFloat, _ g: CGFloat, _ b: CGFloat, _ a: CGFloat = 1) -> CGColor {
         CGColor(red: r, green: g, blue: b, alpha: a)
     }
-    private func fill(_ rect: CGRect, _ color: CGColor) { c.setFillColor(color); c.fill(rect) }
-    private func ellipse(_ rect: CGRect, _ color: CGColor) { c.setFillColor(color); c.fillEllipse(in: rect) }
+
+    private func fill(_ rect: CGRect, _ color: CGColor) {
+        c.setFillColor(color); c.fill(rect)
+    }
+
+    private func ellipse(_ rect: CGRect, _ color: CGColor) {
+        c.setFillColor(color); c.fillEllipse(in: rect)
+    }
+
     private func line(_ points: [CGPoint], _ color: CGColor, _ width: CGFloat = 1) {
         guard let first = points.first else { return }
         c.beginPath(); c.move(to: first)
         for p in points.dropFirst() { c.addLine(to: p) }
         c.setStrokeColor(color); c.setLineWidth(width); c.setLineCap(.round); c.setLineJoin(.round); c.strokePath()
     }
+
     private func rounded(_ rect: CGRect, radius: CGFloat, color: CGColor) {
         c.addPath(CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil))
         c.setFillColor(color); c.fillPath()
     }
-    // Melukis dasar wilayah luar ruangan, jalur tanah, dan detail tumbuhan.
+
+    // Melukis dasar padang rumput cerah Carto, guratan pensil rumput, jalan tanah, dan bunga liar
     private func landscape(level: PrologueLevel, progress: PrologueProgress) {
-        // Broad pigment patches and fine broken strokes give the ground a painted texture.
-        for _ in 0..<2200 {
+        // 1. Sapuan pigmen cat air dan tekstur serat kertas rumput
+        for _ in 0..<1800 {
             let x = random() * 960, y = random() * 480
-            let value = random()
-            ellipse(CGRect(x: x, y: y, width: 8 + random() * 38, height: 3 + random() * 12),
-                    color(0.32 + value * 0.24, 0.36 + value * 0.20, 0.19 + value * 0.12, 0.15))
+            let v = random()
+            ellipse(CGRect(x: x, y: y, width: 14 + random() * 45, height: 6 + random() * 20),
+                    color(0.72 + v * 0.16, 0.82 + v * 0.12, 0.49 + v * 0.14, 0.18))
         }
-        if level.region == .village {
-            trail([CGPoint(x: 0, y: 72), CGPoint(x: 220, y: 82), CGPoint(x: 455, y: 125), CGPoint(x: 740, y: 150), CGPoint(x: 960, y: 145)], width: 52)
-            trail([CGPoint(x: 140, y: 0), CGPoint(x: 160, y: 80), CGPoint(x: 245, y: 275), CGPoint(x: 170, y: 365), CGPoint(x: 210, y: 480)], width: 38)
-            trail([CGPoint(x: 465, y: 80), CGPoint(x: 470, y: 255), CGPoint(x: 510, y: 420), CGPoint(x: 550, y: 480)], width: 42)
-            trail([CGPoint(x: 670, y: 110), CGPoint(x: 700, y: 280), CGPoint(x: 830, y: 310), CGPoint(x: 960, y: 330)], width: 34)
-            // Kitchen-garden beds: low soil and flowers, not false cover.
-            for row in 0..<4 {
-                let rect = CGRect(x: 760, y: 140 + row * 13, width: 136, height: 7)
-                rounded(rect, radius: 3, color: color(0.31, 0.28, 0.17, 0.5))
-                for col in 0..<12 { flower(CGPoint(x: 766 + col * 11, y: 144 + row * 13), size: 1.7) }
-            }
-        } else {
-            trail([CGPoint(x: 30, y: 100), CGPoint(x: 140, y: 150), CGPoint(x: 245, y: 200), CGPoint(x: 280, y: 370)], width: 42)
-            trail([CGPoint(x: 640, y: 65), CGPoint(x: 710, y: 105), CGPoint(x: 790, y: 205), CGPoint(x: 810, y: 370), CGPoint(x: 960, y: 400)], width: 46)
+
+        // 2. Garis pantai tebing dan laut biru tua Carto (seperti screenshot 2)
+        if level.region != .village && level.region != .house {
             if progress.lakeVariant == .dryLake {
-                rounded(CGRect(x: 343, y: 38, width: 244, height: 135), radius: 30, color: color(0.63, 0.53, 0.34))
-                for _ in 0..<42 {
+                // Danau kering / cekungan tanah berpasir
+                rounded(CGRect(x: 343, y: 38, width: 244, height: 135), radius: 35, color: color(0.83, 0.76, 0.60))
+                for _ in 0..<60 {
                     let x = 353 + random() * 217, y = 45 + random() * 115
-                    line([CGPoint(x: x, y: y), CGPoint(x: x + 8, y: y + 7), CGPoint(x: x + 6, y: y + 15)], color(0.38, 0.32, 0.22, 0.4), 0.8)
+                    line([CGPoint(x: x, y: y), CGPoint(x: x + 10, y: y + 8)], color(0.66, 0.58, 0.44, 0.4), 1.2)
+                }
+            } else {
+                // Tebing pesisir dan laut biru Carto (persis seperti screenshot 2)
+                cartoOceanCliff(CGRect(x: 830, y: 0, width: 130, height: 480))
+            }
+        }
+
+        // 3. Jalur jalan tanah berpasir lembut khas Carto
+        if level.region == .village {
+            trail([CGPoint(x: 0, y: 72), CGPoint(x: 220, y: 82), CGPoint(x: 455, y: 125), CGPoint(x: 740, y: 150), CGPoint(x: 960, y: 145)], width: 46)
+            trail([CGPoint(x: 140, y: 0), CGPoint(x: 160, y: 80), CGPoint(x: 245, y: 275), CGPoint(x: 170, y: 365), CGPoint(x: 210, y: 480)], width: 34)
+            trail([CGPoint(x: 465, y: 80), CGPoint(x: 470, y: 255), CGPoint(x: 510, y: 420), CGPoint(x: 550, y: 480)], width: 38)
+            trail([CGPoint(x: 670, y: 110), CGPoint(x: 700, y: 280), CGPoint(x: 830, y: 310), CGPoint(x: 960, y: 330)], width: 30)
+
+            // Kebun sayur kecil desa dengan pagar pasak kayu
+            for row in 0..<3 {
+                let rect = CGRect(x: 760, y: 140 + row * 16, width: 136, height: 9)
+                rounded(rect, radius: 4, color: color(0.55, 0.46, 0.33, 0.6))
+                for col in 0..<11 {
+                    flower(CGPoint(x: 768 + col * 12, y: 144 + row * 16), size: 2.0, isBlue: false)
                 }
             }
+        } else {
+            trail([CGPoint(x: 30, y: 100), CGPoint(x: 140, y: 150), CGPoint(x: 245, y: 200), CGPoint(x: 280, y: 370)], width: 38)
+            trail([CGPoint(x: 640, y: 65), CGPoint(x: 710, y: 105), CGPoint(x: 790, y: 205), CGPoint(x: 810, y: 370), CGPoint(x: 960, y: 400)], width: 42)
         }
+
+        // Zona jalan modular puzzle
         for zone in level.zones where zone.piece == .oldPath || zone.piece == .villageRoad {
             c.saveGState(); c.clip(to: zone.rect)
             c.translateBy(x: zone.rect.midX, y: zone.rect.midY)
             c.rotate(by: -CGFloat(progress.placement(of: zone.piece)?.turns ?? 0) * .pi / 2)
-            trail([CGPoint(x: -zone.rect.width / 2, y: 0), CGPoint(x: zone.rect.width / 2, y: 0)], width: 67)
+            trail([CGPoint(x: -zone.rect.width / 2, y: 0), CGPoint(x: zone.rect.width / 2, y: 0)], width: 55)
             c.restoreGState()
         }
-        for _ in 0..<2900 {
+
+        // 4. Guratan rumput krayon kecil (V-shapes dan blade strokes khas Carto)
+        for _ in 0..<1200 {
             let x = random() * 960, y = random() * 480
-            let v = random()
-            line([CGPoint(x: x, y: y), CGPoint(x: x - 1 + random() * 3, y: y + 2 + random() * 3)],
-                 color(0.36 + v * 0.25, 0.42 + v * 0.18, 0.22 + v * 0.13, 0.24), 0.7)
+            grassTuft(at: CGPoint(x: x, y: y))
         }
-        for _ in 0..<270 {
+
+        // 5. Bunga liar mungil (putih dan biru muda seperti di screenshot Carto)
+        for _ in 0..<240 {
             let p = CGPoint(x: random() * 960, y: random() * 480)
-            if level.obstacles.contains(where: { $0.rect.insetBy(dx: -12, dy: -12).contains(p) }) { continue }
-            flower(p, size: 1.1 + random() * 1.0)
+            if level.obstacles.contains(where: { $0.rect.insetBy(dx: -10, dy: -10).contains(p) }) { continue }
+            flower(p, size: 1.4 + random() * 1.2, isBlue: random() > 0.65)
         }
     }
+
+    // Melukis rumpun rumput krayon mungil
+    private func grassTuft(at p: CGPoint) {
+        let h: CGFloat = 3.5 + random() * 3.0
+        let cGrass = color(0.52 + random() * 0.15, 0.68 + random() * 0.12, 0.32 + random() * 0.10, 0.45)
+        line([CGPoint(x: p.x - 2.5, y: p.y + h), CGPoint(x: p.x, y: p.y), CGPoint(x: p.x + 2.5, y: p.y + h)], cGrass, 0.9)
+    }
+
+    // Melukis jalan tanah dengan transisi lembut ke rumput
     private func trail(_ points: [CGPoint], width: CGFloat) {
-        line(points, color(0.30, 0.32, 0.19, 0.33), width + 10)
-        line(points, color(0.64, 0.57, 0.39), width)
-        line(points, color(0.76, 0.68, 0.48, 0.65), width * 0.70)
+        line(points, color(0.70, 0.72, 0.46, 0.4), width + 14)
+        line(points, color(0.86, 0.81, 0.68, 0.95), width)
+        line(points, color(0.93, 0.89, 0.77, 0.85), width * 0.65)
         for i in 1..<points.count {
             let a = points[i - 1], b = points[i]
-            for _ in 0..<Int(hypot(b.x - a.x, b.y - a.y) / 4) {
+            for _ in 0..<Int(hypot(b.x - a.x, b.y - a.y) / 5) {
                 let t = random(), side = (random() - 0.5) * width * 0.8
                 let p = CGPoint(x: a.x + (b.x - a.x) * t + side * 0.5, y: a.y + (b.y - a.y) * t + side)
-                ellipse(CGRect(x: p.x, y: p.y, width: 1 + random() * 3, height: 1.3), color(0.43, 0.39, 0.28, 0.35))
+                ellipse(CGRect(x: p.x, y: p.y, width: 1.8 + random() * 2.2, height: 1.5), color(0.72, 0.65, 0.50, 0.45))
             }
         }
     }
-    private func flower(_ p: CGPoint, size: CGFloat) {
-        let hue = random()
-        let petals = hue > 0.65 ? color(0.93, 0.77, 0.34, 0.85) : color(0.92, 0.89, 0.70, 0.8)
-        for i in 0..<5 {
-            let a = CGFloat(i) * .pi * 2 / 5
-            ellipse(CGRect(x: p.x + cos(a) * size, y: p.y + sin(a) * size, width: size, height: size), petals)
+
+    // Bunga liar mungil khas Carto (putih dandelion atau biru langit)
+    private func flower(_ p: CGPoint, size: CGFloat, isBlue: Bool) {
+        let petalColor = isBlue ? color(0.46, 0.68, 0.88, 0.9) : color(0.98, 0.98, 0.94, 0.9)
+        line([p, CGPoint(x: p.x, y: p.y - size * 1.8)], color(0.48, 0.62, 0.32, 0.75), 0.9)
+        for i in 0..<4 {
+            let a = CGFloat(i) * .pi / 2
+            ellipse(CGRect(x: p.x + cos(a) * size * 0.8 - size * 0.4,
+                           y: p.y + sin(a) * size * 0.8 - size * 0.4,
+                           width: size * 0.8, height: size * 0.8), petalColor)
         }
-        ellipse(CGRect(x: p.x + size * 0.3, y: p.y + size * 0.3, width: size * 0.8, height: size * 0.8), color(0.79, 0.53, 0.18))
+        ellipse(CGRect(x: p.x - size * 0.3, y: p.y - size * 0.3, width: size * 0.6, height: size * 0.6), color(0.95, 0.82, 0.36, 1))
     }
+
+    // Tebing pantai dan laut biru tua Carto (persis seperti screenshot 2)
+    private func cartoOceanCliff(_ r: CGRect) {
+        // Tepi tebing berpasir krem tipis
+        rounded(r, radius: 15, color: color(0.88, 0.84, 0.70))
+        // Laut biru dalam Carto
+        let sea = r.offsetBy(dx: 16, dy: 0)
+        rounded(sea, radius: 10, color: oceanNavy)
+        // Riak air toska dan gelombang putih
+        for i in 0..<22 {
+            let y = r.minY + CGFloat(i) * 22 + random() * 8
+            let x = sea.minX + 6 + random() * 70
+            line([CGPoint(x: x, y: y), CGPoint(x: x + 8, y: y + 2), CGPoint(x: x + 16, y: y)], color(0.45, 0.75, 0.78, 0.5), 1.6)
+            line([CGPoint(x: x + 2, y: y + 1), CGPoint(x: x + 8, y: y + 2.5)], color(1, 1, 1, 0.55), 1.0)
+        }
+    }
+
+    // Interior kabin kayu Carto (persis seperti screenshot 3):
+    // Dinding balok kayu dengan untaian kalung bulu/taring, karpet anyaman Aztec, bantal kayu, dan pot sup
     private func interior() {
-        fill(PrologueLevel.bounds, color(0.58, 0.44, 0.29))
-        for row in 0..<20 {
-            let y = CGFloat(row) * 25
-            for col in 0..<9 {
-                let x = CGFloat(col) * 128 - (row % 2 == 0 ? 0 : 64)
-                let v = random()
-                fill(CGRect(x: x + 1, y: y + 1, width: 126, height: 23), color(0.53 + v * 0.11, 0.40 + v * 0.10, 0.26 + v * 0.07))
-                for _ in 0..<6 {
-                    let gy = y + 3 + random() * 19
-                    line([CGPoint(x: x + 8, y: gy), CGPoint(x: x + 35 + random() * 85, y: gy + random() * 1.5)], color(0.3, 0.23, 0.15, 0.16), 0.6)
-                }
+        // Latar gelap di luar ruangan kabin (seperti screenshot 3)
+        fill(PrologueLevel.bounds, color(0.12, 0.16, 0.20))
+
+        // Lantai kayu papan hangat
+        let floorRect = CGRect(x: 60, y: 15, width: 840, height: 410)
+        rounded(floorRect, radius: 14, color: color(0.91, 0.83, 0.68))
+
+        // Garis-garis papan lantai horizontal
+        for row in 0..<18 {
+            let y = floorRect.minY + CGFloat(row) * (floorRect.height / 18)
+            line([CGPoint(x: floorRect.minX + 2, y: y), CGPoint(x: floorRect.maxX - 2, y: y)], color(0.72, 0.62, 0.46, 0.5), 1.0)
+        }
+
+        // Pintu masuk di sebelah kiri dengan sorot cahaya luar
+        let doorPath = CGMutablePath()
+        doorPath.move(to: CGPoint(x: floorRect.minX - 10, y: 280))
+        doorPath.addLine(to: CGPoint(x: floorRect.minX + 35, y: 240))
+        doorPath.addLine(to: CGPoint(x: floorRect.minX + 35, y: 120))
+        doorPath.addLine(to: CGPoint(x: floorRect.minX - 10, y: 100))
+        doorPath.closeSubpath()
+        c.setFillColor(color(0.98, 0.94, 0.78, 0.45))
+        c.addPath(doorPath); c.fillPath()
+
+        // Dinding belakang kayu tegak (balok kayu vertikal Carto)
+        let wallHeight: CGFloat = 85
+        let wallY = floorRect.maxY - 15
+        let wallRect = CGRect(x: floorRect.minX - 8, y: wallY, width: floorRect.width + 16, height: wallHeight)
+        rounded(wallRect, radius: 8, color: color(0.48, 0.38, 0.26))
+
+        // Tiang kayu vertikal di dinding
+        let beamCount = 16
+        for b in 0..<beamCount {
+            let bx = wallRect.minX + CGFloat(b) * (wallRect.width / CGFloat(beamCount))
+            fill(CGRect(x: bx, y: wallRect.minY, width: 6, height: wallHeight), woodDark)
+        }
+
+        // Balok kayu penyangga miring (diagonal timber braces)
+        line([CGPoint(x: wallRect.minX + 120, y: wallRect.minY), CGPoint(x: wallRect.minX + 220, y: wallRect.maxY)], woodDark, 8)
+        line([CGPoint(x: wallRect.maxX - 120, y: wallRect.minY), CGPoint(x: wallRect.maxX - 220, y: wallRect.maxY)], woodDark, 8)
+
+        // Untaian kalung hiasan bulu/taring putih menggantung di dinding (seperti screenshot 3)
+        for g in 0..<2 {
+            let startX = wallRect.minX + 240 + CGFloat(g) * 220
+            let endX = startX + 180
+            let midY = wallRect.minY + 25
+            let topY = wallRect.minY + 60
+
+            let garlandPath = CGMutablePath()
+            garlandPath.move(to: CGPoint(x: startX, y: topY))
+            garlandPath.addQuadCurve(to: CGPoint(x: endX, y: topY), control: CGPoint(x: (startX + endX) / 2, y: midY))
+            c.setStrokeColor(color(0.85, 0.75, 0.50, 0.8)); c.setLineWidth(1.8)
+            c.addPath(garlandPath); c.strokePath()
+
+            // Liontin bulu putih segitiga
+            for p in 0..<7 {
+                let px = startX + CGFloat(p) * 24 + 12
+                let py = midY + CGFloat(abs(p - 3)) * 4 + 4
+                let tooth = CGMutablePath()
+                tooth.move(to: CGPoint(x: px - 3, y: py))
+                tooth.addLine(to: CGPoint(x: px + 3, y: py))
+                tooth.addLine(to: CGPoint(x: px, y: py - 9))
+                tooth.closeSubpath()
+                c.setFillColor(color(0.96, 0.95, 0.90)); c.addPath(tooth); c.fillPath()
             }
         }
-        // Plaster perimeter and low window sills stay inside the impassable map edge.
-        fill(CGRect(x: 0, y: 466, width: 960, height: 14), cream)
-        fill(CGRect(x: 0, y: 0, width: 960, height: 10), color(0.28, 0.23, 0.18))
-        fill(CGRect(x: 0, y: 0, width: 10, height: 480), cream)
-        fill(CGRect(x: 950, y: 0, width: 10, height: 480), cream)
-        for x: CGFloat in [90, 340, 620, 845] {
-            fill(CGRect(x: x, y: 466, width: 60, height: 10), color(0.23, 0.34, 0.29))
-            fill(CGRect(x: x + 3, y: 468, width: 54, height: 6), color(0.66, 0.79, 0.67))
-            c.saveGState()
-            c.move(to: CGPoint(x: x + 3, y: 466)); c.addLine(to: CGPoint(x: x + 57, y: 466))
-            c.addLine(to: CGPoint(x: x + 110, y: 390)); c.addLine(to: CGPoint(x: x + 5, y: 390)); c.closePath()
-            c.setFillColor(color(1, 0.9, 0.57, 0.13)); c.fillPath(); c.restoreGState()
+
+        // Karpet anyaman suku Aztec besar di tengah (seperti screenshot 3)
+        let rug = CGRect(x: 330, y: 135, width: 280, height: 185)
+        rounded(rug, radius: 10, color: color(0.88, 0.71, 0.40))
+        rounded(rug.insetBy(dx: 12, dy: 12), radius: 6, color: color(0.96, 0.91, 0.78))
+        // Motif rumbai karpet di sekeliling
+        c.setStrokeColor(color(0.68, 0.48, 0.25, 0.8)); c.setLineWidth(2.5)
+        c.stroke(rug.insetBy(dx: 6, dy: 6))
+
+        // Bantal bulat potongan kayu (tree-stump cushions di sekitar karpet seperti screenshot 3)
+        let stoolPositions = [
+            CGPoint(x: 290, y: 220),
+            CGPoint(x: 295, y: 130),
+            CGPoint(x: 645, y: 235),
+            CGPoint(x: 640, y: 140)
+        ]
+        for sp in stoolPositions {
+            ellipse(CGRect(x: sp.x - 14, y: sp.y - 10, width: 28, height: 20), color(0.35, 0.25, 0.17))
+            ellipse(CGRect(x: sp.x - 12, y: sp.y - 8, width: 24, height: 16), color(0.55, 0.40, 0.26))
+            // Cincin kayu konsentris
+            ellipse(CGRect(x: sp.x - 6, y: sp.y - 4, width: 12, height: 8), color(0.40, 0.28, 0.18))
         }
-        rounded(CGRect(x: 620, y: 270, width: 245, height: 170), radius: 6, color: color(0.43, 0.27, 0.22, 0.65))
-        c.setStrokeColor(color(0.78, 0.64, 0.41, 0.6)); c.setLineWidth(3)
-        c.stroke(CGRect(x: 628, y: 278, width: 229, height: 154))
-        for i in 0..<15 {
-            line([CGPoint(x: 634 + i * 15, y: 285), CGPoint(x: 634 + i * 15, y: 425)], color(0.66, 0.49, 0.32, 0.23), 1)
+
+        // Tanaman hias dalam pot anyaman di sudut kiri bawah (seperti screenshot 3)
+        let plantPot = CGRect(x: 95, y: 40, width: 28, height: 24)
+        rounded(plantPot, radius: 5, color: color(0.56, 0.40, 0.24))
+        // Daun-daun hijau runcing
+        for leaf in 0..<5 {
+            let la = CGFloat(leaf) * .pi / 4 + .pi / 8
+            line([CGPoint(x: plantPot.midX, y: plantPot.maxY),
+                  CGPoint(x: plantPot.midX + cos(la) * 22, y: plantPot.maxY + sin(la) * 26)], color(0.24, 0.52, 0.32), 4)
         }
     }
-    // Memilih cara menggambar rintangan berdasarkan jenisnya pada data level.
+
+    // Melukis rintangan dalam perspektif 3/4 front projection Carto
     private func paint(_ obstacle: WorldObstacle) {
         let r = obstacle.rect
         c.saveGState()
-        // Shadows are ground effects; all substantial objects keep their solid footprint.
-        rounded(r.offsetBy(dx: 5, dy: -5), radius: 5, color: color(0.12, 0.19, 0.15, 0.24))
-        c.clip(to: r)
+
+        // Bayangan lembut di bawah kaki rintangan
+        let shadowRect = CGRect(x: r.minX - 3, y: r.minY - 4, width: r.width + 6, height: min(16, r.height * 0.4))
+        ellipse(shadowRect, color(0.18, 0.24, 0.14, 0.24))
+
         switch obstacle.kind {
-        case "Rumah": cottage(r)
-        case "Pagar tanaman", "Pohon": foliage(r, tree: obstacle.kind == "Pohon")
-        case "Batu", "Dinding batu": rocks(r, wall: obstacle.kind == "Dinding batu")
-        case "Air": water(r)
-        case "Tempat tidur": bed(r)
-        case "Lemari": cabinet(r)
-        case "Meja": table(r)
-        default: crate(r)
+        case "Rumah":
+            cottage(r)
+        case "Pohon":
+            pineTree(r)
+        case "Pagar tanaman":
+            bushHedge(r)
+        case "Batu", "Dinding batu":
+            rocks(r, wall: obstacle.kind == "Dinding batu")
+        case "Air":
+            water(r)
+        case "Tempat tidur":
+            bed(r)
+        case "Lemari":
+            cabinet(r)
+        case "Meja":
+            table(r)
+        default:
+            crate(r)
         }
         c.restoreGState()
     }
+
+    // Pondok panggung beratap jerami tebal khas Carto (seperti screenshot 1)
     private func cottage(_ r: CGRect) {
-        fill(r, color(0.39, 0.29, 0.20))
-        fill(r.insetBy(dx: 3, dy: 3), cream)
-        let roof = CGRect(x: r.minX + 3, y: r.minY + 18, width: r.width - 6, height: r.height - 21)
-        fill(roof, color(0.65, 0.32, 0.18))
-        for row in 0..<Int(roof.height / 7 + 1) {
-            for col in 0..<Int(roof.width / 11 + 1) {
-                let x = roof.minX + CGFloat(col) * 11 - CGFloat(row % 2) * 5
-                let y = roof.minY + CGFloat(row) * 7
-                let v = random()
-                rounded(CGRect(x: x, y: y, width: 10, height: 6), radius: 2, color: color(0.63 + v * 0.22, 0.31 + v * 0.16, 0.16 + v * 0.10))
-                line([CGPoint(x: x + 2, y: y + 5), CGPoint(x: x + 8, y: y + 5)], color(0.98, 0.71, 0.4, 0.25), 0.7)
-            }
+        let groundY = r.minY
+        let wallHeight: CGFloat = r.height * 0.45
+
+        // 1. Tiang panggung kayu di bagian bawah
+        let stiltColor = woodDark
+        fill(CGRect(x: r.minX + 8, y: groundY, width: 6, height: wallHeight * 0.65), stiltColor)
+        fill(CGRect(x: r.maxX - 14, y: groundY, width: 6, height: wallHeight * 0.65), stiltColor)
+        fill(CGRect(x: r.midX - 3, y: groundY, width: 6, height: wallHeight * 0.65), stiltColor)
+
+        // Tangga kayu kecil di depan menuju pintu (persis seperti di Carto)
+        let ladderX = r.midX + 16
+        line([CGPoint(x: ladderX, y: groundY), CGPoint(x: ladderX + 6, y: groundY + wallHeight * 0.7)], woodWarm, 2.5)
+        line([CGPoint(x: ladderX + 10, y: groundY), CGPoint(x: ladderX + 16, y: groundY + wallHeight * 0.7)], woodWarm, 2.5)
+        for s in 0..<3 {
+            let sy = groundY + CGFloat(s) * 6 + 3
+            line([CGPoint(x: ladderX + CGFloat(s) * 2, y: sy), CGPoint(x: ladderX + 10 + CGFloat(s) * 2, y: sy)], woodWarm, 2)
         }
-        line([CGPoint(x: roof.minX, y: roof.midY), CGPoint(x: roof.maxX, y: roof.midY)], color(0.39, 0.21, 0.14, 0.7), 3)
-        fill(CGRect(x: r.midX - 8, y: r.minY + 1, width: 16, height: 16), color(0.22, 0.29, 0.23))
-        for x in [r.minX + 18, r.maxX - 31] {
-            fill(CGRect(x: x, y: r.minY + 4, width: 13, height: 9), color(0.30, 0.41, 0.30))
-            line([CGPoint(x: x + 6, y: r.minY + 4), CGPoint(x: x + 6, y: r.minY + 13)], cream, 1)
+
+        // Guci tanah liat kecil di sebelah kiri tiang
+        ellipse(CGRect(x: r.minX - 4, y: groundY, width: 12, height: 14), color(0.42, 0.35, 0.30))
+        ellipse(CGRect(x: r.minX - 2, y: groundY + 11, width: 8, height: 4), color(0.28, 0.22, 0.18))
+
+        // 2. Dinding papan kayu rumah panggung
+        let wallRect = CGRect(x: r.minX + 4, y: groundY + wallHeight * 0.4, width: r.width - 8, height: wallHeight)
+        rounded(wallRect, radius: 4, color: color(0.68, 0.54, 0.38))
+        for col in 1..<5 {
+            let px = wallRect.minX + CGFloat(col) * (wallRect.width / 5)
+            line([CGPoint(x: px, y: wallRect.minY), CGPoint(x: px, y: wallRect.maxY)], color(0.48, 0.36, 0.24, 0.5), 1.2)
         }
-        fill(CGRect(x: r.maxX - 26, y: r.maxY - 26, width: 13, height: 20), color(0.77, 0.69, 0.52))
-        fill(CGRect(x: r.maxX - 28, y: r.maxY - 9, width: 17, height: 5), color(0.42, 0.33, 0.24))
-    }
-    private func foliage(_ r: CGRect, tree: Bool) {
-        fill(r, color(0.23, 0.31, 0.18))
-        for _ in 0..<Int(r.width * r.height / 25) {
-            let x = r.minX + random() * r.width, y = r.minY + random() * r.height
-            let light = random()
-            let size: CGFloat = tree ? 12 + random() * 16 : 7 + random() * 12
-            ellipse(CGRect(x: x - size / 2, y: y - size / 2, width: size, height: size * 0.8),
-                    color(0.25 + light * 0.25, 0.33 + light * 0.22, 0.17 + light * 0.12, 0.85))
-            ellipse(CGRect(x: x, y: y + 1, width: size * 0.5, height: size * 0.35), color(0.70, 0.70, 0.31, 0.24))
-        }
-        if tree {
-            line([CGPoint(x: r.midX, y: r.minY), CGPoint(x: r.midX, y: r.midY), CGPoint(x: r.midX - 10, y: r.midY + 16)], color(0.36, 0.28, 0.17, 0.5), 4)
-        }
-    }
-    private func rocks(_ r: CGRect, wall: Bool) {
-        fill(r, color(0.35, 0.37, 0.31))
-        if !wall {
-            let points = [CGPoint(x: r.minX + 2, y: r.midY),
-                          CGPoint(x: r.minX + r.width * 0.13, y: r.maxY - 9),
-                          CGPoint(x: r.midX, y: r.maxY - 2),
-                          CGPoint(x: r.maxX - 4, y: r.maxY - r.height * 0.22),
-                          CGPoint(x: r.maxX - 1, y: r.minY + r.height * 0.22),
-                          CGPoint(x: r.midX, y: r.minY + 2),
-                          CGPoint(x: r.minX + 4, y: r.minY + 8)]
-            c.beginPath(); c.move(to: points[0])
-            for p in points.dropFirst() { c.addLine(to: p) }
-            c.closePath(); c.setFillColor(color(0.57, 0.59, 0.51)); c.fillPath()
-            let center = CGPoint(x: r.midX + 3, y: r.midY + 9)
-            for i in 0..<points.count {
-                c.beginPath(); c.move(to: center); c.addLine(to: points[i]); c.addLine(to: points[(i + 1) % points.count]); c.closePath()
-                let v = CGFloat(i % 4) / 4
-                c.setFillColor(color(0.42 + v * 0.32, 0.45 + v * 0.30, 0.40 + v * 0.25)); c.fillPath()
-                line([center, points[i]], color(0.88, 0.86, 0.71, 0.25), 1.3)
-            }
-            for _ in 0..<32 {
-                let x = r.minX + random() * r.width, y = r.minY + random() * r.height
-                ellipse(CGRect(x: x, y: y, width: 3 + random() * 9, height: 2 + random() * 5), color(0.40, 0.46, 0.23, 0.55))
-            }
-            return
-        }
-        let height: CGFloat = 11
-        for row in 0..<Int(r.height / height + 1) {
-            for col in 0..<Int(r.width / 26 + 2) {
-                let x = r.minX + CGFloat(col) * 26 - CGFloat(row % 2) * 13
-                let y = r.minY + CGFloat(row) * height
-                let v = random()
-                rounded(CGRect(x: x + 1, y: y + 1, width: 24, height: height - 2), radius: 3,
-                        color: color(0.45 + v * 0.20, 0.47 + v * 0.18, 0.40 + v * 0.16))
-                line([CGPoint(x: x + 4, y: y + height - 3), CGPoint(x: x + 22, y: y + height - 3)], color(0.90, 0.86, 0.69, 0.34), 1)
-                if random() > 0.55 { ellipse(CGRect(x: x + 7, y: y + 2, width: 11, height: 4), color(0.40, 0.44, 0.18, 0.7)) }
+
+        // Pintu masuk anyaman bermotif toska (seperti Carto)
+        let door = CGRect(x: r.midX - 10, y: wallRect.minY + 2, width: 18, height: wallHeight * 0.9)
+        rounded(door, radius: 5, color: color(0.24, 0.55, 0.52))
+        line([CGPoint(x: door.midX, y: door.maxY - 4), CGPoint(x: door.minX + 2, y: door.minY + 4)], color(0.85, 0.82, 0.55), 1.2)
+        line([CGPoint(x: door.midX, y: door.maxY - 4), CGPoint(x: door.maxX - 2, y: door.minY + 4)], color(0.85, 0.82, 0.55), 1.2)
+
+        // 3. Atap Jerami Tebal (Thatched Roof Carto)
+        let roofBottom = wallRect.maxY - 4
+        let roofTop = r.maxY + 12
+        let roofPath = CGMutablePath()
+        roofPath.move(to: CGPoint(x: r.minX - 8, y: roofBottom))
+        roofPath.addLine(to: CGPoint(x: r.midX, y: roofTop))
+        roofPath.addLine(to: CGPoint(x: r.maxX + 8, y: roofBottom))
+        roofPath.closeSubpath()
+
+        c.setFillColor(color(0.82, 0.66, 0.40))
+        c.addPath(roofPath); c.fillPath()
+
+        let strawDark = color(0.60, 0.46, 0.26, 0.8)
+        let strawLight = color(0.92, 0.80, 0.55, 0.8)
+
+        for row in 0..<4 {
+            let progress = CGFloat(row) / 4.0
+            let y = roofBottom + progress * (roofTop - roofBottom) * 0.85
+            let w = (r.width + 16) * (1.0 - progress * 0.65)
+            let x = r.midX - w / 2
+
+            line([CGPoint(x: x, y: y), CGPoint(x: x + w, y: y)], strawDark, 2.5)
+            for i in 0..<Int(w / 7) {
+                let sx = x + CGFloat(i) * 7 + random() * 2
+                line([CGPoint(x: sx, y: y - 1), CGPoint(x: sx + random() * 3 - 1.5, y: y + 9)], strawLight, 1.0)
             }
         }
     }
-    private func water(_ r: CGRect) {
-        fill(r, color(0.26, 0.46, 0.42))
-        rounded(r.insetBy(dx: 3, dy: 3), radius: 12, color: color(0.24, 0.52, 0.56))
-        for _ in 0..<360 {
-            let x = r.minX + random() * r.width, y = r.minY + random() * r.height
-            let v = random()
-            line([CGPoint(x: x, y: y), CGPoint(x: x + 2 + random() * 12, y: y)], color(0.45 + v * 0.28, 0.70 + v * 0.15, 0.66 + v * 0.20, 0.20), 1)
-        }
-        for i in 0..<Int(r.width / 14) {
-            let x = r.minX + CGFloat(i) * 14
-            ellipse(CGRect(x: x, y: r.minY + random() * 5, width: 10, height: 6), color(0.57, 0.57, 0.40))
-            ellipse(CGRect(x: x, y: r.maxY - 5 - random() * 4, width: 11, height: 7), color(0.55, 0.58, 0.41))
+
+    // Pohon Cemara / Pinus berlapis khas Carto (seperti screenshot 2)
+    private func pineTree(_ r: CGRect) {
+        let trunkWidth: CGFloat = 8
+        let trunkHeight: CGFloat = r.height * 0.32
+        rounded(CGRect(x: r.midX - trunkWidth / 2, y: r.minY, width: trunkWidth, height: trunkHeight),
+                radius: 2, color: woodDark)
+
+        let layers = 4
+        let topY = r.maxY + 18
+        let bottomY = r.minY + trunkHeight * 0.65
+        let totalH = topY - bottomY
+
+        for layer in 0..<layers {
+            let lProgress = CGFloat(layer) / CGFloat(layers)
+            let ly = bottomY + lProgress * totalH * 0.72
+            let lh = totalH * 0.45
+            let lw = (r.width + 12) * (1.0 - lProgress * 0.24)
+            let lx = r.midX - lw / 2
+
+            let tierPath = CGMutablePath()
+            tierPath.move(to: CGPoint(x: lx, y: ly))
+            tierPath.addLine(to: CGPoint(x: r.midX, y: ly + lh))
+            tierPath.addLine(to: CGPoint(x: lx + lw, y: ly))
+            tierPath.closeSubpath()
+
+            let v = CGFloat(layer) * 0.05
+            c.setFillColor(color(0.20 + v, 0.38 + v * 1.2, 0.22 + v, 0.95))
+            c.addPath(tierPath); c.fillPath()
+
+            let needleColor = color(0.35 + v * 1.1, 0.56 + v * 1.1, 0.30 + v, 0.85)
+            for s in 0..<Int(lw / 4.5) {
+                let nx = lx + CGFloat(s) * 4.5 + 2
+                line([CGPoint(x: nx, y: ly + 1), CGPoint(x: nx, y: ly + lh * 0.65)], needleColor, 1.1)
+            }
         }
     }
-    private func crate(_ r: CGRect) {
-        if r.width > 70 && r.height > 70 {
-            let width = r.width / 2, height = r.height / 2
-            for row in 0..<2 {
-                for col in 0..<2 {
-                    let rect = CGRect(x: r.minX + CGFloat(col) * width, y: r.minY + CGFloat(row) * height, width: width - 1, height: height - 1)
-                    smallCrate(rect)
+
+    // Semak rimbun Carto dengan tekstur garis vertikal dan buah beri/bunga (seperti screenshot 1 & 2)
+    private func bushHedge(_ r: CGRect) {
+        // Pasak kayu pagar pembatas
+        let stakeCount = max(2, Int(r.width / 22))
+        for i in 0..<stakeCount {
+            let sx = r.minX + CGFloat(i) * (r.width / CGFloat(stakeCount - 1))
+            rounded(CGRect(x: sx - 2, y: r.minY, width: 4, height: r.height * 0.5), radius: 1, color: woodDark)
+            if i > 0 {
+                let prevX = r.minX + CGFloat(i - 1) * (r.width / CGFloat(stakeCount - 1))
+                line([CGPoint(x: prevX, y: r.minY + r.height * 0.35), CGPoint(x: sx, y: r.minY + r.height * 0.35)], color(0.25, 0.20, 0.15, 0.7), 1.2)
+            }
+        }
+
+        // Gundukan semak bulat hijau berlapis khas Carto
+        let clumpCount = max(2, Int(r.width / 18))
+        for i in 0..<clumpCount {
+            let cx = r.minX + CGFloat(i) * (r.width / CGFloat(clumpCount)) + 8
+            let cy = r.minY + r.height * 0.25
+            let cw: CGFloat = 20 + random() * 8
+            let ch: CGFloat = r.height * 0.75 + random() * 6
+
+            let bushRect = CGRect(x: cx - cw / 2, y: cy, width: cw, height: ch)
+            ellipse(bushRect, color(0.30, 0.52, 0.26, 0.95))
+
+            // Garis-garis kontur daun vertikal Carto
+            let cLine = color(0.44, 0.66, 0.34, 0.85)
+            for step in 1...3 {
+                let inset = CGFloat(step) * 2.8
+                let inner = bushRect.insetBy(dx: inset, dy: inset * 0.8)
+                c.setStrokeColor(cLine); c.setLineWidth(1.1)
+                c.strokeEllipse(in: inner)
+            }
+
+            // Buah beri oranye cerah atau bunga putih (seperti screenshot 2)
+            if random() > 0.4 {
+                let berryColor = random() > 0.5 ? color(0.95, 0.55, 0.18) : color(0.98, 0.98, 0.94)
+                for _ in 0..<3 {
+                    ellipse(CGRect(x: cx + random() * 10 - 5, y: cy + ch * 0.6 + random() * (ch * 0.3), width: 3.5, height: 3.5), berryColor)
                 }
             }
-        } else { smallCrate(r) }
-    }
-    private func smallCrate(_ r: CGRect) {
-        fill(r, color(0.38, 0.27, 0.16))
-        for row in 0..<Int(r.height / 13 + 1) {
-            fill(CGRect(x: r.minX + 3, y: r.minY + CGFloat(row) * 13 + 2, width: r.width - 6, height: 11), color(0.58, 0.41, 0.23))
-        }
-        line([CGPoint(x: r.minX + 6, y: r.minY + 6), CGPoint(x: r.maxX - 6, y: r.maxY - 6)], color(0.70, 0.53, 0.32), 6)
-        line([CGPoint(x: r.minX + 6, y: r.maxY - 6), CGPoint(x: r.maxX - 6, y: r.minY + 6)], color(0.62, 0.45, 0.26), 6)
-        for x in [r.minX + 7, r.maxX - 10] {
-            fill(CGRect(x: x, y: r.minY, width: 3, height: r.height), color(0.23, 0.25, 0.20, 0.8))
         }
     }
-    private func cabinet(_ r: CGRect) {
-        fill(r, color(0.30, 0.23, 0.15))
-        for i in 0..<2 {
-            let door = CGRect(x: r.minX + 5 + CGFloat(i) * (r.width / 2 - 3), y: r.minY + 6, width: r.width / 2 - 8, height: r.height - 12)
-            fill(door, color(0.52, 0.38, 0.23))
-            c.setStrokeColor(color(0.7, 0.53, 0.32)); c.setLineWidth(2); c.stroke(door.insetBy(dx: 5, dy: 6))
-            ellipse(CGRect(x: door.midX, y: door.minY + 17, width: 4, height: 4), color(0.88, 0.69, 0.35))
+
+    // Bebatuan sungai lembut berbatu & dinding batu mortar Carto
+    private func rocks(_ r: CGRect, wall: Bool) {
+        if !wall {
+            let rockRect = CGRect(x: r.minX + 2, y: r.minY, width: r.width - 4, height: r.height * 0.85)
+            rounded(rockRect, radius: min(rockRect.width, rockRect.height) * 0.45, color: color(0.60, 0.62, 0.56))
+            rounded(rockRect.insetBy(dx: 4, dy: 4).offsetBy(dx: -2, dy: 3), radius: 6, color: color(0.74, 0.76, 0.70, 0.8))
+            rounded(CGRect(x: rockRect.minX + 4, y: rockRect.maxY - 8, width: rockRect.width - 8, height: 7),
+                    radius: 3, color: color(0.48, 0.62, 0.35, 0.85))
+        } else {
+            let rowH: CGFloat = 11
+            for row in 0..<Int(r.height / rowH + 1) {
+                for col in 0..<Int(r.width / 22 + 1) {
+                    let x = r.minX + CGFloat(col) * 22 - CGFloat(row % 2) * 11
+                    let y = r.minY + CGFloat(row) * rowH
+                    let v = random()
+                    rounded(CGRect(x: x + 1, y: y + 1, width: 20, height: rowH - 2), radius: 3,
+                            color: color(0.55 + v * 0.12, 0.57 + v * 0.10, 0.52 + v * 0.08))
+                }
+            }
         }
     }
-    private func table(_ r: CGRect) {
-        fill(r, color(0.37, 0.27, 0.17)); fill(r.insetBy(dx: 4, dy: 4), color(0.64, 0.49, 0.30))
-        for i in 1..<5 { line([CGPoint(x: r.minX + 5, y: r.minY + CGFloat(i) * r.height / 5), CGPoint(x: r.maxX - 5, y: r.minY + CGFloat(i) * r.height / 5)], color(0.35, 0.28, 0.18, 0.45), 1) }
-        ellipse(CGRect(x: r.midX - 12, y: r.midY - 12, width: 24, height: 24), cream)
-        ellipse(CGRect(x: r.midX - 7, y: r.midY - 7, width: 14, height: 14), color(0.66, 0.40, 0.22))
+
+    // Air danau / sungai tenang dengan riak busa
+    private func water(_ r: CGRect) {
+        rounded(r, radius: 14, color: color(0.28, 0.58, 0.62))
+        rounded(r.insetBy(dx: 3, dy: 3), radius: 11, color: color(0.34, 0.66, 0.68))
+        for _ in 0..<18 {
+            let x = r.minX + 6 + random() * (r.width - 24)
+            let y = r.minY + 4 + random() * (r.height - 8)
+            line([CGPoint(x: x, y: y), CGPoint(x: x + 8, y: y + 1.5), CGPoint(x: x + 16, y: y)], color(1, 1, 1, 0.45), 1.2)
+        }
     }
+
+    // Tempat tidur kabin kayu Carto
     private func bed(_ r: CGRect) {
-        fill(r, color(0.32, 0.24, 0.16))
-        rounded(r.insetBy(dx: 5, dy: 8), radius: 6, color: cream)
-        fill(CGRect(x: r.minX + 6, y: r.minY + 9, width: r.width - 12, height: r.height * 0.6), color(0.43, 0.53, 0.45))
-        for x in stride(from: r.minX + 10, to: r.maxX - 7, by: 12) {
-            line([CGPoint(x: x, y: r.minY + 10), CGPoint(x: x, y: r.minY + r.height * 0.63)], color(0.67, 0.71, 0.55, 0.4), 3)
-        }
-        rounded(CGRect(x: r.minX + 12, y: r.maxY - 38, width: r.width - 24, height: 25), radius: 8, color: color(0.93, 0.87, 0.69))
+        rounded(r, radius: 6, color: woodDark)
+        let mattress = r.insetBy(dx: 4, dy: 6)
+        rounded(mattress, radius: 4, color: color(0.96, 0.94, 0.88))
+        // Selimut bermotif toska berlipat
+        let blanket = CGRect(x: mattress.minX, y: mattress.minY, width: mattress.width, height: mattress.height * 0.65)
+        rounded(blanket, radius: 3, color: color(0.35, 0.60, 0.58))
+        // Bantal putih lembut di atas
+        rounded(CGRect(x: mattress.minX + 4, y: mattress.maxY - 14, width: mattress.width - 8, height: 12),
+                radius: 4, color: color(0.98, 0.98, 0.98))
     }
+
+    // Lemari rak kayu sudut bertingkat (seperti screenshot 3)
+    private func cabinet(_ r: CGRect) {
+        rounded(r, radius: 4, color: woodDark)
+        // Rak terbuka 3 tingkat
+        let shelfH = r.height / 3
+        for i in 0..<3 {
+            let shelfRect = CGRect(x: r.minX + 4, y: r.minY + CGFloat(i) * shelfH + 3, width: r.width - 8, height: shelfH - 5)
+            rounded(shelfRect, radius: 2, color: woodWarm)
+            // Gulungan kain / selimut di rak
+            rounded(CGRect(x: shelfRect.minX + 3, y: shelfRect.minY + 2, width: shelfRect.width - 6, height: shelfRect.height - 4),
+                    radius: 2, color: color(0.78, 0.68, 0.52))
+        }
+    }
+
+    // Meja rendah dengan panci rebusan sup Carto (seperti screenshot 3)
+    private func table(_ r: CGRect) {
+        rounded(r, radius: 6, color: woodWarm)
+        rounded(r.insetBy(dx: 4, dy: 4), radius: 4, color: color(0.72, 0.56, 0.38))
+
+        // Panci rebusan sup panas (cooking pot) di atas meja
+        let pot = CGRect(x: r.midX - 16, y: r.midY - 12, width: 32, height: 24)
+        ellipse(pot, color(0.24, 0.32, 0.38))
+        // Kaldu sup oranye keemasan di dalam panci
+        ellipse(pot.insetBy(dx: 4, dy: 4), color(0.92, 0.55, 0.18))
+
+        // Dua mangkuk kecil di samping panci
+        ellipse(CGRect(x: pot.minX - 12, y: pot.midY - 4, width: 10, height: 8), color(0.24, 0.32, 0.38))
+        ellipse(CGRect(x: pot.maxX + 2, y: pot.midY - 4, width: 10, height: 8), color(0.24, 0.32, 0.38))
+    }
+
+    // Peti kayu
+    private func crate(_ r: CGRect) {
+        rounded(r, radius: 3, color: woodDark)
+        rounded(r.insetBy(dx: 3, dy: 3), radius: 2, color: woodWarm)
+        line([CGPoint(x: r.minX + 4, y: r.minY + 4), CGPoint(x: r.maxX - 4, y: r.maxY - 4)], woodDark, 2)
+        line([CGPoint(x: r.minX + 4, y: r.maxY - 4), CGPoint(x: r.maxX - 4, y: r.minY + 4)], woodDark, 2)
+    }
+
     private func borderStones() {
-        // Thin worn stones along the world boundary are outside actor clearance.
-        for x in stride(from: CGFloat(0), to: 960, by: 23) {
-            rounded(CGRect(x: x, y: 472, width: 21, height: 8), radius: 3, color: color(0.47, 0.49, 0.37))
-            ellipse(CGRect(x: x, y: 1, width: 17, height: 6), color(0.44, 0.45, 0.32, 0.6))
+        for x in stride(from: CGFloat(0), to: 960, by: 25) {
+            rounded(CGRect(x: x, y: 472, width: 20, height: 7), radius: 3, color: color(0.60, 0.65, 0.48))
+            ellipse(CGRect(x: x, y: 1, width: 18, height: 5), color(0.58, 0.62, 0.46, 0.65))
         }
     }
 }

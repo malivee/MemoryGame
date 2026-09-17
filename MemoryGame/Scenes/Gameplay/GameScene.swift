@@ -27,19 +27,27 @@ final class GameScene: SKScene {
     private var moved = false
     private var confirmingRestart = false
     private var enteringMemory = false
+    private var bag: BagOverlay?
+    var bagSelectedPiece: Int?
 
     // Memuat progres, menyiapkan puzzle, lalu membangun papan saat scene dibuka.
     override func didMove(to view: SKView) {
         backgroundColor = SKColor(red: 0.08, green: 0.12, blue: 0.14, alpha: 1)
         progress.prepareJigsaw()
         PrologueStore.shared.save()
-        addChild(canvas)
+        if canvas.parent == nil { addChild(canvas) }
+        if let id = bagSelectedPiece {
+            selected = id
+            if let index = state.inventory(progress: progress).firstIndex(of: id) { inventoryPage = index / pageSize }
+            bagSelectedPiece = nil
+        }
         layoutPhoto()
     }
     override func didChangeSize(_ oldSize: CGSize) {
         guard canvas.parent != nil, !enteringMemory else { return }
         dragPiece = nil
         layoutPhoto()
+        bag?.resize(to: size)
     }
     // Menyesuaikan skala papan dengan ukuran layar.
     private func layoutPhoto() {
@@ -95,6 +103,7 @@ final class GameScene: SKScene {
         let enterButton = canvas.storyButton(ready ? "Masuk" : "Terkunci", name: "enter", at: CGPoint(x: -50, y: -274))
         enterButton.alpha = ready ? 1 : 0.42
         canvas.storyButton("Mulai ulang", name: "restart", at: CGPoint(x: 330, y: -274), width: 140)
+        canvas.storyButton("Tas", name: "bag", at: CGPoint(x: 330, y: 267), width: 140)
         if confirmingRestart { addRestartConfirmation() }
         if progress.assembled && revealComplete { showAssembled(animated: false) }
     }
@@ -202,9 +211,40 @@ final class GameScene: SKScene {
             view.presentScene(exploration, transition: transition)
         }]), withKey: "enterMemory")
     }
+    private func openBag() {
+        guard bag == nil, !enteringMemory else { return }
+        dragPiece = nil
+        rebuild()
+        let overlay = BagOverlay(progress: progress, sceneSize: size)
+        overlay.onClose = { [weak self] in self?.closeBag() }
+        overlay.onUse = { [weak self] item in
+            guard let self else { return }
+            self.closeBag()
+            switch item {
+            case .fragment(let id):
+                self.selected = id
+                if let index = self.state.inventory(progress: self.progress).firstIndex(of: id) { self.inventoryPage = index / self.pageSize }
+                self.rebuild()
+            case .book:
+                guard self.progress.hasBook, let view = self.view else { return }
+                let book = BookScene(size: self.size)
+                book.scaleMode = .resizeFill
+                book.onClose = { [self, weak view] in
+                    view?.presentScene(self, transition: .fade(withDuration: 0.3))
+                }
+                view.presentScene(book, transition: .fade(withDuration: 0.3))
+            }
+        }
+        bag = overlay
+        addChild(overlay)
+    }
+    private func closeBag() {
+        bag?.removeFromParent()
+        bag = nil
+    }
     // Membedakan tombol dan pemilihan keping, lalu menyiapkan posisi awal drag.
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard !enteringMemory, let touch = touches.first else { return }
+        guard !enteringMemory, bag == nil, let touch = touches.first else { return }
         let point = touch.location(in: canvas)
         let names = Set(canvas.nodes(at: point).compactMap(\.name))
         if confirmingRestart {
@@ -214,6 +254,7 @@ final class GameScene: SKScene {
             } else if names.contains("cancelRestart") { confirmingRestart = false; rebuild() }
             return
         }
+        if names.contains("bag") { openBag(); return }
         if names.contains("previousPage") { inventoryPage = max(0, inventoryPage - 1); rebuild(); return }
         if names.contains("nextPage") {
             let pages = max(1, (state.inventory(progress: progress).count + pageSize - 1) / pageSize)
@@ -241,7 +282,7 @@ final class GameScene: SKScene {
     }
     // Memindahkan keping mengikuti sentuhan dan membedakan drag dari ketukan biasa.
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard !enteringMemory, let touch = touches.first, let id = dragPiece, let tile = tiles[id] else { return }
+        guard !enteringMemory, bag == nil, let touch = touches.first, let id = dragPiece, let tile = tiles[id] else { return }
         let point = touch.location(in: canvas)
         if hypot(point.x - dragStart.x, point.y - dragStart.y) > 8 { moved = true }
         if moved {
@@ -251,7 +292,7 @@ final class GameScene: SKScene {
     }
     // Mengubah posisi lepas menjadi slot; drop di luar papan mengembalikan keping ke inventori.
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard !enteringMemory, let id = dragPiece else { return }
+        guard !enteringMemory, bag == nil, let id = dragPiece else { return }
         defer { dragPiece = nil }
         if moved, let point = tiles[id]?.position {
             var accepted = true

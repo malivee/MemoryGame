@@ -35,9 +35,13 @@ final class ExplorationScene: SKScene {
     private var stickKnob = SKShapeNode(circleOfRadius: 18)
     private var objective = SKLabelNode()
     private var suspicionLabel = SKLabelNode()
-    private var interactionButton: SKShapeNode?
-    private var bookButton: SKShapeNode?
+    private var bag: BagOverlay?
     private var readingBook = false
+    private var bookPickupNode: SKNode?
+    private var friendNodes: [FriendID: MemoryCharacter] = [:]
+    private var markerNode: SKNode?
+    private var nearbyInteraction: MemoryInteractionTarget?
+    private var nearbyPrompt: SKNode?
 
     init(size: CGSize, entry: MemoryPiece) {
         self.entry = entry
@@ -66,7 +70,10 @@ final class ExplorationScene: SKScene {
         buildHUD()
         animateArrival()
     }
-    override func didChangeSize(_ oldSize: CGSize) { if stage.parent != nil { resizeStage() } }
+    override func didChangeSize(_ oldSize: CGSize) {
+        if stage.parent != nil { resizeStage() }
+        bag?.resize(to: size)
+    }
     private func resizeStage() {
         stage.setScale(min(size.width / 1000, size.height / 600))
         stage.position = CGPoint(x: (size.width - 1000 * stage.xScale) / 2, y: (size.height - 600 * stage.yScale) / 2)
@@ -148,13 +155,16 @@ final class ExplorationScene: SKScene {
         if let book = level.book, !progress.hasBook { addBook(at: book) }
         for (friend, point) in level.friends {
             let npc = MemoryCharacter(title: friend.rawValue, color: color(friend))
-            npc.position = point; world.addChild(npc)
+            npc.position = point
+            friendNodes[friend] = npc
+            world.addChild(npc)
         }
         if let marker = level.marker, progress.installed(.oldPath) {
             let post = SKShapeNode(rectOf: CGSize(width: 13, height: 31), cornerRadius: 2)
             post.fillColor = SKColor(red: 0.73, green: 0.61, blue: 0.40, alpha: 1)
             post.position = marker; post.zPosition = 15; world.addChild(post)
             post.storyLabel("Penanda", at: CGPoint(x: 0, y: 32), size: 11)
+            markerNode = post
         }
         if progress.installed(.boundary) {
             if let gathering = level.gathering {
@@ -202,6 +212,7 @@ final class ExplorationScene: SKScene {
         book.name = "bookPickup"
         book.position = point; book.zPosition = 15
         world.addChild(book)
+        bookPickupNode = book
         book.storyLabel("Buku lama", at: CGPoint(x: 0, y: 30), size: 11)
     }
     // Membuat tujuan misi, tombol kembali, indikator kecurigaan, stik, dan tombol interaksi.
@@ -218,13 +229,15 @@ final class ExplorationScene: SKScene {
         stick.strokeColor = SKColor(white: 1, alpha: 0.22); hud.addChild(stick)
         stickKnob.position = stickCenter; stickKnob.fillColor = SKColor(white: 1, alpha: 0.32)
         stickKnob.strokeColor = .clear; hud.addChild(stickKnob)
-        interactionButton = hud.storyButton("Interaksi", name: "interact", at: CGPoint(x: 902, y: 55), width: 145)
-        bookButton = hud.storyButton("Buku", name: "book", at: CGPoint(x: 905, y: 111), width: 118)
+        hud.storyButton("Tas", name: "bag", at: CGPoint(x: 905, y: 111), width: 118)
         updateBookAccess()
     }
     private func updateBookAccess() {
-        bookButton?.isHidden = !progress.hasBook
-        if progress.hasBook { world.childNode(withName: "bookPickup")?.removeFromParent() }
+        if progress.hasBook {
+            bookPickupNode?.removeFromParent()
+            bookPickupNode = nil
+            if nearbyInteraction == .book { clearNearbyInteraction() }
+        }
     }
     private func say(_ text: String, duration: TimeInterval = 4) {
         toast?.removeFromParent()
@@ -239,6 +252,7 @@ final class ExplorationScene: SKScene {
     // Menghentikan gerak pemain dan menyiapkan urutan dialog beserta aksi ketika selesai.
     private func startDialogue(_ lines: [StoryLine], completion: (() -> Void)? = nil) {
         guard dialoguePanel == nil else { return }
+        clearNearbyInteraction()
         arthur.route.removeAll(); stickVector = .zero; stickTouch = nil; stickKnob.position = stickCenter
         dialogue = lines; dialogueIndex = 0; dialogueCompletion = completion
         showDialoguePage()
@@ -267,21 +281,30 @@ final class ExplorationScene: SKScene {
         // Reading pauses the world; resume with time to regain control.
         catchGrace = 1.2
     }
-    // Memilih interaksi terdekat yang memenuhi syarat misi dan kondisi aman dari warga.
+    // Menjalankan aksi pada objek yang sedang disorot di dekat Arthur.
     private func interact() {
         guard !watched && patrols.allSatisfy({ $0.suspicion < 0.25 }) else { say("Cari tempat berlindung sebelum berinteraksi."); return }
-        if let book = level.book, distance(arthur.position, book) < 62 {
-            if progress.hasBook { say("Buku sudah dibawa Arthur. Tunjukkan kepada ketiga teman."); return }
+        guard let target = nearbyInteraction else { return }
+        switch target {
+        case .book:
+            guard let book = bookPickupNode, !progress.hasBook else { return }
+            progress.readBook()
+            PrologueStore.shared.save()
+            clearNearbyInteraction()
+            book.removeAllActions()
+            book.run(.sequence([
+                .group([.move(to: arthur.position, duration: 0.22),
+                        .scale(to: 0.15, duration: 0.22),
+                        .fadeOut(withDuration: 0.22)]),
+                .removeFromParent()
+            ]))
+            bookPickupNode = nil
+            HapticsService.shared.playNotification(.success)
+            objective.text = progress.objective
             startDialogue(PrologueDialogue.book) { [weak self] in
-                self?.progress.readBook()
-                self?.updateBookAccess()
-                self?.say("Keping baru: kebun, pegunungan, cekungan kering. Pasang di foto untuk membuka area.", duration: 6)
+                self?.say("Buku masuk ke tas. Keping baru: kebun, pegunungan, cekungan kering.", duration: 6)
             }
-            return
-        }
-        for friend in FriendID.allCases {
-            guard let point = level.friends[friend], distance(arthur.position, point) < 62,
-                  !navigation.fog.contains(where: { $0.contains(point) }) else { continue }
+        case .friend(let friend):
             guard progress.hasBook else { say("\(friend.rawValue): Sampai nanti, Arthur. Aku masih di desa."); return }
             if progress.joined.contains(friend) { say("\(friend.rawValue) sudah bersedia ikut. (\(progress.joined.count)/3)"); return }
             progress.shownBook.insert(friend)
@@ -293,9 +316,7 @@ final class ExplorationScene: SKScene {
                     self.say("Semua bersedia ikut. Keping danau dan jalur lama masuk inventori.", duration: 6)
                 } else { self.say("\(friend.rawValue) bersedia ikut.") }
             }
-            return
-        }
-        if let marker = level.marker, progress.installed(.oldPath), distance(arthur.position, marker) < 62 {
+        case .marker:
             guard progress.joined.count == 3 else { say("Arthur: Aku ingin membicarakan temuan ini dengan ketiga temanku dulu."); return }
             if progress.foundMarker { say("Penanda mengarah ke batas desa. Berkumpul bersama di sana."); return }
             startDialogue(PrologueDialogue.marker) { [weak self] in
@@ -303,15 +324,85 @@ final class ExplorationScene: SKScene {
                 self.progress.readMarker()
                 self.say("Keping batas desa diperoleh. Kembali ke foto dan pasang untuk melanjutkan.", duration: 6)
             }
+        }
+    }
+
+    // Memilih objek terdekat, memberi highlight, lalu memasang tombol tepat di atasnya.
+    private func updateNearbyInteraction() {
+        var candidates: [(MemoryInteractionTarget, SKNode, CGFloat)] = []
+        if !progress.hasBook, let node = bookPickupNode, node.parent != nil {
+            candidates.append((.book, node, distance(arthur.position, node.position)))
+        }
+        for friend in FriendID.allCases {
+            guard let node = friendNodes[friend],
+                  !navigation.fog.contains(where: { $0.contains(node.position) }) else { continue }
+            candidates.append((.friend(friend), node, distance(arthur.position, node.position)))
+        }
+        if progress.installed(.oldPath), let node = markerNode {
+            candidates.append((.marker, node, distance(arthur.position, node.position)))
+        }
+        guard let nearest = candidates.filter({ $0.2 <= 72 }).min(by: { $0.2 < $1.2 }) else {
+            clearNearbyInteraction()
             return
         }
-        say("Dekati buku, teman, atau penanda untuk berinteraksi.")
+        guard nearbyInteraction != nearest.0 else {
+            nearbyPrompt?.position = nearest.1.position
+            return
+        }
+        clearNearbyInteraction()
+        nearbyInteraction = nearest.0
+        let prompt = makeInteractionPrompt(for: nearest.0)
+        prompt.position = nearest.1.position
+        world.addChild(prompt)
+        nearbyPrompt = prompt
+    }
+
+    private func makeInteractionPrompt(for target: MemoryInteractionTarget) -> SKNode {
+        let root = SKNode()
+        root.zPosition = 90
+        let radius: CGFloat = target == .book ? 24 : 29
+        let highlight = SKShapeNode(circleOfRadius: radius)
+        highlight.name = "contextInteract"
+        highlight.strokeColor = SKColor(red: 1, green: 0.83, blue: 0.36, alpha: 0.95)
+        highlight.fillColor = SKColor(red: 1, green: 0.78, blue: 0.25, alpha: 0.10)
+        highlight.lineWidth = 3
+        root.addChild(highlight)
+        highlight.run(.repeatForever(.sequence([
+            .group([.scale(to: 1.16, duration: 0.55), .fadeAlpha(to: 0.45, duration: 0.55)]),
+            .group([.scale(to: 1, duration: 0.55), .fadeAlpha(to: 1, duration: 0.55)])
+        ])))
+
+        let title = target == .book ? "Ambil" : "Interaksi"
+        let width: CGFloat = target == .book ? 82 : 112
+        let button = root.storyButton(title, name: "contextInteract", at: CGPoint(x: 0, y: 58), width: width)
+        button.fillColor = SKColor(red: 0.24, green: 0.18, blue: 0.09, alpha: 0.97)
+        button.strokeColor = SKColor(red: 1, green: 0.82, blue: 0.38, alpha: 1)
+        button.lineWidth = 2
+        let pointer = SKShapeNode(path: {
+            let path = CGMutablePath()
+            path.move(to: CGPoint(x: -6, y: 35))
+            path.addLine(to: CGPoint(x: 6, y: 35))
+            path.addLine(to: CGPoint(x: 0, y: 27))
+            path.closeSubpath()
+            return path
+        }())
+        pointer.name = "contextInteract"
+        pointer.fillColor = button.fillColor
+        pointer.strokeColor = button.strokeColor
+        root.addChild(pointer)
+        return root
+    }
+
+    private func clearNearbyInteraction() {
+        nearbyPrompt?.removeFromParent()
+        nearbyPrompt = nil
+        nearbyInteraction = nil
     }
     // Memperbarui gerak dan kecurigaan setiap frame; dunia dijeda selama dialog dan transisi masuk.
     override func update(_ currentTime: TimeInterval) {
         let dt = CGFloat(min(0.04, max(0, lastTime == 0 ? 0 : currentTime - lastTime)))
         lastTime = currentTime
-        guard navigation != nil, dialoguePanel == nil, !enteringMemory, !readingBook else { return }
+        guard navigation != nil, dialoguePanel == nil, !enteringMemory, !readingBook, bag == nil else { return }
         warningCooldown = max(0, warningCooldown - dt)
         catchGrace = max(0, catchGrace - dt)
         if hypot(stickVector.dx, stickVector.dy) > 0.05 {
@@ -332,6 +423,7 @@ final class ExplorationScene: SKScene {
         suspicionLabel.text = suspicion > 0 ? "Warga mulai curiga  \(Int(suspicion * 100))%" : "Aman · kembali ke foto tersedia"
         suspicionLabel.fontColor = suspicion > 0 ? .yellow : .lightGray
         if suspicion >= 1 { caught(); return }
+        updateNearbyInteraction()
         if progress.joined.count == 3 && !progress.noticedChangedRoute && entry.region == .foothills,
            progress.installed(.oldPath), distance(arthur.position, CGPoint(x: 465, y: 350)) < 150 && !watched {
             progress.noticedChangedRoute = true
@@ -395,6 +487,7 @@ final class ExplorationScene: SKScene {
     }
     // Mengembalikan kelompok ke checkpoint dan mereset kecurigaan sambil mempertahankan progres misi.
     private func caught() {
+        clearNearbyInteraction()
         arthur.position = checkpoint; arthur.route.removeAll()
         stickVector = .zero; stickTouch = nil; stickKnob.position = stickCenter
         for (index, actor) in companions.enumerated() {
@@ -407,14 +500,37 @@ final class ExplorationScene: SKScene {
         say(entry.region == .house ? "Orang tua: Jangan menyelinap. Kami hanya ingin kamu tetap aman di rumah." : "Warga: Pulang dulu, Arthur. Di luar desa berbahaya; kami tak mau kalian terluka.", duration: 6)
     }
     // Menyimpan progres lalu kembali ke papan ketika warga sudah tidak memperhatikan Arthur.
-    private func returnToPhoto() {
+    private func returnToPhoto(selectedPiece: Int? = nil) {
         guard !watched && patrols.allSatisfy({ $0.suspicion == 0 }) else {
             say("Arthur masih diperhatikan. Berlindung sampai warga tenang."); return
         }
         PrologueStore.shared.save()
         let photo = GameScene(size: size)
+        photo.bagSelectedPiece = selectedPiece
         photo.scaleMode = .resizeFill
         view?.presentScene(photo, transition: .fade(withDuration: 0.35))
+    }
+    private func openBag() {
+        guard bag == nil else { return }
+        arthur.route.removeAll()
+        stickTouch = nil; stickVector = .zero; stickKnob.position = stickCenter
+        let overlay = BagOverlay(progress: progress, sceneSize: size)
+        overlay.onClose = { [weak self] in self?.closeBag() }
+        overlay.onUse = { [weak self] item in
+            guard let self else { return }
+            self.closeBag()
+            switch item {
+            case .book: self.openBook()
+            case .fragment(let id): self.returnToPhoto(selectedPiece: id)
+            }
+        }
+        bag = overlay
+        addChild(overlay)
+    }
+    private func closeBag() {
+        bag?.removeFromParent()
+        bag = nil
+        lastTime = 0
     }
     private func openBook() {
         guard progress.hasBook, !readingBook, let view else { return }
@@ -446,13 +562,14 @@ final class ExplorationScene: SKScene {
     }
     // Mengarahkan sentuhan ke dialog, tombol, stik, atau pencarian rute menuju tanah yang diketuk.
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard !enteringMemory, !readingBook, let touch = touches.first else { return }
+        guard !enteringMemory, !readingBook, bag == nil, let touch = touches.first else { return }
         if dialoguePanel != nil { advanceDialogue(); return }
         let point = touch.location(in: stage)
         let names = Set(hud.nodes(at: touch.location(in: hud)).compactMap(\.name))
+        let worldNames = Set(world.nodes(at: touch.location(in: world)).compactMap { $0.namedAncestor(prefix: "contextInteract") })
         if names.contains("photo") { returnToPhoto(); return }
-        if names.contains("book") { openBook(); return }
-        if names.contains("interact") { interact(); return }
+        if names.contains("bag") { openBag(); return }
+        if worldNames.contains("contextInteract") { interact(); return }
         if distance(point, stickCenter) < 70 {
             stickTouch = touch; arthur.route.removeAll(); updateStick(touch); return
         }
@@ -473,4 +590,10 @@ final class ExplorationScene: SKScene {
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         stickTouch = nil; stickVector = .zero; stickKnob.position = stickCenter; arthur.route.removeAll()
     }
+}
+
+private enum MemoryInteractionTarget: Equatable {
+    case book
+    case friend(FriendID)
+    case marker
 }

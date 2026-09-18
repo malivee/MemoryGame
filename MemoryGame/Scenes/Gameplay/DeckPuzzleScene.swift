@@ -175,23 +175,17 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
                 let safeWidth = (size.width - insets.left - insets.right) / unit - 36
                 let spacing = min(116, safeWidth / CGFloat(max(1, page.count)))
                 let x = deckBounds.midX + CGFloat(index) * spacing - CGFloat(page.count - 1) * spacing / 2
-                // Ukuran kartu dikurangi sedikit agar muat sempurna di deck baru (width: 86, height: 80)
-                let cardSize = CGSize(width: min(98, spacing - 12), height: 88)
-                let card = SKShapeNode(rectOf: cardSize, cornerRadius: 10)
-                card.position = CGPoint(x: x, y: deckBounds.maxY - 82); card.zPosition = 67
-                let shadow = SKShapeNode(rectOf: cardSize, cornerRadius: 10)
-                shadow.position = CGPoint(x: x, y: card.position.y - 4); shadow.zPosition = 66
-                shadow.fillColor = SKColor(white: 0, alpha: 0.28); shadow.strokeColor = .clear
-                canvas.safeAddChild(shadow)
-                card.fillColor = SKColor(red: 0.44, green: 0.37, blue: 0.28, alpha: 1)
-                card.strokeColor = selected == id ? SKColor(red: 1, green: 0.79, blue: 0.40, alpha: 1) : SKColor(red: 0.65, green: 0.54, blue: 0.37, alpha: 1)
-                card.lineWidth = selected == id ? 2.5 : 1
-                let inset = SKShapeNode(rectOf: CGSize(width: cardSize.width - 8, height: cardSize.height - 8), cornerRadius: 7)
-                inset.fillColor = .clear
-                inset.strokeColor = SKColor(white: 1, alpha: 0.08)
-                card.safeAddChild(inset)
-                canvas.safeAddChild(card)
-                addTile(id, at: card.position, inInventory: true)
+                let piecePosition = CGPoint(x: x, y: deckBounds.maxY - 82)
+                if selected == id {
+                    let halo = SKShapeNode(circleOfRadius: 46)
+                    halo.position = piecePosition
+                    halo.zPosition = 66
+                    halo.fillColor = SKColor(red: 1, green: 0.79, blue: 0.40, alpha: 0.10)
+                    halo.strokeColor = SKColor(red: 1, green: 0.79, blue: 0.40, alpha: 0.70)
+                    halo.lineWidth = 2
+                    canvas.safeAddChild(halo)
+                }
+                addTile(id, at: piecePosition, inInventory: true)
             }
         }
         
@@ -236,13 +230,13 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
     // Membuat gambar keping, outline, dan bentuk hit-test yang mengabaikan bagian transparan.
     private func addTile(_ id: Int, at position: CGPoint, inInventory: Bool) {
         let data = JigsawCatalog.data(for: id)
-        let scale = inInventory ? min(60 / data.width, 60 / data.height) : boardScale
+        let scale = inInventory ? min(78 / data.width, 78 / data.height) : boardScale
         let coreX = CGFloat(data.col - 1) * PuzzleCatalog.cellWidth - data.targetX + PuzzleCatalog.cellWidth / 2
         let coreY = CGFloat(data.row - 1) * PuzzleCatalog.cellHeight - data.targetY + PuzzleCatalog.cellHeight / 2
         let tile = SKNode()
         tile.position = position
         tile.zRotation = -CGFloat(state.rotations[id] ?? 0) * .pi / 2
-        tile.zPosition = selected == id ? 40 : 10
+        tile.zPosition = inInventory ? (selected == id ? 69 : 68) : (selected == id ? 40 : 10)
         let image = SKSpriteNode(texture: textures.texture(for: data, dryVariant: id == JigsawCatalog.dryLakeID))
         image.size = CGSize(width: data.width * scale, height: data.height * scale)
         image.position = CGPoint(x: (data.width / 2 - coreX) * scale, y: (coreY - data.height / 2) * scale)

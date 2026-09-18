@@ -1026,7 +1026,7 @@ final class ExplorationScene: SKScene {
             say("Arthur masih diperhatikan. Berlindung sampai warga tenang."); return
         }
         PrologueStore.shared.save()
-        let photo = DeckPuzzleScene(size: size)
+        let photo = RightDeckPuzzleScene(size: size)
         photo.bagSelectedPiece = selectedPiece
         photo.scaleMode = .resizeFill
         view?.presentScene(photo, transition: .fade(withDuration: 0.35))

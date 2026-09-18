@@ -3,7 +3,8 @@ import SpriteKit
 /// A bound manuscript. Page artwork is kept separate from the binding so each
 /// leaf can bend around the gutter without moving the rest of the book.
 final class BookScene: SKScene {
-    let maximumFlipCount = 5
+    private let journalArtwork = JournalPageArtwork()
+    var maximumFlipCount: Int { journalArtwork.spreadCount - 1 }
     var onClose: (() -> Void)?
     private(set) var flipCount = 0
     var touchStartPoint: CGPoint?
@@ -19,7 +20,6 @@ final class BookScene: SKScene {
     private let counterLabel = SKLabelNode(fontNamed: "AvenirNext-Medium")
     private let promptLabel = SKLabelNode(fontNamed: "AvenirNext-Regular")
     private let closeButtonName = "bookClose"
-    private lazy var pageAtlas = SKTexture(imageNamed: "ManuscriptPages")
     private let turnAmount = SKUniform(name: "u_turn", float: 0)
     private lazy var paperShader = SKShader(source: """
         void main() {
@@ -78,11 +78,7 @@ final class BookScene: SKScene {
     }
 
     private func pageTexture(side: BookPageSide, spread: Int) -> SKTexture {
-        // Alternate text and illumination across the existing five spreads.
-        let illustrated = (side == .right) != (spread % 2 == 1)
-        let texture = SKTexture(rect: CGRect(x: illustrated ? 0.5 : 0, y: 0, width: 0.5, height: 1), in: pageAtlas)
-        texture.filteringMode = .linear
-        return texture
+        journalArtwork.texture(side: side, spread: spread)
     }
 
     private func makePage(side: BookPageSide, spread: Int) -> SKSpriteNode {
@@ -210,7 +206,7 @@ final class BookScene: SKScene {
     }
 
     private func updateHUD() {
-        counterLabel.text = "MANUSCRIPT   ·   \(flipCount) / \(maximumFlipCount)"
+        counterLabel.text = "JOURNAL   ·   \(flipCount + 1) / \(maximumFlipCount + 1)"
         promptLabel.text = flipCount == maximumFlipCount
             ? "Last leaf · Tap the left page to return"
             : "Tap a page or swipe to turn"

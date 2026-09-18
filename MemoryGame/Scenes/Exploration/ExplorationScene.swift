@@ -472,9 +472,8 @@ final class ExplorationScene: SKScene {
         card.addChild(titleLabel)
 
         // Teks penjelasan cerita multiline
-        let bodyLabel = hud.storyLabel(body, at: CGPoint(x: 0, y: cardHeight / 2 - 72), size: 12.5, color: SKColor(red: 0.95, green: 0.95, blue: 0.90, alpha: 0.95), width: cardWidth - 48)
+        let bodyLabel = card.storyLabel(body, at: CGPoint(x: 0, y: cardHeight / 2 - 72), size: 12.5, color: SKColor(red: 0.95, green: 0.95, blue: 0.90, alpha: 0.95), width: cardWidth - 48)
         bodyLabel.name = "unlockCard"
-        card.addChild(bodyLabel)
 
         // Tombol Lanjutkan di bagian bawah kartu
         let okBtn = card.storyButton("Lanjutkan Petualangan", name: "unlockCardDismiss", at: CGPoint(x: 0, y: -cardHeight / 2 + 32), width: 220)

@@ -17,11 +17,12 @@ class GameViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
+        
         if let view = self.view as? SKView {
             let hasSeenCutscene = UserDefaults.standard.bool(forKey: "hasSeenOpeningCutscene")
             let scene: SKScene
             if hasSeenCutscene {
-                let puzzle = DeckPuzzleScene(size: view.bounds.size)
+                let puzzle = RightDeckPuzzleScene(size: view.bounds.size)
                 puzzle.scaleMode = .resizeFill
                 scene = puzzle
             } else {

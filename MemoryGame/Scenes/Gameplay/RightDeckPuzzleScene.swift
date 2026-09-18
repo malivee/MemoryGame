@@ -44,6 +44,7 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
     private var gestures: [UIGestureRecognizer] = []
     private var halfWidth: CGFloat = 500
     private var deckBounds = CGRect.zero
+    private let fixedDeckWidth: CGFloat = 185
     private var entryVisible = false
     private var rotatingPiece: Int?
     private var rotationStart: CGFloat = 0
@@ -91,17 +92,15 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
         canvas.removeAllChildren()
         tiles.removeAll(); hitPaths.removeAll(); renderScales.removeAll()
         halfWidth = size.width / canvas.xScale / 2
-        let insets = view?.safeAreaInsets ?? .zero
         let unit = canvas.xScale
         let halfHeight = size.height / unit / 2
-        let rightPadding = insets.right / unit
-        let deckWidth: CGFloat = 160 + rightPadding
+        let deckWidth: CGFloat = fixedDeckWidth
         deckBounds = CGRect(x: halfWidth - deckWidth, y: -halfHeight,
                             width: deckWidth, height: halfHeight * 2)
         viewport = CGRect(x: -halfWidth, y: -halfHeight,
                           width: max(1, halfWidth * 2 - deckWidth - 6), height: halfHeight * 2)
         let width = viewport.width
-        let deckCenterX = deckBounds.minX + 80
+        let deckCenterX = deckBounds.midX
         // Preserve image proportions while the deck occupies the right side.
         let boardHeight = width * PuzzleCatalog.canvasHeight / PuzzleCatalog.canvasWidth
         board = CGRect(x: -width / 2, y: -boardHeight / 2, width: width, height: boardHeight)
@@ -150,7 +149,7 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
         let currentWorld = selected.flatMap { PuzzleWorld.containing($0) }
             ?? PuzzleWorld.allCases.last(where: { $0.isUnlocked(in: progress) }) ?? .house
         let worldBadge = SKShapeNode(rectOf: CGSize(width: 180, height: 32), cornerRadius: 16)
-        worldBadge.position = CGPoint(x: viewport.midX, y: viewport.maxY - insets.top / unit - 28)
+        worldBadge.position = CGPoint(x: viewport.midX, y: viewport.maxY - 28)
         worldBadge.zPosition = 100
         worldBadge.fillColor = SKColor(red: 0.22, green: 0.25, blue: 0.22, alpha: 0.88)
         worldBadge.strokeColor = SKColor(red: 0.81, green: 0.72, blue: 0.52, alpha: 0.6)
@@ -163,7 +162,7 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
         deck.fillColor = SKColor(red: 0.25, green: 0.20, blue: 0.15, alpha: 0.9)
         deck.strokeColor = SKColor(red: 0.65, green: 0.52, blue: 0.35, alpha: 1)
         canvas.safeAddChild(deck)
-        let deckTitle = canvas.storyLabel("Kepingan Puzzle", at: CGPoint(x: deckCenterX, y: deckBounds.maxY - insets.top / unit - 25), size: 14,
+        let deckTitle = canvas.storyLabel("Kepingan Puzzle", at: CGPoint(x: deckCenterX, y: deckBounds.maxY - 25), size: 14,
                                          color: SKColor(red: 0.92, green: 0.84, blue: 0.67, alpha: 1))
         deckTitle.zPosition = 70
         
@@ -175,8 +174,8 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
             inventoryPage = min(inventoryPage, pages - 1)
             let page = Array(inventory.dropFirst(inventoryPage * pageSize).prefix(pageSize))
             for (index, id) in page.enumerated() {
-                let top = deckBounds.maxY - insets.top / unit - 65
-                let bottom = deckBounds.minY + insets.bottom / unit + 12
+                let top = deckBounds.maxY - 65
+                let bottom = deckBounds.minY + 16
                 let spacing = min(96, (top - bottom) / CGFloat(max(1, page.count)))
                 let piecePosition = CGPoint(x: deckCenterX, y: top - spacing * (CGFloat(index) + 0.5))
                 addTile(id, at: piecePosition, inInventory: true)
@@ -252,19 +251,6 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
         let activeGroup = !inInventory && (selected.map { state.connectedIDs(to: id).contains($0) } ?? false)
         let raisedGroup = activeGroup && entryVisible && rotatingPiece == nil
             && (selected.flatMap { state.worldEntry(for: $0, progress: progress) } != nil)
-        if inInventory {
-            outline.strokeColor = SKColor(white: selected == id ? 0.85 : 0.65, alpha: 0.85)
-        } else if raisedGroup {
-            outline.strokeColor = SKColor(red: 1, green: 0.82, blue: 0.37, alpha: 1)
-        } else if activeGroup {
-            outline.strokeColor = SKColor(red: 1, green: 0.53, blue: 0.15, alpha: 1)
-        } else {
-            outline.strokeColor = connected ? SKColor(white: 1, alpha: 0.72) : SKColor(white: 0.65, alpha: 0.7)
-        }
-        outline.lineWidth = raisedGroup ? 4 : (activeGroup ? 1.8 : (selected == id ? 1.2 : 0.85))
-        outline.glowWidth = raisedGroup ? 2.5 : 0
-        outline.fillColor = .clear; outline.zPosition = 1
-        tile.safeAddChild(outline)
         if raisedGroup {
             // Lift the artwork equally across all three pieces, preserving their joins
             // and the logical slot coordinates used for dragging and saving.
@@ -280,12 +266,10 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
             let lift: CGFloat = 6
             if UIAccessibility.isReduceMotionEnabled {
                 image.position.y += lift
-                outline.position.y = lift
             } else {
                 let action = SKAction.moveBy(x: 0, y: lift, duration: 0.16)
                 action.timingMode = .easeOut
                 image.run(action)
-                outline.run(action)
             }
         }
         (inInventory ? canvas : boardLayer).safeAddChild(tile)
@@ -377,7 +361,7 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard !enteringMemory, rotatingPiece == nil else { return }
         if (event?.allTouches?.count ?? touches.count) > 1 {
-            trackedTouch = nil; dragPiece = nil; entryVisible = false; rebuild()
+            trackedTouch = nil; dragPiece = nil; entryVisible = false; clearPlaceHighlights(); rebuild()
             return
         }
         guard trackedTouch == nil, let touch = touches.first else { return }
@@ -389,7 +373,10 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
         let sorted = tiles.sorted { $0.value.zPosition > $1.value.zPosition }
         guard let match = sorted.first(where: { id, node in
             (node.parent === canvas || viewport.contains(point)) && hitPaths[id]?.contains(node.convert(point, from: canvas)) == true
-        }) else { entryVisible = false; selected = nil; rebuild(); return }
+        }) else {
+            clearPlaceHighlights()
+            entryVisible = false; selected = nil; rebuild(); return
+        }
         trackedTouch = touch
         entryVisible = false
         updateEntryPrompt()
@@ -401,6 +388,7 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
         tile.position = origin; tile.setScale(scale)
         dragHome = origin; moved = false
         tile.zPosition = 90
+        updatePlaceHighlight(dragScreenPoint: origin)
     }
     
     // Memindahkan keping mengikuti sentuhan dan membedakan drag dari ketukan biasa.
@@ -410,7 +398,9 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
         if hypot(point.x - dragStart.x, point.y - dragStart.y) > 8 { moved = true }
         if moved {
             tile.setScale(boardScale * zoom / (renderScales[id] ?? boardScale))
-            tile.position = CGPoint(x: dragHome.x + point.x - dragStart.x, y: dragHome.y + point.y - dragStart.y)
+            let newPos = CGPoint(x: dragHome.x + point.x - dragStart.x, y: dragHome.y + point.y - dragStart.y)
+            tile.position = newPos
+            updatePlaceHighlight(dragScreenPoint: newPos)
         }
     }
     
@@ -427,8 +417,8 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
             let point = boardLayer.convert(screenPoint, from: canvas)
             var accepted = true
             if viewport.contains(screenPoint), board.contains(point) {
-                let col = min(7, max(0, Int((point.x - board.minX) / cell.width)))
-                let row = min(5, max(0, Int((board.maxY - point.y) / cell.height)))
+                let col = min(PuzzleCatalog.columns - 1, max(0, Int((point.x - board.minX) / cell.width)))
+                let row = min(PuzzleCatalog.rows - 1, max(0, Int((board.maxY - point.y) / cell.height)))
                 let slot = row * PuzzleCatalog.columns + col
                 if let occupant = state.placements[slot], occupant.id != id {
                     accepted = false
@@ -441,15 +431,21 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
                 // A drop in the frame/gap restores the original slot, rather than discarding it.
                 accepted = false
             }
+            clearPlaceHighlights()
             selected = id; changed(focusInventory: true)
             if !accepted { message("Letakkan keping pada slot kosong di papan.") }
-        } else { selected = id; entryVisible = true; rebuild() }
+        } else {
+            clearPlaceHighlights()
+            selected = id; entryVisible = true; rebuild()
+        }
     }
     
     // Membatalkan drag ketika sentuhan terputus dan memulihkan tampilan dari state.
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard !enteringMemory, rotatingPiece == nil else { return }
-        trackedTouch = nil; dragPiece = nil; rebuild()
+        trackedTouch = nil; dragPiece = nil
+        clearPlaceHighlights()
+        rebuild()
     }
     
     private var allowsBoardGestures: Bool {
@@ -504,13 +500,13 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
     }
     @objc private func pinchBoard(_ gesture: UIPinchGestureRecognizer) {
         guard allowsBoardGestures else { return }
-        if gesture.state == .began { trackedTouch = nil; dragPiece = nil; entryVisible = false; rebuild() }
+        if gesture.state == .began { trackedTouch = nil; dragPiece = nil; entryVisible = false; clearPlaceHighlights(); rebuild() }
         setZoom(zoom * gesture.scale)
         gesture.scale = 1
     }
     @objc private func panBoard(_ gesture: UIPanGestureRecognizer) {
         guard allowsBoardGestures, let view else { return }
-        if gesture.state == .began { dragPiece = nil; entryVisible = false; rebuild() }
+        if gesture.state == .began { dragPiece = nil; entryVisible = false; clearPlaceHighlights(); rebuild() }
         let delta = gesture.translation(in: view)
         cameraOffset.x += delta.x / canvas.xScale
         cameraOffset.y -= delta.y / canvas.yScale
@@ -540,6 +536,7 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
             let point = canvas.convert(convertPoint(fromView: gesture.location(in: view)), from: self)
             guard let id = rotationTarget(at: point) else { return }
             trackedTouch = nil; dragPiece = nil; entryVisible = false
+            clearPlaceHighlights()
             selected = id; rotatingPiece = id
             rebuild()
             rotationStart = tiles[id]?.zRotation ?? 0
@@ -561,6 +558,7 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
     @objc private func swipeDeck(_ gesture: UISwipeGestureRecognizer) {
         guard allowsBoardGestures else { return }
         trackedTouch = nil; dragPiece = nil; entryVisible = false
+        clearPlaceHighlights()
         let pages = max(1, (state.inventory(progress: progress).count + pageSize - 1) / pageSize)
         inventoryPage = min(pages - 1, max(0, inventoryPage + (gesture.direction == .up ? 1 : -1)))
         rebuild()
@@ -568,5 +566,40 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
     override func willMove(from view: SKView) {
         gestures.forEach { view.removeGestureRecognizer($0) }
         gestures.removeAll()
+    }
+
+    // MARK: - Puzzle Placement Board Slot Highlight System
+
+    private func clearPlaceHighlights() {
+        boardLayer.enumerateChildNodes(withName: "//candidateSlotHighlight") { node, _ in
+            node.removeFromParent()
+        }
+    }
+
+    private func updatePlaceHighlight(dragScreenPoint: CGPoint) {
+        // Highlight the board slot under the drag position
+        boardLayer.childNode(withName: "candidateSlotHighlight")?.removeFromParent()
+        guard viewport.contains(dragScreenPoint) else { return }
+        let point = boardLayer.convert(dragScreenPoint, from: canvas)
+        guard board.contains(point) else { return }
+
+        let col = min(PuzzleCatalog.columns - 1, max(0, Int((point.x - board.minX) / cell.width)))
+        let row = min(PuzzleCatalog.rows - 1, max(0, Int((board.maxY - point.y) / cell.height)))
+        let slot = row * PuzzleCatalog.columns + col
+
+        let slotRect = CGRect(x: board.minX + CGFloat(col) * cell.width,
+                              y: board.maxY - CGFloat(row + 1) * cell.height,
+                              width: cell.width, height: cell.height)
+        let isOccupied = state.placements[slot] != nil && (dragPiece == nil || state.placements[slot]?.id != dragPiece)
+        let highlight = SKShapeNode(rect: slotRect.insetBy(dx: 2, dy: 2), cornerRadius: 4)
+        highlight.name = "candidateSlotHighlight"
+        highlight.fillColor = isOccupied ? SKColor(red: 0.85, green: 0.25, blue: 0.20, alpha: 0.14)
+                                         : SKColor(red: 1.0, green: 0.88, blue: 0.20, alpha: 0.18)
+        highlight.strokeColor = isOccupied ? SKColor(red: 0.90, green: 0.30, blue: 0.25, alpha: 0.80)
+                                           : SKColor(red: 1.0, green: 0.88, blue: 0.20, alpha: 0.85)
+        highlight.lineWidth = 2.2
+        highlight.glowWidth = 4.0
+        highlight.zPosition = 8
+        boardLayer.safeAddChild(highlight)
     }
 }

@@ -34,6 +34,43 @@ enum JigsawOutline {
         return path
     }
 
+    /// Generates the Bezier path for one specific edge (0 = top, 1 = right, 2 = bottom, 3 = left).
+    static func edgePath(for piece: PuzzlePieceData, direction edgeIndex: Int) -> CGPath {
+        let row = piece.row - 1
+        let col = piece.col - 1
+        let x = CGFloat(col) * PuzzleCatalog.cellWidth - piece.targetX
+        let y = CGFloat(row) * PuzzleCatalog.cellHeight - piece.targetY
+        let width = PuzzleCatalog.cellWidth
+        let height = PuzzleCatalog.cellHeight
+        let topLeft = CGPoint(x: x, y: y)
+        let topRight = CGPoint(x: x + width, y: y)
+        let bottomRight = CGPoint(x: x + width, y: y + height)
+        let bottomLeft = CGPoint(x: x, y: y + height)
+        let path = CGMutablePath()
+
+        switch edgeIndex {
+        case 0: // Top: from topLeft to topRight
+            path.move(to: topLeft)
+            edge(path, from: topLeft, to: topRight,
+                 sign: row == 0 ? 0 : -Self.direction(row: row - 1, col: col))
+        case 1: // Right: from topRight to bottomRight
+            path.move(to: topRight)
+            edge(path, from: topRight, to: bottomRight,
+                 sign: col == PuzzleCatalog.columns - 1 ? 0 : Self.direction(row: row, col: col))
+        case 2: // Bottom: from bottomRight to bottomLeft
+            path.move(to: bottomRight)
+            edge(path, from: bottomRight, to: bottomLeft,
+                 sign: row == PuzzleCatalog.rows - 1 ? 0 : Self.direction(row: row, col: col))
+        case 3: // Left: from bottomLeft to topLeft
+            path.move(to: bottomLeft)
+            edge(path, from: bottomLeft, to: topLeft,
+                 sign: col == 0 ? 0 : -Self.direction(row: row, col: col - 1))
+        default:
+            break
+        }
+        return path
+    }
+
     private static func direction(row: Int, col: Int) -> CGFloat {
         (row + col).isMultiple(of: 2) ? 1 : -1
     }

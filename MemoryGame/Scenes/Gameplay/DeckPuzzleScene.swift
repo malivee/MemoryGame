@@ -249,19 +249,6 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
         let activeGroup = !inInventory && (selected.map { state.connectedIDs(to: id).contains($0) } ?? false)
         let raisedGroup = activeGroup && entryVisible && rotatingPiece == nil
             && (selected.flatMap { state.worldEntry(for: $0, progress: progress) } != nil)
-        if inInventory {
-            outline.strokeColor = SKColor(white: selected == id ? 0.85 : 0.65, alpha: 0.85)
-        } else if raisedGroup {
-            outline.strokeColor = SKColor(red: 1, green: 0.82, blue: 0.37, alpha: 1)
-        } else if activeGroup {
-            outline.strokeColor = SKColor(red: 1, green: 0.53, blue: 0.15, alpha: 1)
-        } else {
-            outline.strokeColor = connected ? SKColor(white: 1, alpha: 0.72) : SKColor(white: 0.65, alpha: 0.7)
-        }
-        outline.lineWidth = raisedGroup ? 4 : (activeGroup ? 1.8 : (selected == id ? 1.2 : 0.85))
-        outline.glowWidth = raisedGroup ? 2.5 : 0
-        outline.fillColor = .clear; outline.zPosition = 1
-        tile.safeAddChild(outline)
         if raisedGroup {
             // Lift the artwork equally across all three pieces, preserving their joins
             // and the logical slot coordinates used for dragging and saving.
@@ -277,12 +264,10 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
             let lift: CGFloat = 6
             if UIAccessibility.isReduceMotionEnabled {
                 image.position.y += lift
-                outline.position.y = lift
             } else {
                 let action = SKAction.moveBy(x: 0, y: lift, duration: 0.16)
                 action.timingMode = .easeOut
                 image.run(action)
-                outline.run(action)
             }
         }
         (inInventory ? canvas : boardLayer).safeAddChild(tile)

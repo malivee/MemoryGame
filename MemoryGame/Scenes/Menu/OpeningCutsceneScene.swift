@@ -112,7 +112,7 @@ final class OpeningCutsceneScene: SKScene {
         leaving = true
         removeAction(forKey: "advanceCutscene")
         UserDefaults.standard.set(true, forKey: "hasSeenOpeningCutscene")
-        let puzzle = DeckPuzzleScene(size: size)
+        let puzzle = RightDeckPuzzleScene(size: size)
         puzzle.scaleMode = .resizeFill
         MemoryFogTransition.present(puzzle, from: self, in: view)
     }
@@ -125,7 +125,7 @@ final class OpeningCutsceneScene: SKScene {
             leaving = true
 
             UserDefaults.standard.set(true, forKey: "hasSeenOpeningCutscene")
-            let puzzle = DeckPuzzleScene(size: size)
+            let puzzle = RightDeckPuzzleScene(size: size)
             puzzle.scaleMode = .resizeFill
             hint.run(.fadeOut(withDuration: 0.25))
             subtitle.run(.fadeOut(withDuration: 0.4))

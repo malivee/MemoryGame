@@ -288,3 +288,17 @@ extension PrologueProgress {
         assembled = leftVillage && jigsaw.solved
     }
 }
+
+extension JigsawProgress {
+    /// Connected groups eligible for a portal label, independent of scene layout.
+    var enterableGroups: [Set<Int>] {
+        var visited: Set<Int> = []
+        var result: [Set<Int>] = []
+        for id in installedIDs.sorted() where !visited.contains(id) {
+            let group = connectedIDs(to: id)
+            visited.formUnion(group)
+            if group.count >= JigsawCatalog.minimumConnectedPieces { result.append(group) }
+        }
+        return result
+    }
+}

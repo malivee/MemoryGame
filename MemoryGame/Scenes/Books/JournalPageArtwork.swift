@@ -3,14 +3,7 @@ import SpriteKit
 
 /// Prototype pages are rasterized once so the ink bends with the existing paper animation.
 final class JournalPageArtwork {
-    private struct Page {
-        let entry: IsoldeJournalEntry
-        var text = ""
-        var illustration: String?
-        var scribbles = false
-        var heading = false
-    }
-    private var pages: [Page] = []
+    private var pages: [JournalPage] = []
     private var cache: [Int: SKTexture] = [:]
     private let paperSize = CGSize(width: 500, height: 532)
     private let textRect = CGRect(x: 55, y: 88, width: 390, height: 389)
@@ -30,53 +23,8 @@ final class JournalPageArtwork {
     var spreadCount: Int { pages.count / 2 }
 
     init() {
-        for entry in IsoldeJournalEntry.entries {
-            if entry.localLanguage {
-                pages.append(Page(entry: entry, scribbles: true))
-                pages.append(Page(entry: entry, illustration: entry.illustration, scribbles: true))
-            } else if entry.journal.isEmpty {
-                pages.append(Page(entry: entry))
-                pages.append(Page(entry: entry, illustration: entry.illustration))
-            } else {
-                var remaining = entry.journal
-                var first = true
-                while !remaining.isEmpty {
-                    let illustration = !first && pages.count % 2 == 1 ? entry.illustration : nil
-                    let rect = illustration == nil ? textRect : illustratedTextRect
-                    let chunk = takeText(from: &remaining, fitting: rect)
-                    pages.append(Page(entry: entry, text: chunk, illustration: illustration, heading: first))
-                    first = false
-                    // Illustration appears once, on the first right-hand page.
-                    if pages.count % 2 == 0 { break }
-                }
-                while !remaining.isEmpty {
-                    pages.append(Page(entry: entry, text: takeText(from: &remaining, fitting: textRect)))
-                }
-                if pages.last?.heading == true, let illustration = entry.illustration {
-                    pages.append(Page(entry: entry, illustration: illustration))
-                }
-            }
-            // Start each new record on a fresh spread.
-            if pages.count % 2 != 0 { pages.append(Page(entry: entry)) }
-        }
-    }
-
-    private func takeText(from remaining: inout String, fitting rect: CGRect) -> String {
-        let words = remaining.components(separatedBy: " ")
-        var chunk = ""
-        var consumed = 0
-        for word in words {
-            let candidate = chunk.isEmpty ? word : chunk + " " + word
-            let height = (candidate as NSString).boundingRect(
-                with: CGSize(width: rect.width, height: .greatestFiniteMagnitude),
-                options: [.usesLineFragmentOrigin, .usesFontLeading],
-                attributes: textAttributes, context: nil).height
-            if ceil(height) > rect.height && consumed > 0 { break }
-            chunk = candidate
-            consumed += 1
-        }
-        remaining = words.dropFirst(consumed).joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
-        return chunk.trimmingCharacters(in: .whitespacesAndNewlines)
+        pages = JournalPaginator(textRect: textRect, illustratedTextRect: illustratedTextRect,
+                                 textAttributes: textAttributes).paginate()
     }
 
     func texture(side: BookPageSide, spread: Int) -> SKTexture {

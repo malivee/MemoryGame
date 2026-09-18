@@ -31,4 +31,25 @@ extension BookScene {
         trackedTouch = nil
         touchStartPoint = nil
     }
+    func closeBookIfNeeded(at point: CGPoint) -> Bool {
+        guard onClose != nil else { return false }
+        let tappedClose = nodes(at: point).contains { node in
+            var current: SKNode? = node
+            while let inspected = current {
+                if inspected.name == closeButtonName { return true }
+                current = inspected.parent
+            }
+            return false
+        }
+        if tappedClose {
+            trackedTouch = nil
+            touchStartPoint = nil
+            finishTurn()
+            let close = onClose
+            onClose = nil // A second tap during the transition must not reopen.
+            close?()
+        }
+        return tappedClose
+    }
+
 }

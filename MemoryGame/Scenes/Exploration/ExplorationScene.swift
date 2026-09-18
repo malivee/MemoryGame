@@ -43,6 +43,8 @@ final class ExplorationScene: SKScene {
     private var markerNode: SKNode?
     private var nearbyInteraction: MemoryInteractionTarget?
     private var nearbyPrompt: SKNode?
+    private var hudInteractButton: SKShapeNode?
+    private var hudInteractLabel: SKLabelNode?
 
     init(size: CGSize, entry: MemoryPiece, worldLocations: Set<MemoryPiece>) {
         self.entry = entry
@@ -161,7 +163,8 @@ final class ExplorationScene: SKScene {
         let local = PrologueProgress()
         local.placements = progress.placements.filter { worldLocations.contains($0.value.piece) }
         level = PrologueLevel.make(region: entry.region, progress: local)
-        navigation = MemoryNavigation(bounds: PrologueLevel.bounds, solids: level.obstacles.map(\.rect), fog: level.fog(progress: local))
+        let solids = calculateEffectiveSolids(for: level)
+        navigation = MemoryNavigation(bounds: PrologueLevel.bounds, solids: solids, fog: level.fog(progress: local))
         if let texture = SceneryTextures.texture(level: level, progress: local) {
             let scenery = SKSpriteNode(texture: texture)
             scenery.anchorPoint = .zero
@@ -256,6 +259,93 @@ final class ExplorationScene: SKScene {
             world.addChild(patrol.field); world.addChild(patrol.character)
         }
     }
+
+    // Menghitung kotak tabrakan 2.5D yang akurat pada tapak/alas benda di tanah.
+    // Pohon hanya bertabrakan pada pangkal batang (bukan kanopi daun di udara).
+    // Batu hanya bertabrakan pada alas bawah di tanah.
+    // Rumah bertabrakan pada tiang dan pondasi dinding bawah.
+    private func calculateEffectiveSolids(for level: PrologueLevel) -> [CGRect] {
+        if level.region == .house {
+            var solids: [CGRect] = []
+            // Dinding kabin kayu:
+            // Dinding atas (di y >= 435 agar rute patroli orang tua di y: 415 tetap leluasa)
+            solids.append(CGRect(x: 0, y: 435, width: 960, height: 45))
+            // Dinding bawah
+            solids.append(CGRect(x: 0, y: 0, width: 960, height: 18))
+            // Dinding kiri (pintu di y: 190..340 tetap terbuka untuk cahaya)
+            solids.append(CGRect(x: 0, y: 0, width: 65, height: 190))
+            solids.append(CGRect(x: 0, y: 340, width: 65, height: 140))
+            // Dinding kanan
+            solids.append(CGRect(x: 900, y: 0, width: 60, height: 480))
+
+            // Perabotan di dalam kabin (dihitung alasnya agar Arthur dan patroli bisa berlindung secara alami)
+            for obstacle in level.obstacles {
+                let r = obstacle.rect
+                switch obstacle.kind {
+                case "Lemari":
+                    let w = max(20, r.width * 0.85)
+                    let h = max(20, r.height * 0.65)
+                    solids.append(CGRect(x: r.midX - w / 2, y: r.minY, width: w, height: h))
+                case "Tempat tidur":
+                    let w = max(20, r.width * 0.88)
+                    let h = max(20, r.height * 0.65)
+                    solids.append(CGRect(x: r.midX - w / 2, y: r.minY, width: w, height: h))
+                case "Meja":
+                    let w = max(20, r.width * 0.85)
+                    let h = max(20, r.height * 0.70)
+                    solids.append(CGRect(x: r.midX - w / 2, y: r.minY, width: w, height: h))
+                case "Peti":
+                    let w = max(20, r.width * 0.80)
+                    let h = max(20, r.height * 0.70)
+                    solids.append(CGRect(x: r.midX - w / 2, y: r.minY, width: w, height: h))
+                default:
+                    solids.append(r)
+                }
+            }
+            return solids
+        }
+
+        return level.obstacles.compactMap { obstacle in
+            let r = obstacle.rect
+            switch obstacle.kind {
+            case "Pohon":
+                // Batang pohon di dasar (tapak di tanah). Arthur bisa lewat di belakang/samping kanopi daun.
+                let trunkW: CGFloat = max(14, min(22, r.width * 0.35))
+                let trunkH: CGFloat = max(16, min(24, r.height * 0.28))
+                return CGRect(x: r.midX - trunkW / 2, y: r.minY, width: trunkW, height: trunkH)
+
+            case "Batu":
+                // Alas batu yang menyentuh tanah (lower 45%)
+                let rockW = max(18, r.width * 0.72)
+                let rockH = max(16, r.height * 0.44)
+                return CGRect(x: r.midX - rockW / 2, y: r.minY, width: rockW, height: rockH)
+
+            case "Rumah":
+                // Pondasi tiang panggung pondok di tanah (lower 52%)
+                let houseW = max(30, r.width * 0.88)
+                let houseH = max(24, r.height * 0.52)
+                return CGRect(x: r.midX - houseW / 2, y: r.minY, width: houseW, height: houseH)
+
+            case "Pagar tanaman":
+                // Semak pagar pembatas di tanah (lower 55%)
+                let hedgeH = max(18, r.height * 0.55)
+                return CGRect(x: r.minX + 2, y: r.minY, width: max(12, r.width - 4), height: hedgeH)
+
+            case "Peti":
+                // Peti kayu di tanah (lower 60%)
+                let crateH = max(16, r.height * 0.60)
+                return CGRect(x: r.minX + 2, y: r.minY, width: max(12, r.width - 4), height: crateH)
+
+            case "Dinding batu", "Air":
+                // Dinding tebing dan danau air tetap solid penuh
+                return r
+
+            default:
+                return r
+            }
+        }
+    }
+
     private func color(_ friend: FriendID) -> SKColor {
         switch friend {
         case .keneth: return SKColor(red: 0.73, green: 0.39, blue: 0.24, alpha: 1)
@@ -571,7 +661,67 @@ final class ExplorationScene: SKScene {
         let hint = hud.storyLabel("Berlindung di balik benda • Bidang kuning = pandangan warga",
                                   at: CGPoint(x: size.width / 2, y: 18), size: 11, color: SKColor(white: 1, alpha: 0.5))
         hint.zPosition = 10
+
+        // 7. Tombol Interaksi Aksi Cepat HUD bergaya Carto di kanan bawah
+        let interactBtn = SKShapeNode(rectOf: CGSize(width: 176, height: 46), cornerRadius: 23)
+        interactBtn.name = "hudInteract"
+        interactBtn.position = CGPoint(x: size.width - 110, y: 115)
+        interactBtn.fillColor = SKColor(red: 0.16, green: 0.22, blue: 0.17, alpha: 0.96)
+        interactBtn.strokeColor = SKColor(red: 0.98, green: 0.84, blue: 0.42, alpha: 1.0)
+        interactBtn.lineWidth = 2.0
+        interactBtn.zPosition = 50
+        interactBtn.alpha = 0
+        interactBtn.isHidden = true
+        hud.addChild(interactBtn)
+
+        let interactLbl = SKLabelNode(text: "Interaksi")
+        interactLbl.name = "hudInteract"
+        interactLbl.fontName = "AvenirNext-Bold"
+        interactLbl.fontSize = 13
+        interactLbl.fontColor = SKColor(red: 0.98, green: 0.92, blue: 0.70, alpha: 1.0)
+        interactLbl.verticalAlignmentMode = .center
+        interactBtn.addChild(interactLbl)
+
+        hudInteractButton = interactBtn
+        hudInteractLabel = interactLbl
+
         updateBookAccess()
+    }
+
+    private func showHUDInteractButton(for target: MemoryInteractionTarget) {
+        guard let btn = hudInteractButton, let lbl = hudInteractLabel else { return }
+        let text: String
+        switch target {
+        case .book:
+            text = "📖 Ambil Buku"
+        case .friend(let friend):
+            if progress.joined.contains(friend) {
+                text = "💬 Bicara"
+            } else {
+                text = "✨ Ajak \(friend.rawValue)"
+            }
+        case .marker:
+            text = "🧭 Penanda"
+        }
+        lbl.text = text
+        if btn.isHidden || btn.alpha < 0.1 {
+            btn.isHidden = false
+            btn.removeAllActions()
+            btn.setScale(0.85)
+            btn.run(.group([
+                .scale(to: 1.0, duration: 0.25),
+                .fadeIn(withDuration: 0.20)
+            ]))
+        }
+    }
+
+    private func hideHUDInteractButton() {
+        guard let btn = hudInteractButton, !btn.isHidden else { return }
+        btn.removeAllActions()
+        btn.run(.sequence([
+            .group([.scale(to: 0.85, duration: 0.16), .fadeOut(withDuration: 0.16)]),
+            .run { btn.isHidden = true }
+        ]))
     }
     private func updateBookAccess() {
         if progress.hasBook {
@@ -838,11 +988,12 @@ final class ExplorationScene: SKScene {
         if progress.installed(.oldPath), let node = markerNode {
             candidates.append((.marker, node, distance(arthur.position, node.position)))
         }
-        guard let nearest = candidates.filter({ $0.2 <= 72 }).min(by: { $0.2 < $1.2 }) else {
+        // Radius deteksi 85pt agar interaksi mudah terpicu saat mendekati objek/teman
+        guard let nearest = candidates.filter({ $0.2 <= 85 }).min(by: { $0.2 < $1.2 }) else {
             clearNearbyInteraction()
             return
         }
-        guard nearbyInteraction != nearest.0 else {
+        if nearbyInteraction == nearest.0 {
             nearbyPrompt?.position = nearest.1.position
             return
         }
@@ -852,50 +1003,76 @@ final class ExplorationScene: SKScene {
         prompt.position = nearest.1.position
         world.addChild(prompt)
         nearbyPrompt = prompt
+        showHUDInteractButton(for: nearest.0)
     }
 
     private func makeInteractionPrompt(for target: MemoryInteractionTarget) -> SKNode {
         let root = SKNode()
+        root.name = "contextInteract"
         root.zPosition = 90
-        let radius: CGFloat = target == .book ? 24 : 29
-        let highlight = SKShapeNode(circleOfRadius: radius)
-        highlight.name = "contextInteract"
-        highlight.strokeColor = SKColor(red: 1, green: 0.83, blue: 0.36, alpha: 0.95)
-        highlight.fillColor = SKColor(red: 1, green: 0.78, blue: 0.25, alpha: 0.10)
-        highlight.lineWidth = 3
-        root.addChild(highlight)
-        highlight.run(.repeatForever(.sequence([
-            .group([.scale(to: 1.16, duration: 0.55), .fadeAlpha(to: 0.45, duration: 0.55)]),
-            .group([.scale(to: 1, duration: 0.55), .fadeAlpha(to: 1, duration: 0.55)])
+
+        // 1. Area sentuh toleran tak terlihat (radius 65pt) untuk menangkap ketukan di sekitar target
+        let hitArea = SKShapeNode(circleOfRadius: 65)
+        hitArea.name = "contextInteract"
+        hitArea.fillColor = SKColor(white: 1.0, alpha: 0.001)
+        hitArea.strokeColor = .clear
+        hitArea.zPosition = -1
+        root.addChild(hitArea)
+
+        // 2. Lingkaran sorot interaksi emas Carto di tanah (pulsing ground indicator)
+        let groundRadius: CGFloat = target == .book ? 26 : 32
+        let groundRing = SKShapeNode(circleOfRadius: groundRadius)
+        groundRing.name = "contextInteract"
+        groundRing.strokeColor = SKColor(red: 1.0, green: 0.85, blue: 0.40, alpha: 0.95)
+        groundRing.fillColor = SKColor(red: 1.0, green: 0.82, blue: 0.30, alpha: 0.18)
+        groundRing.lineWidth = 2.5
+        groundRing.position = CGPoint(x: 0, y: -4)
+        root.addChild(groundRing)
+        groundRing.run(.repeatForever(.sequence([
+            .group([.scale(to: 1.18, duration: 0.6), .fadeAlpha(to: 0.45, duration: 0.6)]),
+            .group([.scale(to: 0.96, duration: 0.6), .fadeAlpha(to: 1.0, duration: 0.6)])
         ])))
 
+        // Cincin aura halus
+        let outerAura = SKShapeNode(circleOfRadius: groundRadius + 8)
+        outerAura.name = "contextInteract"
+        outerAura.strokeColor = SKColor(red: 1.0, green: 0.92, blue: 0.60, alpha: 0.4)
+        outerAura.fillColor = .clear
+        outerAura.lineWidth = 1.0
+        outerAura.position = CGPoint(x: 0, y: -4)
+        root.addChild(outerAura)
+
+        // 3. Tombol aksi mengambang Carto dengan bubble speech pointer
         let title: String
         let width: CGFloat
         switch target {
         case .book:
             title = "📖 Ambil Buku"
-            width = 120
+            width = 126
         case .friend(let friend):
             if progress.joined.contains(friend) {
                 title = "💬 \(friend.rawValue)"
-                width = 125
+                width = 126
             } else {
                 title = "✨ Ajak \(friend.rawValue)"
-                width = 135
+                width = 138
             }
         case .marker:
             title = "🧭 Penanda"
-            width = 125
+            width = 126
         }
-        let button = root.storyButton(title, name: "contextInteract", at: CGPoint(x: 0, y: 58), width: width)
-        button.fillColor = SKColor(red: 0.24, green: 0.18, blue: 0.09, alpha: 0.97)
-        button.strokeColor = SKColor(red: 1, green: 0.82, blue: 0.38, alpha: 1)
-        button.lineWidth = 2
+
+        let bubbleY: CGFloat = target == .book ? 50 : 62
+        let button = root.storyButton(title, name: "contextInteract", at: CGPoint(x: 0, y: bubbleY), width: width)
+        button.fillColor = SKColor(red: 0.16, green: 0.22, blue: 0.17, alpha: 0.97)
+        button.strokeColor = SKColor(red: 1.0, green: 0.85, blue: 0.42, alpha: 1.0)
+        button.lineWidth = 2.0
+
         let pointer = SKShapeNode(path: {
             let path = CGMutablePath()
-            path.move(to: CGPoint(x: -6, y: 35))
-            path.addLine(to: CGPoint(x: 6, y: 35))
-            path.addLine(to: CGPoint(x: 0, y: 27))
+            path.move(to: CGPoint(x: -6, y: bubbleY - 14))
+            path.addLine(to: CGPoint(x: 6, y: bubbleY - 14))
+            path.addLine(to: CGPoint(x: 0, y: bubbleY - 22))
             path.closeSubpath()
             return path
         }())
@@ -903,6 +1080,17 @@ final class ExplorationScene: SKScene {
         pointer.fillColor = button.fillColor
         pointer.strokeColor = button.strokeColor
         root.addChild(pointer)
+
+        // Animasi melayang naik-turun lembut (bobbing)
+        button.run(.repeatForever(.sequence([
+            .moveBy(x: 0, y: 3.5, duration: 0.75),
+            .moveBy(x: 0, y: -3.5, duration: 0.75)
+        ])))
+        pointer.run(.repeatForever(.sequence([
+            .moveBy(x: 0, y: 3.5, duration: 0.75),
+            .moveBy(x: 0, y: -3.5, duration: 0.75)
+        ])))
+
         return root
     }
 
@@ -910,6 +1098,7 @@ final class ExplorationScene: SKScene {
         nearbyPrompt?.removeFromParent()
         nearbyPrompt = nil
         nearbyInteraction = nil
+        hideHUDInteractButton()
     }
     // Memperbarui gerak dan kecurigaan setiap frame; kamera mengikuti Arthur secara halus ala Carto.
     override func update(_ currentTime: TimeInterval) {
@@ -1096,14 +1285,68 @@ final class ExplorationScene: SKScene {
             return
         }
         if dialoguePanel != nil { advanceDialogue(); return }
-        let worldNames = Set(world.nodes(at: touch.location(in: world)).compactMap { $0.namedAncestor(prefix: "contextInteract") })
         if names.contains("photo") { returnToPhoto(); return }
         if names.contains("bag") { openBag(); return }
-        if worldNames.contains("contextInteract") { interact(); return }
+        if names.contains("hudInteract") { interact(); return }
+
+        let worldPoint = touch.location(in: world)
+        let worldNodes = world.nodes(at: worldPoint)
+        let worldNames = Set(worldNodes.compactMap { $0.namedAncestor(prefix: "contextInteract") ?? $0.name })
+
+        if worldNames.contains("contextInteract") {
+            interact()
+            return
+        }
+
+        // Cek jika ketukan berada di dekat target interaksi aktif (jarak toleran 75pt)
+        if let target = nearbyInteraction {
+            let targetPos: CGPoint
+            switch target {
+            case .book: targetPos = bookPickupNode?.position ?? (level.book ?? .zero)
+            case .friend(let f): targetPos = friendNodes[f]?.position ?? (level.friends[f] ?? .zero)
+            case .marker: targetPos = markerNode?.position ?? (level.marker ?? .zero)
+            }
+            if distance(worldPoint, targetPos) < 75 || (nearbyPrompt != nil && distance(worldPoint, nearbyPrompt!.position) < 75) {
+                interact()
+                return
+            }
+        }
+
+        // Cek jika mengetuk langsung pada karakter teman, buku, atau penanda saat Arthur berada di dekatnya
+        for friend in FriendID.allCases {
+            if let fNode = friendNodes[friend] {
+                if worldNodes.contains(where: { $0 == fNode || $0.inParentHierarchy(fNode) }) {
+                    if distance(arthur.position, fNode.position) <= 95 {
+                        nearbyInteraction = .friend(friend)
+                        interact()
+                        return
+                    }
+                }
+            }
+        }
+        if let bookNode = bookPickupNode, !progress.hasBook {
+            if worldNodes.contains(where: { $0 == bookNode || $0.inParentHierarchy(bookNode) }) {
+                if distance(arthur.position, bookNode.position) <= 95 {
+                    nearbyInteraction = .book
+                    interact()
+                    return
+                }
+            }
+        }
+        if let mNode = markerNode, progress.installed(.oldPath) {
+            if worldNodes.contains(where: { $0 == mNode || $0.inParentHierarchy(mNode) }) {
+                if distance(arthur.position, mNode.position) <= 95 {
+                    nearbyInteraction = .marker
+                    interact()
+                    return
+                }
+            }
+        }
+
         if distance(hudPoint, stickCenter) < 70 {
             stickTouch = touch; arthur.route.removeAll(); updateStick(touch); return
         }
-        let destination = touch.location(in: world)
+        let destination = worldPoint
         guard PrologueLevel.bounds.contains(destination) else { return }
         if navigation.fog.contains(where: { $0.contains(destination) }) { checkFog(at: destination); return }
         arthur.route = navigation.route(from: arthur.position, to: destination)

@@ -41,6 +41,24 @@ final class OpeningCutsceneScene: SKScene {
         hint.fontColor = SKColor(white: 0.55, alpha: 1)
         hint.position.y = -280
         canvas.addChild(hint)
+
+        // Tombol Lewati di pojok kanan atas
+        let skipBtn = SKShapeNode(rectOf: CGSize(width: 96, height: 32), cornerRadius: 16)
+        skipBtn.name = "skipCutscene"
+        skipBtn.position = CGPoint(x: 410, y: 260)
+        skipBtn.fillColor = SKColor(white: 0.15, alpha: 0.75)
+        skipBtn.strokeColor = SKColor(white: 1.0, alpha: 0.28)
+        skipBtn.lineWidth = 1.2
+        canvas.addChild(skipBtn)
+
+        let skipLabel = SKLabelNode(text: "Lewati ›")
+        skipLabel.name = "skipCutscene"
+        skipLabel.fontName = "AvenirNext-Medium"
+        skipLabel.fontSize = 13
+        skipLabel.fontColor = SKColor(white: 0.90, alpha: 1)
+        skipLabel.verticalAlignmentMode = .center
+        skipBtn.addChild(skipLabel)
+
         layoutCanvas()
         showShot()
     }
@@ -79,8 +97,24 @@ final class OpeningCutsceneScene: SKScene {
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard !touches.isEmpty else { return }
+        guard !touches.isEmpty, let touch = touches.first else { return }
+        let canvasPoint = touch.location(in: canvas)
+        let hitNodes = canvas.nodes(at: canvasPoint)
+        if hitNodes.contains(where: { $0.name == "skipCutscene" }) {
+            skipCutscene()
+            return
+        }
         advance()
+    }
+
+    private func skipCutscene() {
+        guard !leaving, let view else { return }
+        leaving = true
+        removeAction(forKey: "advanceCutscene")
+        UserDefaults.standard.set(true, forKey: "hasSeenOpeningCutscene")
+        let puzzle = DeckPuzzleScene(size: size)
+        puzzle.scaleMode = .resizeFill
+        MemoryFogTransition.present(puzzle, from: self, in: view)
     }
 
     private func advance() {
@@ -89,6 +123,7 @@ final class OpeningCutsceneScene: SKScene {
         changingShot = true
         if index == shots.count - 1 {
             leaving = true
+            UserDefaults.standard.set(true, forKey: "hasSeenOpeningCutscene")
             let puzzle = DeckPuzzleScene(size: size)
             puzzle.scaleMode = .resizeFill
             hint.run(.fadeOut(withDuration: 0.25))

@@ -18,8 +18,17 @@ class GameViewController: UIViewController {
         super.viewDidLoad()
         
         if let view = self.view as? SKView {
-            let scene = OpeningCutsceneScene(size: view.bounds.size)
-            scene.scaleMode = .resizeFill
+            let hasSeenCutscene = UserDefaults.standard.bool(forKey: "hasSeenOpeningCutscene")
+            let scene: SKScene
+            if hasSeenCutscene {
+                let puzzle = DeckPuzzleScene(size: view.bounds.size)
+                puzzle.scaleMode = .resizeFill
+                scene = puzzle
+            } else {
+                let cutscene = OpeningCutsceneScene(size: view.bounds.size)
+                cutscene.scaleMode = .resizeFill
+                scene = cutscene
+            }
             view.presentScene(scene)
             
             view.ignoresSiblingOrder = true

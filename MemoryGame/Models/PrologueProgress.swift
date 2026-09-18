@@ -1,6 +1,6 @@
 // Penjelasan file: PrologueProgress.swift
 // Menyimpan progres cerita: buku, teman yang bergabung, penanda jalan, dan keberangkatan kelompok.
-// Model lokasi lama dipertahankan untuk kompatibilitas dan menjadi hasil sinkronisasi puzzle 48 keping.
+// Model lokasi lama dipertahankan untuk kompatibilitas dan menjadi hasil sinkronisasi puzzle 10x4.
 // PrologueStore memuat dan menyimpan progres sebagai JSON di UserDefaults.
 
 import Foundation

@@ -1,6 +1,6 @@
 // Penjelasan file: MemoryPhotoTextures.swift
 // Pemotong foto untuk prototipe lama dengan sembilan bagian lokasi.
-// Papan 48 keping sekarang memakai PuzzleTextureService; file ini masih menyimpan implementasi tekstur lama.
+// Papan keping utama sekarang memakai PuzzleTextureService; file ini masih menyimpan implementasi tekstur lama.
 
 import SpriteKit
 import UIKit

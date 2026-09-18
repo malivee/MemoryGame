@@ -6,10 +6,10 @@ enum PuzzleWorld: Int, CaseIterable {
 
     var pieceIDs: Set<Int> {
         switch self {
-        case .house: return [29, 36, 37]
-        case .village: return [24, 32, 33]
-        case .hills: return [0, 1, 8]
-        case .boundary: return [6, 7, 15]
+        case .house: return [14, 23, 24]
+        case .village: return [16, 26, 27]
+        case .hills: return [0, 1, 10]
+        case .boundary: return [8, 9, 19]
         }
     }
     var title: String {

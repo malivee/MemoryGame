@@ -6,7 +6,7 @@
 import SpriteKit
 import UIKit
 
-/// A 6-row by 8-column jigsaw photo, also used to enter the remembered locations.
+/// A 10-column by 4-row jigsaw photo, also used to enter the remembered locations.
 final class GameScene: SKScene {
     private var progress: PrologueProgress { PrologueStore.shared.progress }
     private var state: JigsawProgress { progress.jigsaw ?? JigsawProgress() }
@@ -61,7 +61,9 @@ final class GameScene: SKScene {
     private func rebuild(revealComplete: Bool = true) {
         canvas.removeAllChildren()
         tiles.removeAll(); hitPaths.removeAll(); renderScales.removeAll()
-        board = CGRect(x: -470, y: -182, width: 600, height: 400)
+        let boardWidth: CGFloat = 600
+        let boardHeight = boardWidth * PuzzleCatalog.canvasHeight / PuzzleCatalog.canvasWidth
+        board = CGRect(x: -470, y: -150, width: boardWidth, height: boardHeight)
         boardScale = board.width / PuzzleCatalog.canvasWidth
         cell = CGSize(width: board.width / CGFloat(PuzzleCatalog.columns), height: board.height / CGFloat(PuzzleCatalog.rows))
         canvas.storyLabel("KEPING KENANGAN  ·  3 KEPING PER MAP", at: CGPoint(x: -110, y: 275), size: 22)

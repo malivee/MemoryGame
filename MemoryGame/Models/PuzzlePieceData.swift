@@ -1,5 +1,5 @@
 // Penjelasan file: PuzzlePieceData.swift
-// Menentukan ukuran foto sumber serta pembagian menjadi 6 baris × 8 kolom.
+// Menentukan ukuran foto sumber serta pembagian landscape 10 kolom × 4 baris.
 // Setiap keping menyimpan batas potongan gambar termasuk tonjolan jigsaw; koordinat foto berawal dari kiri atas.
 
 //
@@ -25,9 +25,9 @@ public struct PuzzlePieceData: Identifiable, Sendable {
 public enum PuzzleCatalog {
     public static let imageName = "final photo"
     public static let canvasWidth: CGFloat = 1536
-    public static let canvasHeight: CGFloat = 1024
-    public static let rows = 6
-    public static let columns = 8
+    public static let canvasHeight: CGFloat = 614.4
+    public static let rows = 4
+    public static let columns = 10
     public static let cellWidth = canvasWidth / CGFloat(columns)
     public static let cellHeight = canvasHeight / CGFloat(rows)
     public static let tabDepth = min(cellWidth, cellHeight) * 0.22

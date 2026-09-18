@@ -17,7 +17,7 @@ private extension SKNode {
     }
 }
 
-/// A 6-row by 8-column jigsaw photo, also used to enter the remembered locations.
+/// A 10-column by 4-row jigsaw photo, also used to enter the remembered locations.
 final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
     private var progress: PrologueProgress { PrologueStore.shared.progress }
     private var state: JigsawProgress { progress.jigsaw ?? JigsawProgress() }
@@ -157,7 +157,7 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
 
         let deck = SKShapeNode(rect: deckBounds)
         deck.zPosition = 65
-        deck.fillColor = SKColor(red: 0.25, green: 0.20, blue: 0.15, alpha: 1)
+        deck.fillColor = SKColor(red: 0.25, green: 0.20, blue: 0.15, alpha: 0.9)
         deck.strokeColor = SKColor(red: 0.65, green: 0.52, blue: 0.35, alpha: 1)
         canvas.safeAddChild(deck)
         let deckTitle = canvas.storyLabel("Kepingan Puzzle", at: CGPoint(x: 0, y: deckBounds.maxY - 20), size: 15,
@@ -420,17 +420,32 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
     // Mengubah posisi lepas menjadi slot; drop di luar papan mengembalikan keping ke inventori.
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard !enteringMemory, rotatingPiece == nil, let touch = trackedTouch, touches.contains(touch), let id = dragPiece else { return }
+        let releasePoint = touch.location(in: canvas)
+        if hypot(releasePoint.x - dragStart.x, releasePoint.y - dragStart.y) > 8 { moved = true }
         trackedTouch = nil; dragPiece = nil
-        if moved, let screenPoint = tiles[id]?.position {
+        if moved {
+            // touchesEnded may arrive beyond the last touchesMoved position.
+            let screenPoint = CGPoint(x: dragHome.x + releasePoint.x - dragStart.x,
+                                      y: dragHome.y + releasePoint.y - dragStart.y)
             let point = boardLayer.convert(screenPoint, from: canvas)
             var accepted = true
             if viewport.contains(screenPoint), board.contains(point) {
                 let col = min(7, max(0, Int((point.x - board.minX) / cell.width)))
                 let row = min(5, max(0, Int((board.maxY - point.y) / cell.height)))
-                accepted = progress.placeJigsawPiece(id, at: row * 8 + col)
-            } else { progress.jigsaw?.remove(id) }
+                let slot = row * PuzzleCatalog.columns + col
+                if let occupant = state.placements[slot], occupant.id != id {
+                    accepted = false
+                } else {
+                    accepted = progress.placeJigsawPiece(id, at: slot)
+                }
+            } else if deckBounds.contains(releasePoint) {
+                progress.jigsaw?.remove(id)
+            } else {
+                // A drop in the frame/gap restores the original slot, rather than discarding it.
+                accepted = false
+            }
             selected = id; changed(focusInventory: true)
-            if !accepted { message("Keping belum tersedia atau berada di luar papan.") }
+            if !accepted { message("Letakkan keping pada slot kosong di papan.") }
         } else { selected = id; entryVisible = true; rebuild() }
     }
     
@@ -466,8 +481,10 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
         let rotation = UIRotationGestureRecognizer(target: self, action: #selector(rotatePiece(_:)))
         let left = UISwipeGestureRecognizer(target: self, action: #selector(swipeDeck(_:)))
         left.direction = .left
+        left.numberOfTouchesRequired = 2
         let right = UISwipeGestureRecognizer(target: self, action: #selector(swipeDeck(_:)))
         right.direction = .right
+        right.numberOfTouchesRequired = 2
         for gesture: UIGestureRecognizer in [pinch, pan, rotation, left, right] {
             gesture.delegate = self
             view.addGestureRecognizer(gesture)

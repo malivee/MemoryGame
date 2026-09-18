@@ -1,12 +1,12 @@
 // Penjelasan file: JigsawProgress.swift
-// Mengatur 48 keping utama, varian danau kering, hadiah misi, posisi, dan rotasi keping.
+// Mengatur keping utama, varian danau kering, hadiah misi, posisi, dan rotasi keping.
 // Keping boleh berada di slot mana pun; minimal tiga keping dengan tonjolan dan cekungan cocok membuka akses eksplorasi.
 // Penyelesaian akhir tetap memerlukan foto yang benar. File ini juga menjembatani puzzle dengan progres cerita.
 
 import Foundation
 import CoreGraphics
 
-/// 48 actual photo fragments plus one alternate fragment for the same lake.
+/// Actual photo fragments plus one alternate fragment for the same lake.
 /// Story locations remain independent from the physical photo-piece identity.
 enum JigsawCatalog {
     static let count = PuzzleCatalog.rows * PuzzleCatalog.columns
@@ -14,23 +14,35 @@ enum JigsawCatalog {
     static let allIDs = Array(0...dryLakeID)
     static let minimumConnectedPieces = 3
     // An L-shaped opening: house above road, yard immediately to its left.
-    static let starterIDs: Set<Int> = [29, 36, 37]
+    static let starterIDs: Set<Int> = PuzzleWorld.house.pieceIDs
     static let bookReward = PuzzleWorld.village.pieceIDs
     static let friendsReward = PuzzleWorld.hills.pieceIDs
     static let markerReward = PuzzleWorld.boundary.pieceIDs
+    private static let locationIDs: [MemoryPiece: Int] = [
+        .house: 14,
+        .yard: 23,
+        .villageRoad: 24,
+        .garden: 27,
+        .mountain: 0,
+        .oldPath: 1,
+        .lake: 10,
+        .dryLake: dryLakeID,
+        .boundary: 8,
+        .closing: 9
+    ]
 
     static func location(for id: Int) -> MemoryPiece {
         if id == dryLakeID { return .dryLake }
+        if let location = locationIDs.first(where: { $0.value == id })?.key { return location }
+        if let world = PuzzleWorld.containing(id) { return world.entry }
         let row = id / PuzzleCatalog.columns
         let col = id % PuzzleCatalog.columns
         let band = col < 3 ? 0 : (col < 5 ? 1 : 2)
-        return MemoryPiece.main[(row / 2) * 3 + band]
+        let index = min(MemoryPiece.main.count - 1, (row / 2) * 3 + band)
+        return MemoryPiece.main[index]
     }
     static func primaryID(for location: MemoryPiece) -> Int {
-        if location == .dryLake { return dryLakeID }
-        if location == .house { return 29 }
-        if location == .yard { return 36 }
-        return (0..<count).first { self.location(for: $0) == location }!
+        locationIDs[location] ?? PuzzleWorld.house.pieceIDs.sorted()[0]
     }
     static func data(for id: Int) -> PuzzlePieceData {
         PuzzleCatalog.pieces[id == dryLakeID ? primaryID(for: .lake) : id]
@@ -45,7 +57,7 @@ enum JigsawCatalog {
             let location = location(for: id)
             guard progress.discovered.contains(location) else { return false }
             if [.house, .yard, .villageRoad].contains(location), !progress.hasBook {
-                return [21, 35, 37].contains(id)
+                return starterIDs.contains(id)
             }
             return true
         })
@@ -55,8 +67,8 @@ enum JigsawCatalog {
         let data = data(for: id)
         let row = data.row - 1, col = data.col - 1
         let sign = (row + col).isMultiple(of: 2) ? 1 : -1
-        let original = [row == 0 ? 0 : sign, col == 7 ? 0 : sign,
-                        row == 5 ? 0 : sign, col == 0 ? 0 : sign]
+        let original = [row == 0 ? 0 : sign, col == PuzzleCatalog.columns - 1 ? 0 : sign,
+                        row == PuzzleCatalog.rows - 1 ? 0 : sign, col == 0 ? 0 : sign]
         let rotation = ((turns % 4) + 4) % 4
         return (0..<4).map { original[($0 - rotation + 4) % 4] }
     }
@@ -104,10 +116,10 @@ struct JigsawProgress: Codable {
         guard secondPhoto.row - firstPhoto.row == boardRowDelta,
               secondPhoto.col - firstPhoto.col == boardColDelta else { return false }
         let direction: Int
-        if neighbor == slot - 8 { direction = 0 }
-        else if neighbor == slot + 1 && slot % 8 < 7 { direction = 1 }
-        else if neighbor == slot + 8 { direction = 2 }
-        else if neighbor == slot - 1 && slot % 8 > 0 { direction = 3 }
+        if neighbor == slot - PuzzleCatalog.columns { direction = 0 }
+        else if neighbor == slot + 1 && slot % PuzzleCatalog.columns < PuzzleCatalog.columns - 1 { direction = 1 }
+        else if neighbor == slot + PuzzleCatalog.columns { direction = 2 }
+        else if neighbor == slot - 1 && slot % PuzzleCatalog.columns > 0 { direction = 3 }
         else { return false }
         let edge = JigsawCatalog.edges(for: first.id, turns: first.turns)[direction]
         let opposite = JigsawCatalog.edges(for: second.id, turns: second.turns)[(direction + 2) % 4]
@@ -214,7 +226,7 @@ extension PrologueProgress {
                 } else {
                     // Old starters were all sockets, so they could not form one
                     // connected cluster. Swap only these unearned opening pieces.
-                    for (oldID, newID) in [21: 29, 35: 36] {
+                    for (oldID, newID) in [13: 14, 20: 23, 21: 24, 29: 14, 35: 23, 36: 23, 37: 24] {
                         existing.rotations[newID] = existing.rotations.removeValue(forKey: oldID) ?? 0
                         if let slot = existing.placements.first(where: { $0.value.id == oldID })?.key {
                             existing.placements.removeValue(forKey: slot)

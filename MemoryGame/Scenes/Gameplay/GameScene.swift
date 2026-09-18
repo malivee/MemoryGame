@@ -192,21 +192,6 @@ final class GameScene: SKScene {
         tile.addChild(image)
         var transform = CGAffineTransform(a: scale, b: 0, c: 0, d: -scale, tx: -coreX * scale, ty: coreY * scale)
         let path = JigsawOutline.path(for: data).copy(using: &transform)!
-        let outline = SKShapeNode(path: path)
-        // Inventori abu-abu; sambungan siap berwarna putih tipis; pilihan di papan oranye.
-        let connected = !inInventory && state.connectedIDs(to: id).count >= 2
-        let activeGroup = !inInventory && (selected.map { state.connectedIDs(to: id).contains($0) } ?? false)
-        if inInventory {
-            outline.strokeColor = SKColor(white: selected == id ? 0.65 : 0.48, alpha: 0.85)
-        } else if activeGroup {
-            outline.strokeColor = SKColor(red: 1, green: 0.53, blue: 0.15, alpha: 1)
-        } else {
-            outline.strokeColor = connected ? SKColor(white: 1, alpha: 0.72) : SKColor(white: 0.65, alpha: 0.7)
-        }
-        outline.lineWidth = activeGroup ? 1.8 : (selected == id ? 1.2 : 0.85)
-        outline.glowWidth = 0
-        outline.fillColor = .clear; outline.zPosition = 1
-        tile.addChild(outline)
         canvas.addChild(tile)
         tiles[id] = tile; hitPaths[id] = path; renderScales[id] = scale
     }

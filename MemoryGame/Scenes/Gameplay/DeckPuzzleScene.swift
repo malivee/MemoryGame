@@ -176,15 +176,6 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
                 let spacing = min(116, safeWidth / CGFloat(max(1, page.count)))
                 let x = deckBounds.midX + CGFloat(index) * spacing - CGFloat(page.count - 1) * spacing / 2
                 let piecePosition = CGPoint(x: x, y: deckBounds.maxY - 82)
-                if selected == id {
-                    let halo = SKShapeNode(circleOfRadius: 46)
-                    halo.position = piecePosition
-                    halo.zPosition = 66
-                    halo.fillColor = SKColor(red: 1, green: 0.79, blue: 0.40, alpha: 0.10)
-                    halo.strokeColor = SKColor(red: 1, green: 0.79, blue: 0.40, alpha: 0.70)
-                    halo.lineWidth = 2
-                    canvas.safeAddChild(halo)
-                }
                 addTile(id, at: piecePosition, inInventory: true)
             }
         }
@@ -243,25 +234,9 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
         tile.safeAddChild(image)
         var transform = CGAffineTransform(a: scale, b: 0, c: 0, d: -scale, tx: -coreX * scale, ty: coreY * scale)
         let path = JigsawOutline.path(for: data).copy(using: &transform)!
-        let outline = SKShapeNode(path: path)
-        // Inventori abu-abu; sambungan siap berwarna putih tipis; pilihan di papan oranye.
-        let connected = !inInventory && state.connectedIDs(to: id).count >= 2
         let activeGroup = !inInventory && (selected.map { state.connectedIDs(to: id).contains($0) } ?? false)
         let raisedGroup = activeGroup && entryVisible && rotatingPiece == nil
             && (selected.flatMap { state.worldEntry(for: $0, progress: progress) } != nil)
-        if inInventory {
-            outline.strokeColor = SKColor(white: selected == id ? 0.85 : 0.65, alpha: 0.85)
-        } else if raisedGroup {
-            outline.strokeColor = SKColor(red: 1, green: 0.82, blue: 0.37, alpha: 1)
-        } else if activeGroup {
-            outline.strokeColor = SKColor(red: 1, green: 0.53, blue: 0.15, alpha: 1)
-        } else {
-            outline.strokeColor = connected ? SKColor(white: 1, alpha: 0.72) : SKColor(white: 0.65, alpha: 0.7)
-        }
-        outline.lineWidth = raisedGroup ? 4 : (activeGroup ? 1.8 : (selected == id ? 1.2 : 0.85))
-        outline.glowWidth = raisedGroup ? 2.5 : 0
-        outline.fillColor = .clear; outline.zPosition = 1
-        tile.safeAddChild(outline)
         if raisedGroup {
             // Lift the artwork equally across all three pieces, preserving their joins
             // and the logical slot coordinates used for dragging and saving.
@@ -277,12 +252,10 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
             let lift: CGFloat = 6
             if UIAccessibility.isReduceMotionEnabled {
                 image.position.y += lift
-                outline.position.y = lift
             } else {
                 let action = SKAction.moveBy(x: 0, y: lift, duration: 0.16)
                 action.timingMode = .easeOut
                 image.run(action)
-                outline.run(action)
             }
         }
         (inInventory ? canvas : boardLayer).safeAddChild(tile)

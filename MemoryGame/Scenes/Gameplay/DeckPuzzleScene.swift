@@ -176,15 +176,6 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
                 let spacing = min(116, safeWidth / CGFloat(max(1, page.count)))
                 let x = deckBounds.midX + CGFloat(index) * spacing - CGFloat(page.count - 1) * spacing / 2
                 let piecePosition = CGPoint(x: x, y: deckBounds.maxY - 82)
-                if selected == id {
-                    let halo = SKShapeNode(circleOfRadius: 46)
-                    halo.position = piecePosition
-                    halo.zPosition = 66
-                    halo.fillColor = SKColor(red: 1, green: 0.79, blue: 0.40, alpha: 0.10)
-                    halo.strokeColor = SKColor(red: 1, green: 0.79, blue: 0.40, alpha: 0.70)
-                    halo.lineWidth = 2
-                    canvas.safeAddChild(halo)
-                }
                 addTile(id, at: piecePosition, inInventory: true)
             }
         }
@@ -243,6 +234,15 @@ final class DeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
         tile.safeAddChild(image)
         var transform = CGAffineTransform(a: scale, b: 0, c: 0, d: -scale, tx: -coreX * scale, ty: coreY * scale)
         let path = JigsawOutline.path(for: data).copy(using: &transform)!
+        if inInventory && selected == id {
+            let selectedBacking = SKShapeNode(path: path)
+            selectedBacking.fillColor = SKColor(red: 1, green: 0.79, blue: 0.40, alpha: 0.12)
+            selectedBacking.strokeColor = SKColor(red: 1, green: 0.79, blue: 0.40, alpha: 0.85)
+            selectedBacking.lineWidth = 3
+            selectedBacking.glowWidth = 1.6
+            selectedBacking.zPosition = -1
+            tile.safeAddChild(selectedBacking)
+        }
         let outline = SKShapeNode(path: path)
         // Inventori abu-abu; sambungan siap berwarna putih tipis; pilihan di papan oranye.
         let connected = !inInventory && state.connectedIDs(to: id).count >= 2

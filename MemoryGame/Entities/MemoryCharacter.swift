@@ -22,6 +22,10 @@ final class MemoryCharacter: SKNode {
     private var idlePhase: CGFloat = 0
     private var isWalking: Bool = false
 
+    private(set) var isSitting: Bool = false
+    private(set) var isSleeping: Bool = false
+    private var sleepParticlesNode: SKNode?
+
     private var holdingBookNode: SKNode?
     private var statusBadgeNode: SKNode?
 
@@ -352,10 +356,110 @@ final class MemoryCharacter: SKNode {
         statusBadgeNode = badge
     }
 
+    // Duduk santai di atas bantalan batang kayu (tree plate)
+    func sit(at point: CGPoint) {
+        isSitting = true
+        isSleeping = false
+        sleepParticlesNode?.removeFromParent()
+        sleepParticlesNode = nil
+        position = point
+        visualRoot.removeAllActions()
+        characterBodyNode.removeAllActions()
+        characterBodyNode.zRotation = 0
+        characterBodyNode.position = CGPoint(x: 0, y: -3)
+        characterBodyNode.setScale(1.0)
+        shadowNode.setScale(0.85)
+        visualRoot.run(SKAction.sequence([
+            SKAction.scaleX(to: 1.12, y: 0.82, duration: 0.18),
+            SKAction.scaleX(to: 1.05, y: 0.88, duration: 0.14)
+        ]))
+        updateDepth()
+    }
+
+    // Bangun dari posisi duduk
+    func standUp() {
+        guard isSitting else { return }
+        isSitting = false
+        visualRoot.removeAllActions()
+        characterBodyNode.position = .zero
+        characterBodyNode.zRotation = 0
+        shadowNode.setScale(1.0)
+        visualRoot.run(SKAction.sequence([
+            SKAction.scaleX(to: 0.90, y: 1.15, duration: 0.12),
+            SKAction.scale(to: 1.0, duration: 0.12)
+        ]))
+        updateDepth()
+    }
+
+    // Berbaring tidur di atas kasur anyaman wol hangat
+    func sleep(at point: CGPoint) {
+        isSleeping = true
+        isSitting = false
+        position = point
+        visualRoot.removeAllActions()
+        characterBodyNode.removeAllActions()
+        characterBodyNode.zRotation = -.pi / 2
+        characterBodyNode.position = CGPoint(x: 0, y: 4)
+        visualRoot.setScale(0.92)
+        shadowNode.setScale(0.7)
+
+        // Efek partikel Zzz mengambang
+        let zContainer = SKNode()
+        zContainer.name = "sleepZzz"
+        zContainer.position = CGPoint(x: 8, y: 22)
+        zContainer.zPosition = 60
+        addChild(zContainer)
+        sleepParticlesNode = zContainer
+
+        for i in 0..<3 {
+            let zLabel = SKLabelNode(text: "z")
+            zLabel.fontName = "AvenirNext-Bold"
+            zLabel.fontSize = CGFloat(10 + i * 3)
+            zLabel.fontColor = SKColor(red: 0.98, green: 0.92, blue: 0.72, alpha: 0.9)
+            zLabel.position = CGPoint(x: CGFloat(i * 6), y: CGFloat(i * 8))
+            zLabel.alpha = 0
+            zContainer.addChild(zLabel)
+            zLabel.run(SKAction.repeatForever(SKAction.sequence([
+                SKAction.wait(forDuration: Double(i) * 0.45),
+                SKAction.group([
+                    SKAction.fadeIn(withDuration: 0.4),
+                    SKAction.moveBy(x: 6, y: 14, duration: 1.2),
+                    SKAction.scale(to: 1.2, duration: 1.2)
+                ]),
+                SKAction.fadeOut(withDuration: 0.4),
+                SKAction.moveBy(x: -6, y: -14, duration: 0),
+                SKAction.scale(to: 0.8, duration: 0),
+                SKAction.wait(forDuration: 0.8)
+            ])))
+        }
+        updateDepth()
+    }
+
+    // Bangun dari tidur
+    func wakeUp() {
+        guard isSleeping else { return }
+        isSleeping = false
+        sleepParticlesNode?.removeFromParent()
+        sleepParticlesNode = nil
+        visualRoot.removeAllActions()
+        characterBodyNode.removeAllActions()
+        characterBodyNode.position = .zero
+        characterBodyNode.zRotation = 0
+        visualRoot.setScale(1.0)
+        shadowNode.setScale(1.0)
+        visualRoot.run(SKAction.sequence([
+            SKAction.scaleX(to: 0.88, y: 1.22, duration: 0.18),
+            SKAction.scale(to: 1.0, duration: 0.14)
+        ]))
+        updateDepth()
+    }
+
     // Memperbarui arah pandang dan animasi langkah/diam
     func applyMovement(dx: CGFloat, dy: CGFloat, dt: CGFloat) {
         let speed = hypot(dx, dy)
         if speed > 0.5 {
+            if isSitting { standUp() }
+            if isSleeping { wakeUp() }
             isWalking = true
             walkPhase += dt * 14
 
@@ -383,6 +487,8 @@ final class MemoryCharacter: SKNode {
 
     // Mengikuti rute dengan navigasi dan memperbarui visual 2.5D
     func walk(dt: CGFloat, speed: CGFloat, navigation: MemoryNavigation) {
+        if isSitting { standUp() }
+        if isSleeping { wakeUp() }
         guard let next = route.first else {
             applyMovement(dx: 0, dy: 0, dt: dt)
             return

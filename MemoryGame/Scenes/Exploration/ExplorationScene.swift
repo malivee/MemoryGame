@@ -46,6 +46,16 @@ final class ExplorationScene: SKScene {
     private var hudInteractButton: SKShapeNode?
     private var hudInteractLabel: SKLabelNode?
 
+    private let houseStumpCushions: [CGPoint] = [
+        CGPoint(x: 305, y: 335), // Atas karpet
+        CGPoint(x: 465, y: 212), // Kanan karpet
+        CGPoint(x: 295, y: 91),  // Bawah karpet
+        CGPoint(x: 151, y: 222)  // Kiri karpet
+    ]
+    private let houseBedSpot = CGPoint(x: 580, y: 78)
+    private var stumpNodes: [SKNode] = []
+    private var bedNode: SKNode?
+
     init(size: CGSize, entry: MemoryPiece, worldLocations: Set<MemoryPiece>) {
         self.entry = entry
         // Satu kunjungan hanya membuka satu wilayah, tanpa pilihan dunia kedua.
@@ -226,6 +236,21 @@ final class ExplorationScene: SKScene {
             post.storyLabel("Penanda", at: CGPoint(x: 0, y: 32), size: 11)
             markerNode = post
         }
+        if level.region == .house {
+            stumpNodes.removeAll()
+            for (i, stump) in houseStumpCushions.enumerated() {
+                let node = SKNode()
+                node.name = "stump_\(i)"
+                node.position = stump
+                world.addChild(node)
+                stumpNodes.append(node)
+            }
+            let bedAnchor = SKNode()
+            bedAnchor.name = "bedAnchor"
+            bedAnchor.position = houseBedSpot
+            world.addChild(bedAnchor)
+            self.bedNode = bedAnchor
+        }
         if worldInstalled(.boundary) {
             if let gathering = level.gathering {
                 let ring = SKShapeNode(circleOfRadius: 54)
@@ -267,41 +292,53 @@ final class ExplorationScene: SKScene {
     private func calculateEffectiveSolids(for level: PrologueLevel) -> [CGRect] {
         if level.region == .house {
             var solids: [CGRect] = []
-            // Dinding kabin kayu:
-            // Dinding atas (di y >= 435 agar rute patroli orang tua di y: 415 tetap leluasa)
-            solids.append(CGRect(x: 0, y: 435, width: 960, height: 45))
-            // Dinding bawah
-            solids.append(CGRect(x: 0, y: 0, width: 960, height: 18))
-            // Dinding kiri (pintu di y: 190..340 tetap terbuka untuk cahaya)
-            solids.append(CGRect(x: 0, y: 0, width: 65, height: 190))
-            solids.append(CGRect(x: 0, y: 340, width: 65, height: 140))
-            // Dinding kanan
-            solids.append(CGRect(x: 900, y: 0, width: 60, height: 480))
+            // 1. Dinding Atas (Top Wall Barrier)
+            // Dinding balok kayu tegak di y >= 368. Pemain TIDAK BISA menginjak atau menembus dinding ini!
+            solids.append(CGRect(x: 0, y: 368, width: 960, height: 112))
 
-            // Perabotan di dalam kabin (dihitung alasnya agar Arthur dan patroli bisa berlindung secara alami)
-            for obstacle in level.obstacles {
-                let r = obstacle.rect
-                switch obstacle.kind {
-                case "Lemari":
-                    let w = max(20, r.width * 0.85)
-                    let h = max(20, r.height * 0.65)
-                    solids.append(CGRect(x: r.midX - w / 2, y: r.minY, width: w, height: h))
-                case "Tempat tidur":
-                    let w = max(20, r.width * 0.88)
-                    let h = max(20, r.height * 0.65)
-                    solids.append(CGRect(x: r.midX - w / 2, y: r.minY, width: w, height: h))
-                case "Meja":
-                    let w = max(20, r.width * 0.85)
-                    let h = max(20, r.height * 0.70)
-                    solids.append(CGRect(x: r.midX - w / 2, y: r.minY, width: w, height: h))
-                case "Peti":
-                    let w = max(20, r.width * 0.80)
-                    let h = max(20, r.height * 0.70)
-                    solids.append(CGRect(x: r.midX - w / 2, y: r.minY, width: w, height: h))
-                default:
-                    solids.append(r)
-                }
-            }
+            // 2. Dinding Bawah (Bottom Perimeter Barrier)
+            // Membatasi lantai agar pemain tidak melangkah keluar dari papan kayu bawah
+            solids.append(CGRect(x: 0, y: 0, width: 960, height: 26))
+
+            // 3. Dinding Samping Kiri (Left Wall Barrier)
+            // Di atas pintu (y: 335 ke atas):
+            solids.append(CGRect(x: 0, y: 335, width: 90, height: 145))
+            // Di bawah pintu (y: 195 ke bawah):
+            solids.append(CGRect(x: 0, y: 0, width: 75, height: 195))
+
+            // 4. Dinding Samping Kanan (Right Wall Barrier)
+            // Membatasi lantai kanan di x >= 895
+            solids.append(CGRect(x: 895, y: 0, width: 65, height: 480))
+
+            // 5. Perabotan Kabin (Mengikuti Aset Visual Game Secara Akurat):
+            // A. Lemari Rak Sudut Kayu Bertingkat + Topeng Buruan di Kiri Atas:
+            // Aset digambar di CGRect(x: 140, y: 300, width: 85, height: 115)
+            solids.append(CGRect(x: 140, y: 298, width: 85, height: 75))
+
+            // B. Lemari Laci Kayu di Dinding Kanan:
+            // Aset digambar di CGRect(x: 595, y: 315, width: 95, height: 80)
+            solids.append(CGRect(x: 595, y: 312, width: 95, height: 60))
+
+            // C. Meja Pajangan Buku Kuno di Sudut Kanan:
+            // Aset digambar di CGRect(x: 840, y: 335, width: 60, height: 48)
+            solids.append(CGRect(x: 838, y: 332, width: 60, height: 40))
+
+            // D. Meja Makan Ukir Rendah + Panci Sup Panas Mengepul:
+            // Aset digambar di CGRect(x: 540, y: 155, width: 135, height: 75)
+            solids.append(CGRect(x: 540, y: 152, width: 135, height: 68))
+
+            // E. Matras Tidur Anyaman Wol / Kasur:
+            // Aset digambar di CGRect(x: 480, y: 30, width: 215, height: 110)
+            solids.append(CGRect(x: 480, y: 28, width: 215, height: 95))
+
+            // F. Pot Tanaman Hias Daun Lebar di Sudut Kiri Bawah:
+            // Aset digambar di CGRect(x: 95, y: 28, width: 34, height: 28)
+            solids.append(CGRect(x: 90, y: 24, width: 44, height: 35))
+
+            // G. Figur Ibu Duduk Bersila Merajut di Tengah Karpet:
+            // Posisi di (305, 204)
+            solids.append(CGRect(x: 288, y: 188, width: 34, height: 32))
+
             return solids
         }
 
@@ -702,6 +739,14 @@ final class ExplorationScene: SKScene {
             }
         case .marker:
             text = "🧭 Penanda"
+        case .sitStump:
+            text = "🪑 Duduk"
+        case .standUp:
+            text = "🚶 Berdiri"
+        case .sleepBed:
+            text = "🛏️ Tidur"
+        case .wakeUp:
+            text = "☀️ Bangun"
         }
         lbl.text = text
         if btn.isHidden || btn.alpha < 0.1 {
@@ -971,6 +1016,39 @@ final class ExplorationScene: SKScene {
                     body: "Penanda mengarah ke gerbang batas desa! Susun keping batas di puzzle foto, lalu berkumpullah bersama ketiga temanmu di titik kumpul."
                 )
             }
+
+        case .sitStump(let point):
+            clearNearbyInteraction()
+            HapticsService.shared.playSelection()
+            arthur.route.removeAll()
+            stickVector = .zero
+            stickKnob.position = stickCenter
+            arthur.sit(at: point)
+            showHUDInteractButton(for: .standUp)
+            say("Arthur duduk santai di atas bantalan batang kayu.", duration: 3)
+
+        case .standUp:
+            clearNearbyInteraction()
+            HapticsService.shared.playSelection()
+            arthur.standUp()
+            say("Arthur kembali berdiri.", duration: 2)
+
+        case .sleepBed:
+            clearNearbyInteraction()
+            HapticsService.shared.playSelection()
+            arthur.route.removeAll()
+            stickVector = .zero
+            stickKnob.position = stickCenter
+            arthur.sleep(at: houseBedSpot)
+            showHUDInteractButton(for: .wakeUp)
+            say("Arthur berbaring di kasur wol hangat... Zzz", duration: 4)
+
+        case .wakeUp:
+            clearNearbyInteraction()
+            HapticsService.shared.playSelection()
+            arthur.wakeUp()
+            arthur.position = navigation.nearestOpen(to: CGPoint(x: 450, y: 78))
+            say("Arthur bangun dengan segar!", duration: 2)
         }
     }
 
@@ -988,6 +1066,37 @@ final class ExplorationScene: SKScene {
         if progress.installed(.oldPath), let node = markerNode {
             candidates.append((.marker, node, distance(arthur.position, node.position)))
         }
+
+        // Interaksi khusus interior rumah: bantalan tunggul kayu (duduk) dan kasur (tidur)
+        if entry.region == .house {
+            if arthur.isSitting {
+                if nearbyInteraction != .standUp {
+                    clearNearbyInteraction()
+                    nearbyInteraction = .standUp
+                    showHUDInteractButton(for: .standUp)
+                }
+                return
+            }
+            if arthur.isSleeping {
+                if nearbyInteraction != .wakeUp {
+                    clearNearbyInteraction()
+                    nearbyInteraction = .wakeUp
+                    showHUDInteractButton(for: .wakeUp)
+                }
+                return
+            }
+            if distance(arthur.position, houseBedSpot) <= 68 {
+                candidates.append((.sleepBed, bedNode ?? arthur, distance(arthur.position, houseBedSpot)))
+            }
+            for (i, stump) in houseStumpCushions.enumerated() {
+                let d = distance(arthur.position, stump)
+                if d <= 52 {
+                    let anchor = i < stumpNodes.count ? stumpNodes[i] : arthur
+                    candidates.append((.sitStump(stump), anchor, d))
+                }
+            }
+        }
+
         // Radius deteksi 85pt agar interaksi mudah terpicu saat mendekati objek/teman
         guard let nearest = candidates.filter({ $0.2 <= 85 }).min(by: { $0.2 < $1.2 }) else {
             clearNearbyInteraction()
@@ -1060,6 +1169,18 @@ final class ExplorationScene: SKScene {
         case .marker:
             title = "🧭 Penanda"
             width = 126
+        case .sitStump:
+            title = "🪑 Duduk"
+            width = 110
+        case .standUp:
+            title = "🚶 Berdiri"
+            width = 110
+        case .sleepBed:
+            title = "🛏️ Tidur"
+            width = 110
+        case .wakeUp:
+            title = "☀️ Bangun"
+            width = 110
         }
 
         let bubbleY: CGFloat = target == .book ? 50 : 62
@@ -1267,6 +1388,11 @@ final class ExplorationScene: SKScene {
     private func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }
     // Mengubah jarak sentuhan dari pusat stik menjadi arah dan kekuatan gerak terbatas.
     private func updateStick(_ touch: UITouch) {
+        if arthur.isSitting { arthur.standUp() }
+        if arthur.isSleeping {
+            arthur.wakeUp()
+            arthur.position = navigation.nearestOpen(to: CGPoint(x: 450, y: 78))
+        }
         let point = touch.location(in: hud)
         let center = stickCenter
         let dx = point.x - center.x, dy = point.y - center.y
@@ -1289,6 +1415,17 @@ final class ExplorationScene: SKScene {
         if names.contains("bag") { openBag(); return }
         if names.contains("hudInteract") { interact(); return }
 
+        // Jika Arthur sedang duduk atau tidur, bangun/berdiri saat layar disentuh
+        if arthur.isSitting {
+            arthur.standUp()
+            clearNearbyInteraction()
+        }
+        if arthur.isSleeping {
+            arthur.wakeUp()
+            arthur.position = navigation.nearestOpen(to: CGPoint(x: 450, y: 78))
+            clearNearbyInteraction()
+        }
+
         let worldPoint = touch.location(in: world)
         let worldNodes = world.nodes(at: worldPoint)
         let worldNames = Set(worldNodes.compactMap { $0.namedAncestor(prefix: "contextInteract") ?? $0.name })
@@ -1305,10 +1442,29 @@ final class ExplorationScene: SKScene {
             case .book: targetPos = bookPickupNode?.position ?? (level.book ?? .zero)
             case .friend(let f): targetPos = friendNodes[f]?.position ?? (level.friends[f] ?? .zero)
             case .marker: targetPos = markerNode?.position ?? (level.marker ?? .zero)
+            case .sitStump(let p): targetPos = p
+            case .standUp, .wakeUp: targetPos = arthur.position
+            case .sleepBed: targetPos = houseBedSpot
             }
             if distance(worldPoint, targetPos) < 75 || (nearbyPrompt != nil && distance(worldPoint, nearbyPrompt!.position) < 75) {
                 interact()
                 return
+            }
+        }
+
+        // Cek jika mengetuk langsung pada bantalan batang kayu atau kasur
+        if entry.region == .house {
+            if distance(worldPoint, houseBedSpot) < 65 && distance(arthur.position, houseBedSpot) <= 90 {
+                nearbyInteraction = .sleepBed
+                interact()
+                return
+            }
+            for stump in houseStumpCushions {
+                if distance(worldPoint, stump) < 36 && distance(arthur.position, stump) <= 85 {
+                    nearbyInteraction = .sitStump(stump)
+                    interact()
+                    return
+                }
             }
         }
 
@@ -1369,4 +1525,8 @@ private enum MemoryInteractionTarget: Equatable {
     case book
     case friend(FriendID)
     case marker
+    case sitStump(CGPoint)
+    case standUp
+    case sleepBed
+    case wakeUp
 }

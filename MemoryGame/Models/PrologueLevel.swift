@@ -43,8 +43,8 @@ struct PrologueLevel {
                     .init(rect: CGRect(x: 470, y: 250, width: 100, height: 145), kind: "Lemari"),
                     .init(rect: CGRect(x: 680, y: 80, width: 120, height: 65), kind: "Meja"),
                     .init(rect: CGRect(x: 160, y: 280, width: 120, height: 130), kind: "Tempat tidur")],
-                patrols: [.init(title: "Orang tua", points: [CGPoint(x: 430, y: 205), CGPoint(x: 800, y: 205), CGPoint(x: 800, y: 415), CGPoint(x: 430, y: 415)], speed: 48, range: 190)],
-                book: CGPoint(x: 870, y: 360), friends: [:], marker: nil, gathering: nil, exit: nil)
+                patrols: [.init(title: "Orang tua", points: [CGPoint(x: 430, y: 205), CGPoint(x: 800, y: 205), CGPoint(x: 800, y: 335), CGPoint(x: 430, y: 335)], speed: 48, range: 190)],
+                book: CGPoint(x: 870, y: 345), friends: [:], marker: nil, gathering: nil, exit: nil)
         case .village:
             let roadZone = CGRect(x: 300, y: 0, width: 360, height: 480)
             let turns = progress.placement(of: .villageRoad)?.turns ?? 0

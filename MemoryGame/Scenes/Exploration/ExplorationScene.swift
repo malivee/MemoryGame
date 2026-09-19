@@ -45,6 +45,8 @@ final class ExplorationScene: SKScene {
     var nearbyPrompt: SKNode?
     var hudInteractButton: SKShapeNode?
     var hudInteractLabel: SKLabelNode?
+    var echoesVillagePassed = false
+    var sceneryNode: SKSpriteNode?
 
     let houseStumpCushions: [CGPoint] = [
         CGPoint(x: 305, y: 335), // Atas karpet

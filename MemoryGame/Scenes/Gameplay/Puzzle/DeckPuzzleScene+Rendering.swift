@@ -122,11 +122,13 @@ extension DeckPuzzleScene {
     }
 
     func worldName(_ entry: MemoryPiece) -> String {
+        if entry == .echoesBoundary { return PuzzleWorld.echoesBoundary.title }
         if entry == .boundary { return "Batas Desa" }
         switch entry.region {
         case .house: return "Rumah"
         case .village: return "Desa"
         case .foothills: return "Bukit"
+        case .echoes: return PuzzleWorld.echoesBoundary.title
         }
     }
 

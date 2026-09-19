@@ -6,10 +6,13 @@
 import Foundation
 
 enum MemoryPiece: String, CaseIterable, Codable {
-    case mountain, oldPath, boundary, lake, garden, house, closing, yard, villageRoad, dryLake
+    case mountain, oldPath, boundary, lake, garden, house, closing, yard, villageRoad, dryLake, echoesBoundary
 
     static let main: [MemoryPiece] = [.mountain, .oldPath, .boundary, .lake, .garden, .house, .closing, .yard, .villageRoad]
-    var slot: Int { self == .dryLake ? 3 : Self.main.firstIndex(of: self)! }
+    var slot: Int {
+        if self == .echoesBoundary { return 9 }
+        return self == .dryLake ? 3 : Self.main.firstIndex(of: self)!
+    }
     var title: String {
         switch self {
         case .mountain: return "Pegunungan"
@@ -22,19 +25,21 @@ enum MemoryPiece: String, CaseIterable, Codable {
         case .yard: return "Halaman"
         case .villageRoad: return "Jalan desa"
         case .dryLake: return "Cekungan kering"
+        case .echoesBoundary: return "Zona Bahaya"
         }
     }
     var region: MemoryRegion {
         switch self {
         case .house: return .house
         case .yard, .villageRoad, .garden: return .village
+        case .echoesBoundary: return .echoes
         default: return .foothills
         }
     }
     var location: MemoryPiece { self == .dryLake ? .lake : self }
 }
 
-enum MemoryRegion: String, Codable { case house, village, foothills }
+enum MemoryRegion: String, Codable { case house, village, foothills, echoes }
 enum FriendID: String, CaseIterable, Codable { case keneth = "Keneth", roland = "Roland", anneth = "Anneth" }
 
 struct PhotoPlacement: Codable, Equatable {

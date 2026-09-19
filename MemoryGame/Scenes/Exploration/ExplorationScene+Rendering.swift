@@ -8,8 +8,8 @@ extension ExplorationScene {
         let targetX = size.width / 2 - actorPos.x * scale
         let targetY = size.height / 2 - actorPos.y * scale
 
-        let worldW = 960 * scale
-        let worldH = 480 * scale
+        let worldW = (level?.mapBounds.width ?? PrologueLevel.bounds.width) * scale
+        let worldH = (level?.mapBounds.height ?? PrologueLevel.bounds.height) * scale
 
         let clampedX: CGFloat
         if worldW > size.width {
@@ -82,14 +82,18 @@ extension ExplorationScene {
         let local = PrologueProgress()
         local.placements = progress.placements.filter { worldLocations.contains($0.value.piece) }
         level = PrologueLevel.make(region: entry.region, progress: local)
+        if entry.region == .echoes && echoesVillagePassed {
+            level.obstacles.removeAll { $0.kind == "Rumah ilusi" || $0.kind == "Sumur" }
+        }
         let solids = ExplorationCollisionGeometry.solids(for: level)
-        navigation = MemoryNavigation(bounds: PrologueLevel.bounds, solids: solids, fog: level.fog(progress: local))
+        navigation = MemoryNavigation(bounds: level.mapBounds, solids: solids, fog: level.fog(progress: local))
         if let texture = SceneryTextures.texture(level: level, progress: local) {
             let scenery = SKSpriteNode(texture: texture)
             scenery.anchorPoint = .zero
-            scenery.size = PrologueLevel.bounds.size
+            scenery.size = level.mapBounds.size
             scenery.zPosition = -10
             world.addChild(scenery)
+            sceneryNode = scenery
         }
         MemoryAtmosphere.add(to: world, level: level)
         for zone in level.zones {
@@ -192,6 +196,20 @@ extension ExplorationScene {
             patrols.append(patrol)
             world.addChild(patrol.field); world.addChild(patrol.character)
         }
+    }
+
+    func refreshEchoesScenery() {
+        guard entry.region == .echoes else { return }
+        sceneryNode?.removeFromParent()
+        var map = PrologueLevel.make(region: .echoes, progress: progress)
+        map.obstacles.removeAll { $0.kind == "Rumah ilusi" || $0.kind == "Sumur" }
+        guard let texture = SceneryTextures.texture(level: map, progress: progress) else { return }
+        let scenery = SKSpriteNode(texture: texture)
+        scenery.anchorPoint = .zero
+        scenery.size = map.mapBounds.size
+        scenery.zPosition = -10
+        world.addChild(scenery)
+        sceneryNode = scenery
     }
 
     func color(_ friend: FriendID) -> SKColor {

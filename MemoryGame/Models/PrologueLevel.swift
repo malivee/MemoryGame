@@ -22,6 +22,7 @@ struct PatrolDefinition {
 }
 struct PrologueLevel {
     static let bounds = CGRect(x: 0, y: 0, width: 960, height: 480)
+    var mapBounds: CGRect { region == .echoes ? CGRect(x: 0, y: 0, width: 1800, height: 480) : Self.bounds }
     let region: MemoryRegion
     let zones: [MemoryZone]
     var obstacles: [WorldObstacle]
@@ -116,6 +117,8 @@ struct PrologueLevel {
                     .init(title: "Penjaga", points: [CGPoint(x: 785, y: 90), CGPoint(x: 785, y: 415)], speed: 48, range: 175)],
                 book: nil, friends: [:], marker: rotate(CGPoint(x: 555, y: 350)),
                 gathering: CGPoint(x: 710, y: 110), exit: CGPoint(x: 915, y: 390))
+        case .echoes:
+            return EchoesBoundaryLevel.make(region: region)
         }
     }
 
@@ -131,6 +134,7 @@ struct PrologueLevel {
     // Memilih titik masuk awal berdasarkan lokasi keping; navigasi kemudian mencari posisi terbuka terdekat.
     func spawn(for entry: MemoryPiece, progress: PrologueProgress) -> CGPoint {
         switch entry {
+        case .echoesBoundary: return CGPoint(x: 80, y: 240)
         case .house: return CGPoint(x: 85, y: 90)
         case .yard: return CGPoint(x: 70, y: 70)
         case .villageRoad: return CGPoint(x: 355, y: 80)

@@ -26,7 +26,7 @@ final class SceneryPainter {
     // Membuat bitmap peta dalam sudut pandang 3/4 oblique
     func image(level: PrologueLevel, progress: PrologueProgress, scale: CGFloat = 2) -> CGImage? {
         seed = 1937
-        guard let context = CGContext(data: nil, width: Int(960 * scale), height: Int(480 * scale),
+        guard let context = CGContext(data: nil, width: Int(level.mapBounds.width * scale), height: Int(level.mapBounds.height * scale),
                                       bitsPerComponent: 8, bytesPerRow: 0,
                                       space: CGColorSpaceCreateDeviceRGB(),
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
@@ -36,7 +36,7 @@ final class SceneryPainter {
         if level.region == .house {
             interior()
         } else {
-            fill(PrologueLevel.bounds, grassBase)
+            fill(level.mapBounds, grassBase)
             landscape(level: level, progress: progress)
 
             // Urutkan rintangan dari atas ke bawah (Y tertinggi ke terendah) untuk depth sorting 3/4
@@ -560,7 +560,9 @@ final class SceneryPainter {
         }
 
         // 3. Jalur jalan tanah berpasir lembut khas Carto
-        if level.region == .village {
+        if level.region == .echoes {
+            trail([CGPoint(x: 30, y: 240), CGPoint(x: level.mapBounds.maxX, y: 240)], width: 78)
+        } else if level.region == .village {
             trail([CGPoint(x: 0, y: 72), CGPoint(x: 220, y: 82), CGPoint(x: 455, y: 125), CGPoint(x: 740, y: 150), CGPoint(x: 960, y: 145)], width: 44)
             trail([CGPoint(x: 140, y: 0), CGPoint(x: 160, y: 80), CGPoint(x: 245, y: 275), CGPoint(x: 170, y: 365), CGPoint(x: 210, y: 480)], width: 32)
             trail([CGPoint(x: 465, y: 80), CGPoint(x: 470, y: 255), CGPoint(x: 510, y: 420), CGPoint(x: 550, y: 480)], width: 36)
@@ -666,9 +668,9 @@ final class SceneryPainter {
         ellipse(shadowRect, color(0.18, 0.24, 0.14, 0.26))
 
         switch obstacle.kind {
-        case "Rumah":
+        case "Rumah", "Rumah ilusi":
             cottage(r)
-        case "Pohon":
+        case "Pohon", "Pohon tua":
             pineTree(r)
         case "Pagar tanaman":
             bushHedge(r)

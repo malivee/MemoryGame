@@ -119,7 +119,7 @@ extension ExplorationScene {
             stickTouch = touch; arthur.route.removeAll(); updateStick(touch); return
         }
         let destination = worldPoint
-        guard PrologueLevel.bounds.contains(destination) else { return }
+        guard level.mapBounds.contains(destination) else { return }
         if navigation.fog.contains(where: { $0.contains(destination) }) { checkFog(at: destination); return }
         arthur.route = navigation.route(from: arthur.position, to: destination)
         if arthur.route.isEmpty { say("Arthur: Belum ada jalan yang bisa kulewati dari sini.") }

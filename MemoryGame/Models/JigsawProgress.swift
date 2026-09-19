@@ -20,6 +20,7 @@ enum JigsawCatalog {
     static let friendsReward = PuzzleWorld.hills.pieceIDs
     static let markerReward = PuzzleWorld.boundary.pieceIDs
     private static let locationIDs: [MemoryPiece: Int] = [
+        .echoesBoundary: 5,
         .house: 14,
         .yard: 23,
         .villageRoad: 24,

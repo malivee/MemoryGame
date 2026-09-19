@@ -12,6 +12,11 @@ extension RightDeckPuzzleScene {
         guard trackedTouch == nil, let touch = touches.first else { return }
         let point = touch.location(in: canvas)
         let names = Set(canvas.nodes(at: point).compactMap(\.name))
+        if names.contains("debug") { toggleDebugMenu(); return }
+        for world in PuzzleWorld.allCases where names.contains("debug-world-\(world.rawValue)") {
+            enterDebugWorld(world)
+            return
+        }
         if names.contains("enter") || names.contains("entryPrompt") { enterSelected(); return }
         guard !progress.assembled else { return }
         // Transparent margins and sockets never steal a neighbouring piece's tap.

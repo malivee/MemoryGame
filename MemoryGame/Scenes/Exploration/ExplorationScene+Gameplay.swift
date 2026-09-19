@@ -260,6 +260,11 @@ extension ExplorationScene {
             arthur.body.zRotation = atan2(movement.dy, movement.dx) - .pi / 2
             checkFog(at: attempted)
         } else { arthur.walk(dt: dt, speed: 140, navigation: navigation) }
+        if entry.region == .echoes && !echoesVillagePassed && arthur.position.x > 870 {
+            echoesVillagePassed = true
+            refreshEchoesScenery()
+            say("Desa itu lenyap. Yang tersisa hanya hutan.", duration: 3.5)
+        }
         updateCompanions(dt: dt)
         watched = false
         for patrol in patrols {

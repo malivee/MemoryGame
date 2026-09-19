@@ -10,7 +10,7 @@ enum MemoryAtmosphere {
     static func add(to world: SKNode, level: PrologueLevel) {
         guard !UIAccessibility.isReduceMotionEnabled else { return }
         let layer = SKCropNode()
-        let mask = SKShapeNode(rect: PrologueLevel.bounds)
+        let mask = SKShapeNode(rect: level.mapBounds)
         mask.fillColor = .white; mask.strokeColor = .clear
         layer.maskNode = mask
         layer.zPosition = 7

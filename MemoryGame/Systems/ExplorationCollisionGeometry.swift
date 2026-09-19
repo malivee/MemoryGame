@@ -4,6 +4,10 @@ import CoreGraphics
 /// Ground footprints used by navigation, independent of SpriteKit rendering.
 enum ExplorationCollisionGeometry {
     static func solids(for level: PrologueLevel) -> [CGRect] {
+        if level.region == .echoes {
+            // Echoes is a single-road map: the forest bands are fully blocked.
+            return level.obstacles.map(\.rect)
+        }
         if level.region == .house {
             var solids: [CGRect] = []
             // 1. Dinding Atas (Top Wall Barrier)

@@ -19,8 +19,8 @@ extension RightDeckPuzzleScene {
             message("Susun 3 keping dari map yang sama sesuai gambar dan putar hingga tegak.")
             return
         }
-        guard let entry = state.worldEntry(for: id, progress: progress) else { return }
-        let locations = state.worldLocations(for: id)
+        guard state.worldEntry(for: id, progress: progress) != nil,
+              let destination = PuzzleWorld.containing(id) else { return }
         let connected = state.connectedIDs(to: id)
         enteringMemory = true; dragPiece = nil
         session.synchronize(); PrologueStore.shared.save()
@@ -53,7 +53,7 @@ extension RightDeckPuzzleScene {
         MemoryPortal.play(on: self, origin: origin, inward: true, duration: duration)
         run(.sequence([.wait(forDuration: duration), .run { [weak self, weak view] in
             guard let self, let view, self.view === view else { return }
-            let exploration = ExplorationScene(size: self.size, entry: entry, worldLocations: locations)
+            let exploration = destination.makeScene(size: self.size)
             exploration.scaleMode = .resizeFill
             let transition = SKTransition.fade(with: SKColor(red: 0.87, green: 0.83, blue: 0.68, alpha: 1), duration: reduced ? 0.18 : 0.38)
             transition.pausesIncomingScene = false; transition.pausesOutgoingScene = false

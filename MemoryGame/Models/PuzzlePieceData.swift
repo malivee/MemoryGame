@@ -28,8 +28,13 @@ public enum PuzzleCatalog {
     public static let canvasHeight: CGFloat = 614.4
     public static let rows = 4
     public static let columns = 10
+    public static let boardRows = 12
+    public static let boardColumns = 13
+    public static let boardSlotCount = boardRows * boardColumns
     public static let cellWidth = canvasWidth / CGFloat(columns)
     public static let cellHeight = canvasHeight / CGFloat(rows)
+    public static let boardCanvasWidth = cellWidth * CGFloat(boardColumns)
+    public static let boardCanvasHeight = cellHeight * CGFloat(boardRows)
     public static let tabDepth = min(cellWidth, cellHeight) * 0.22
 
     // Bounds include the tabs. All coordinates use the photo's top-left origin.

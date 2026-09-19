@@ -13,15 +13,15 @@ extension GameScene {
         canvas.removeAllChildren()
         tiles.removeAll(); hitPaths.removeAll(); renderScales.removeAll()
         let boardWidth: CGFloat = 600
-        let boardHeight = boardWidth * PuzzleCatalog.canvasHeight / PuzzleCatalog.canvasWidth
+        let boardHeight = boardWidth * PuzzleCatalog.boardCanvasHeight / PuzzleCatalog.boardCanvasWidth
         board = CGRect(x: -470, y: -150, width: boardWidth, height: boardHeight)
-        boardScale = board.width / PuzzleCatalog.canvasWidth
-        cell = CGSize(width: board.width / CGFloat(PuzzleCatalog.columns), height: board.height / CGFloat(PuzzleCatalog.rows))
+        boardScale = board.width / PuzzleCatalog.boardCanvasWidth
+        cell = CGSize(width: board.width / CGFloat(PuzzleCatalog.boardColumns), height: board.height / CGFloat(PuzzleCatalog.boardRows))
         canvas.storyLabel("KEPING KENANGAN  ·  3 KEPING PER MAP", at: CGPoint(x: -110, y: 275), size: 22)
         canvas.storyLabel(progress.objective, at: CGPoint(x: -110, y: 243), size: 13, width: 760)
         let backing = SKShapeNode(rect: board, cornerRadius: 4)
         backing.fillColor = SKColor(white: 1, alpha: 0.025)
-        backing.strokeColor = SKColor(white: 1, alpha: 0.28)
+        backing.strokeColor = SKColor(white: 1, alpha: 0)
         backing.lineWidth = 1.5
         canvas.addChild(backing)
         for (slot, placement) in state.placements.sorted(by: { $0.key < $1.key }) {
@@ -76,8 +76,8 @@ extension GameScene {
     }
 
     func center(_ slot: Int) -> CGPoint {
-        CGPoint(x: board.minX + (CGFloat(slot % PuzzleCatalog.columns) + 0.5) * cell.width,
-                y: board.maxY - (CGFloat(slot / PuzzleCatalog.columns) + 0.5) * cell.height)
+        CGPoint(x: board.minX + (CGFloat(slot % PuzzleCatalog.boardColumns) + 0.5) * cell.width,
+                y: board.maxY - (CGFloat(slot / PuzzleCatalog.boardColumns) + 0.5) * cell.height)
     }
 
     func addTile(_ id: Int, at position: CGPoint, inInventory: Bool) {
@@ -124,7 +124,7 @@ extension GameScene {
         // Warna menunjukkan pilihan aktif, bukan identitas dunia yang berbeda.
         let active = selected.map { state.connectedIDs(to: id).contains($0) } ?? false
         return active ? SKColor(red: 1, green: 0.53, blue: 0.15, alpha: 1)
-            : SKColor(white: 1, alpha: 0.72)
+            : SKColor(white: 1, alpha: 0)
     }
 
     func addWorldLabels() {

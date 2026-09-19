@@ -64,7 +64,7 @@ final class PuzzleTextureService {
                 }
             }
             context.cgContext.restoreGState()
-            UIColor.black.withAlphaComponent(0.18).setStroke()
+            UIColor.white.withAlphaComponent(0).setStroke()
             path.lineWidth = 0.8
             path.stroke()
         }

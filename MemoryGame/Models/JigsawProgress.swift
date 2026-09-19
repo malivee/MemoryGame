@@ -10,6 +10,7 @@ import CoreGraphics
 /// Story locations remain independent from the physical photo-piece identity.
 enum JigsawCatalog {
     static let count = PuzzleCatalog.rows * PuzzleCatalog.columns
+    static let boardSlotCount = PuzzleCatalog.boardSlotCount
     static let dryLakeID = count
     static let allIDs = Array(0...dryLakeID)
     static let minimumConnectedPieces = 3
@@ -75,11 +76,11 @@ enum JigsawCatalog {
     // Exploration accepts any earned fragment in any board cell, in any rotation.
     // Hanya memeriksa ID dan batas papan; isi foto, bentuk tepi, serta rotasi tidak membatasi drop.
     static func canPlace(_ id: Int, at slot: Int) -> Bool {
-        allIDs.contains(id) && (0..<count).contains(slot)
+        allIDs.contains(id) && (0..<boardSlotCount).contains(slot)
     }
     // Memeriksa kecocokan bentuk geometris untuk kompatibilitas lama; bukan syarat peletakan bebas saat ini.
     static func fits(_ id: Int, at slot: Int, turns: Int) -> Bool {
-        guard allIDs.contains(id), (0..<count).contains(slot) else { return false }
+        guard allIDs.contains(id), (0..<boardSlotCount).contains(slot) else { return false }
         // The photo's aspect ratio gives rectangular cells. A quarter-turn has
         // different dimensions; a half-turn can fit if the physical edges match.
         if turns % 2 != 0 && abs(PuzzleCatalog.cellWidth - PuzzleCatalog.cellHeight) > 0.01 { return false }
@@ -104,22 +105,22 @@ struct JigsawProgress: Codable {
     // Sambungan harus mengikuti tetangga pada foto sumber; posisi seluruh rangkaian di papan bebas.
     // Bentuk tepi cocok saja tidak cukup: isi foto dan orientasi juga harus benar.
     func interlocks(from slot: Int, to neighbor: Int) -> Bool {
-        guard (0..<JigsawCatalog.count).contains(slot), (0..<JigsawCatalog.count).contains(neighbor),
+        guard (0..<JigsawCatalog.boardSlotCount).contains(slot), (0..<JigsawCatalog.boardSlotCount).contains(neighbor),
               let first = placements[slot], let second = placements[neighbor],
               JigsawCatalog.allIDs.contains(first.id), JigsawCatalog.allIDs.contains(second.id) else { return false }
         // Gambar harus tegak dan menyambung, bukan hanya memiliki bentuk tepi serupa.
         guard first.turns % 4 == 0, second.turns % 4 == 0 else { return false }
         let firstPhoto = JigsawCatalog.data(for: first.id)
         let secondPhoto = JigsawCatalog.data(for: second.id)
-        let boardRowDelta = neighbor / PuzzleCatalog.columns - slot / PuzzleCatalog.columns
-        let boardColDelta = neighbor % PuzzleCatalog.columns - slot % PuzzleCatalog.columns
+        let boardRowDelta = neighbor / PuzzleCatalog.boardColumns - slot / PuzzleCatalog.boardColumns
+        let boardColDelta = neighbor % PuzzleCatalog.boardColumns - slot % PuzzleCatalog.boardColumns
         guard secondPhoto.row - firstPhoto.row == boardRowDelta,
               secondPhoto.col - firstPhoto.col == boardColDelta else { return false }
         let direction: Int
-        if neighbor == slot - PuzzleCatalog.columns { direction = 0 }
-        else if neighbor == slot + 1 && slot % PuzzleCatalog.columns < PuzzleCatalog.columns - 1 { direction = 1 }
-        else if neighbor == slot + PuzzleCatalog.columns { direction = 2 }
-        else if neighbor == slot - 1 && slot % PuzzleCatalog.columns > 0 { direction = 3 }
+        if neighbor == slot - PuzzleCatalog.boardColumns { direction = 0 }
+        else if neighbor == slot + 1 && slot % PuzzleCatalog.boardColumns < PuzzleCatalog.boardColumns - 1 { direction = 1 }
+        else if neighbor == slot + PuzzleCatalog.boardColumns { direction = 2 }
+        else if neighbor == slot - 1 && slot % PuzzleCatalog.boardColumns > 0 { direction = 3 }
         else { return false }
         let edge = JigsawCatalog.edges(for: first.id, turns: first.turns)[direction]
         let opposite = JigsawCatalog.edges(for: second.id, turns: second.turns)[(direction + 2) % 4]
@@ -137,11 +138,11 @@ struct JigsawProgress: Codable {
         var head = 0
         while head < queue.count {
             let slot = queue[head]; head += 1
-            let column = slot % PuzzleCatalog.columns
+            let column = slot % PuzzleCatalog.boardColumns
             let neighbors = [column > 0 ? slot - 1 : -1,
-                             column < PuzzleCatalog.columns - 1 ? slot + 1 : -1,
-                             slot - PuzzleCatalog.columns, slot + PuzzleCatalog.columns]
-            for neighbor in neighbors where (0..<JigsawCatalog.count).contains(neighbor) && !visited.contains(neighbor) {
+                             column < PuzzleCatalog.boardColumns - 1 ? slot + 1 : -1,
+                             slot - PuzzleCatalog.boardColumns, slot + PuzzleCatalog.boardColumns]
+            for neighbor in neighbors where (0..<JigsawCatalog.boardSlotCount).contains(neighbor) && !visited.contains(neighbor) {
                 guard let neighborPiece = placements[neighbor],
                       PuzzleWorld.containing(neighborPiece.id) == PuzzleWorld.containing(id),
                       interlocks(from: slot, to: neighbor) else { continue }

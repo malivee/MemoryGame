@@ -41,6 +41,9 @@ final class RightDeckPuzzleScene: SKScene, UIGestureRecognizerDelegate {
     var rotationStart: CGFloat = 0
     var trackedTouch: UITouch?
     var bagSelectedPiece: Int?
+    var isSwipingGrid = false
+    var swipeStartPoint = CGPoint.zero
+    var swipeStartCameraOffset = CGPoint.zero
     
     // Memuat progres, menyiapkan puzzle, lalu membangun papan saat scene dibuka.
     override func didMove(to view: SKView) {

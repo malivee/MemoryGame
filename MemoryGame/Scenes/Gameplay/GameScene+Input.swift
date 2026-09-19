@@ -62,9 +62,9 @@ extension GameScene {
         if moved, let point = tiles[id]?.position {
             var accepted = true
             if board.contains(point) {
-                let col = min(PuzzleCatalog.columns - 1, max(0, Int((point.x - board.minX) / cell.width)))
-                let row = min(PuzzleCatalog.rows - 1, max(0, Int((board.maxY - point.y) / cell.height)))
-                accepted = session.place(id, at: row * PuzzleCatalog.columns + col)
+                let col = min(PuzzleCatalog.boardColumns - 1, max(0, Int((point.x - board.minX) / cell.width)))
+                let row = min(PuzzleCatalog.boardRows - 1, max(0, Int((board.maxY - point.y) / cell.height)))
+                accepted = session.place(id, at: row * PuzzleCatalog.boardColumns + col)
             } else { session.remove(id) }
             selected = id; changed(focusInventory: true)
             if !accepted { message("Keping belum tersedia atau berada di luar papan.") }

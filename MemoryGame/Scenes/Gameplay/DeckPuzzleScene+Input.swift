@@ -54,9 +54,9 @@ extension DeckPuzzleScene {
             let point = boardLayer.convert(screenPoint, from: canvas)
             var accepted = true
             if viewport.contains(screenPoint), board.contains(point) {
-                let col = min(PuzzleCatalog.columns - 1, max(0, Int((point.x - board.minX) / cell.width)))
-                let row = min(PuzzleCatalog.rows - 1, max(0, Int((board.maxY - point.y) / cell.height)))
-                let slot = row * PuzzleCatalog.columns + col
+                let col = min(PuzzleCatalog.boardColumns - 1, max(0, Int((point.x - board.minX) / cell.width)))
+                let row = min(PuzzleCatalog.boardRows - 1, max(0, Int((board.maxY - point.y) / cell.height)))
+                let slot = row * PuzzleCatalog.boardColumns + col
                 accepted = session.place(id, at: slot)
             } else if deckBounds.contains(releasePoint) {
                 session.remove(id)

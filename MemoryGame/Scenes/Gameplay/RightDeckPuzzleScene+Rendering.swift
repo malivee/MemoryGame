@@ -6,10 +6,11 @@ extension RightDeckPuzzleScene {
     func layoutPhoto() {
         canvas.setScale(min(size.width / 1000, size.height / 600))
         canvas.position = CGPoint(x: size.width / 2, y: size.height / 2)
-        rebuild()
+        rebuild(resetCamera: true)
     }
 
-    func rebuild(revealComplete: Bool = true) {
+    func rebuild(revealComplete: Bool = true, resetCamera: Bool = false) {
+        if resetCamera { cameraOffset = .zero }
         // --- PASTIKAN SEMUA PROMPT LAMA DIHAPUS DI AWAL REBUILD ---
         canvas.childNode(withName: "emptyDeckPrompt")?.removeFromParent()
         canvas.childNode(withName: "entryPrompt")?.removeFromParent()
@@ -25,44 +26,44 @@ extension RightDeckPuzzleScene {
         deckBounds = CGRect(x: halfWidth - deckWidth, y: -halfHeight,
                             width: deckWidth, height: halfHeight * 2)
         viewport = CGRect(x: -halfWidth, y: -halfHeight,
-                          width: max(1, halfWidth * 2 - deckWidth - 6), height: halfHeight * 2)
-        let width = viewport.width
+                          width: max(1, halfWidth * 2 - deckWidth), height: halfHeight * 2)
         let deckCenterX = deckBounds.midX
-        // Preserve image proportions while the deck occupies the right side.
-        let boardHeight = width * PuzzleCatalog.canvasHeight / PuzzleCatalog.canvasWidth
-        board = CGRect(x: -width / 2, y: -boardHeight / 2, width: width, height: boardHeight)
-        boardScale = board.width / PuzzleCatalog.canvasWidth
-        cell = CGSize(width: board.width / CGFloat(PuzzleCatalog.columns), height: board.height / CGFloat(PuzzleCatalog.rows))
+        // Board fills the viewport width at zoom = 1. The 13x12 grid gives a spacious board area for free piece placement.
+        boardScale = viewport.width / PuzzleCatalog.boardCanvasWidth
+        let boardSize = CGSize(width: PuzzleCatalog.boardCanvasWidth * boardScale,
+                               height: PuzzleCatalog.boardCanvasHeight * boardScale)
+        board = CGRect(x: -boardSize.width / 2,
+                       y: -boardSize.height / 2,
+                       width: boardSize.width,
+                       height: boardSize.height)
+        cell = CGSize(width: board.width / CGFloat(PuzzleCatalog.boardColumns),
+                      height: board.height / CGFloat(PuzzleCatalog.boardRows))
+        let minZoom = max(viewport.width / board.width, viewport.height / board.height)
+        if resetCamera || zoom < minZoom { zoom = minZoom }
         let crop = SKCropNode()
-        let shadow = SKShapeNode(rect: viewport.offsetBy(dx: 0, dy: -5).insetBy(dx: -7, dy: -7), cornerRadius: 13)
-        shadow.fillColor = SKColor(red: 0.26, green: 0.20, blue: 0.13, alpha: 0.15)
-        shadow.strokeColor = .clear
-        canvas.safeAddChild(shadow)
-        let frame = SKShapeNode(rect: viewport.insetBy(dx: -6, dy: -6), cornerRadius: 12)
-        frame.fillColor = SKColor(red: 0.48, green: 0.37, blue: 0.24, alpha: 1)
-        frame.strokeColor = SKColor(red: 0.68, green: 0.55, blue: 0.36, alpha: 1)
-        frame.lineWidth = 2
-        canvas.safeAddChild(frame)
-        let mask = SKShapeNode(rect: viewport, cornerRadius: 7)
+        let mask = SKShapeNode(rect: viewport)
         mask.fillColor = .white; mask.strokeColor = .clear
         crop.maskNode = mask
         canvas.safeAddChild(crop); crop.safeAddChild(boardLayer)
         applyCamera()
+        if resetCamera { centerOnPieces() }
         
+        // Backing node strictly covers the 13x12 board grid with warm beige fill and dark border outline.
         let backing = SKShapeNode(rect: board)
         backing.fillColor = SKColor(red: 0.82, green: 0.79, blue: 0.72, alpha: 1)
-        backing.strokeColor = SKColor(white: 0, alpha: 0.15)
+        backing.strokeColor = SKColor(red: 0.45, green: 0.35, blue: 0.25, alpha: 1)
+        backing.lineWidth = 3
         boardLayer.safeAddChild(backing)
         
         // Subtle slot guides keep the enlarged board readable while panning.
-        for row in 0...PuzzleCatalog.rows {
+        for row in 0...PuzzleCatalog.boardRows {
             let path = CGMutablePath()
             let y = board.minY + CGFloat(row) * cell.height
             path.move(to: CGPoint(x: board.minX, y: y)); path.addLine(to: CGPoint(x: board.maxX, y: y))
             let line = SKShapeNode(path: path); line.strokeColor = SKColor(white: 0, alpha: 0.08)
             boardLayer.safeAddChild(line)
         }
-        for col in 0...PuzzleCatalog.columns {
+        for col in 0...PuzzleCatalog.boardColumns {
             let path = CGMutablePath()
             let x = board.minX + CGFloat(col) * cell.width
             path.move(to: CGPoint(x: x, y: board.minY)); path.addLine(to: CGPoint(x: x, y: board.maxY))
@@ -123,8 +124,10 @@ extension RightDeckPuzzleScene {
     }
 
     func center(_ slot: Int) -> CGPoint {
-        CGPoint(x: board.minX + (CGFloat(slot % PuzzleCatalog.columns) + 0.5) * cell.width,
-                y: board.maxY - (CGFloat(slot / PuzzleCatalog.columns) + 0.5) * cell.height)
+        let col = slot % PuzzleCatalog.boardColumns
+        let row = slot / PuzzleCatalog.boardColumns
+        return CGPoint(x: board.minX + (CGFloat(col) + 0.5) * cell.width,
+                y: board.maxY - (CGFloat(row) + 0.5) * cell.height)
     }
 
     func addTile(_ id: Int, at position: CGPoint, inInventory: Bool) {
@@ -220,6 +223,8 @@ extension RightDeckPuzzleScene {
     }
 
     func applyCamera() {
+        let minZoom = max(viewport.width / board.width, viewport.height / board.height)
+        if zoom < minZoom { zoom = minZoom }
         let limitX = max(0, (board.width * zoom - viewport.width) / 2)
         let limitY = max(0, (board.height * zoom - viewport.height) / 2)
         cameraOffset.x = min(limitX, max(-limitX, cameraOffset.x))
@@ -227,6 +232,37 @@ extension RightDeckPuzzleScene {
         boardLayer.setScale(zoom)
         boardLayer.position = CGPoint(x: viewport.midX + cameraOffset.x, y: viewport.midY + cameraOffset.y)
         updateEntryPrompt()
+    }
+
+    func centerOnPieces() {
+        let placedSlots: [Int]
+        if let sel = selected, let slot = state.placements.first(where: { $0.value.id == sel })?.key {
+            let groupIDs = state.connectedIDs(to: sel)
+            let groupSlots = state.placements.compactMap { (s, p) in groupIDs.contains(p.id) ? s : nil }
+            placedSlots = groupSlots.isEmpty ? [slot] : groupSlots
+        } else {
+            placedSlots = Array(state.placements.keys)
+        }
+        
+        guard !placedSlots.isEmpty else {
+            cameraOffset = .zero
+            applyCamera()
+            return
+        }
+        
+        var totalX: CGFloat = 0
+        var totalY: CGFloat = 0
+        for slot in placedSlots {
+            let pCenter = center(slot)
+            totalX += pCenter.x
+            totalY += pCenter.y
+        }
+        let avgX = totalX / CGFloat(placedSlots.count)
+        let avgY = totalY / CGFloat(placedSlots.count)
+        
+        cameraOffset.x = -avgX * zoom
+        cameraOffset.y = -avgY * zoom
+        applyCamera()
     }
     func clearPlaceHighlights() {
         boardLayer.enumerateChildNodes(withName: "//candidateSlotHighlight") { node, _ in
@@ -241,9 +277,9 @@ extension RightDeckPuzzleScene {
         let point = boardLayer.convert(dragScreenPoint, from: canvas)
         guard board.contains(point) else { return }
 
-        let col = min(PuzzleCatalog.columns - 1, max(0, Int((point.x - board.minX) / cell.width)))
-        let row = min(PuzzleCatalog.rows - 1, max(0, Int((board.maxY - point.y) / cell.height)))
-        let slot = row * PuzzleCatalog.columns + col
+        let col = min(PuzzleCatalog.boardColumns - 1, max(0, Int((point.x - board.minX) / cell.width)))
+        let row = min(PuzzleCatalog.boardRows - 1, max(0, Int((board.maxY - point.y) / cell.height)))
+        let slot = row * PuzzleCatalog.boardColumns + col
 
         let slotRect = CGRect(x: board.minX + CGFloat(col) * cell.width,
                               y: board.maxY - CGFloat(row + 1) * cell.height,

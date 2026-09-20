@@ -1491,7 +1491,7 @@ final class SceneryPainter {
 
         // TANAH LONGSOR KECIL DI KANAN (Panel 6)
         let slideRect = CGRect(x: 540, y: 170, width: 135, height: 95)
-        rounded(slideRect, radius: 10, color(0.68, 0.48, 0.32))
+        rounded(slideRect, radius: 10, color: color(0.68, 0.48, 0.32))
         for s in 0..<5 {
             let sy = slideRect.minY + CGFloat(s) * 18
             line([CGPoint(x: slideRect.minX + 3, y: sy), CGPoint(x: slideRect.maxX - 3, y: sy - 5)], color(0.55, 0.38, 0.24, 0.65), 2.0)

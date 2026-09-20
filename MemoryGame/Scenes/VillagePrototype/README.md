@@ -1,5 +1,7 @@
 # Area Desa — mengikuti desain main
 
+Kontrak minigame story dan aturan SSOT didokumentasikan di `docs/story-minigames.md`.
+
 Modul desa mandiri, dapat dibuka dari tombol Area Desa di kiri atas layar puzzle awal. Tombol Kembali mengembalikan pemain ke papan puzzle. Eksplorasi desa tidak mengubah progres cerita atau syarat Jump In.
 
 ## Acuan visual

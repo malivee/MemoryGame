@@ -9,6 +9,11 @@ struct StoryProgressionStep: Identifiable {
     let unlockedPieceID: Int
     let npcs: [StoryNPC]
     let dialogue: [StoryLine]
+    let minigame: StoryMinigame?
+}
+
+enum StoryMinigame: String {
+    case maraShelfQTE
 }
 
 struct StoryNPC: Equatable, Identifiable {
@@ -47,7 +52,8 @@ enum StoryProgression {
     static let steps: [StoryProgressionStep] = [
         step(1, "Arthur menolong Bu Mara", .villagePrototype, "Jalan Rumah Arthur - Sumur", 16,
              [npc("mara", "Bu Mara", "warga")],
-             [line("Bu Mara", "Arthur! Just in time. Can you help me move these clay pots?"), line("Arthur", "The ground is sinking under this leg. Let me wedge this brick under it.")]),
+             [line("Bu Mara", "Arthur! Just in time. Can you help me move these clay pots?"), line("Arthur", "The ground is sinking under this leg. Let me wedge this brick under it.")],
+             .maraShelfQTE),
         step(2, "Arthur menuju lumbung", .villagePrototype, "Jalan utama desa menuju ujung kebun", 26,
              [npc("old-man", "Kakek Tua", "warga")],
              [line("Warga", "Arthur! Heading to the barn? Drop this empty basket there for me, will you?"), line("Kakek Tua", "Tomorrow they will want to know what is past the garden.")]),
@@ -98,9 +104,11 @@ enum StoryProgression {
     }
 
     static func step(_ id: Int, _ title: String, _ world: PuzzleWorld, _ area: String, _ piece: Int,
-                     _ npcs: [StoryNPC], _ dialogue: [StoryLine]) -> StoryProgressionStep {
+                     _ npcs: [StoryNPC], _ dialogue: [StoryLine],
+                     _ minigame: StoryMinigame? = nil) -> StoryProgressionStep {
         StoryProgressionStep(id: id, title: title, world: world, area: area,
-                             unlockedPieceID: piece, npcs: npcs, dialogue: dialogue)
+                             unlockedPieceID: piece, npcs: npcs, dialogue: dialogue,
+                             minigame: minigame)
     }
 
     static func npc(_ id: String, _ name: String, _ role: String) -> StoryNPC {

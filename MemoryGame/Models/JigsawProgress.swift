@@ -16,7 +16,7 @@ enum JigsawCatalog {
     static let minimumConnectedPieces = 3
     // An L-shaped opening: house above road, yard immediately to its left.
     static let starterIDs: Set<Int> = PuzzleWorld.house.pieceIDs
-    static let bookReward = PuzzleWorld.village.pieceIDs
+    static let bookReward = PuzzleWorld.villagePrototype.pieceIDs
     static let friendsReward = PuzzleWorld.hills.pieceIDs
     static let markerReward = PuzzleWorld.boundary.pieceIDs
     private static let locationIDs: [MemoryPiece: Int] = [

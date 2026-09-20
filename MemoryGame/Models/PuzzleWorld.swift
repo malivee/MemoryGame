@@ -2,12 +2,12 @@ import Foundation
 
 /// Fixed three-piece portals. Art coordinates do not determine the destination.
 enum PuzzleWorld: Int, CaseIterable {
-    case house, village, hills, boundary, echoesBoundary
+    case house, villagePrototype, hills, boundary, echoesBoundary
 
     var pieceIDs: Set<Int> {
         switch self {
         case .house: return [14, 23, 24]
-        case .village: return [16, 26, 27]
+        case .villagePrototype: return [16, 26, 27]
         case .hills: return [0, 1, 10]
         case .boundary: return [8, 9, 19]
         case .echoesBoundary: return [5, 6, 15]
@@ -16,7 +16,7 @@ enum PuzzleWorld: Int, CaseIterable {
     var title: String {
         switch self {
         case .house: return "Rumah"
-        case .village: return "Desa"
+        case .villagePrototype: return "Desa"
         case .hills: return "Bukit"
         case .boundary: return "Batas Desa"
         case .echoesBoundary: return "Zona Bahaya"
@@ -25,7 +25,7 @@ enum PuzzleWorld: Int, CaseIterable {
     var entry: MemoryPiece {
         switch self {
         case .house: return .house
-        case .village: return .yard
+        case .villagePrototype: return .yard
         case .hills: return .oldPath
         case .boundary: return .boundary
         case .echoesBoundary: return .echoesBoundary
@@ -34,7 +34,7 @@ enum PuzzleWorld: Int, CaseIterable {
     var locations: Set<MemoryPiece> {
         switch self {
         case .house: return [.house]
-        case .village: return [.yard, .villageRoad, .garden]
+        case .villagePrototype: return [.yard, .villageRoad, .garden]
         case .hills: return [.mountain, .oldPath, .dryLake]
         case .boundary: return [.boundary]
         case .echoesBoundary: return [.echoesBoundary]
@@ -43,7 +43,7 @@ enum PuzzleWorld: Int, CaseIterable {
     func isUnlocked(in progress: PrologueProgress) -> Bool {
         switch self {
         case .house: return true
-        case .village: return progress.hasBook
+        case .villagePrototype: return progress.hasBook
         case .hills: return progress.hasBook && progress.joined.count == 3
         case .boundary: return progress.hasBook && progress.joined.count == 3 && progress.foundMarker
         case .echoesBoundary: return progress.leftVillage

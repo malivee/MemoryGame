@@ -2,7 +2,7 @@ import SpriteKit
 
 extension PuzzleWorld {
     func makeScene(size: CGSize) -> SKScene {
-        if self == .village {
+        if self == .villagePrototype {
             let scene = VillagePrototypeScene(size: size)
             scene.storyProgress = PrologueStore.shared.progress
             scene.onExit = { [weak scene] in

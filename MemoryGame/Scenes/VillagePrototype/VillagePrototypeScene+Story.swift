@@ -17,12 +17,12 @@ extension VillagePrototypeScene {
             }
         }
         activeStoryStep = StoryProgression.currentStep(for: storyProgress)
-        if activeStoryStep?.world != .village {
+        if activeStoryStep?.world != .villagePrototype {
             activeStoryStep = StoryProgression.steps.last {
-                $0.world == .village && $0.id <= storyProgress.storyProgress
+                $0.world == .villagePrototype && $0.id <= storyProgress.storyProgress
             }
         }
-        guard let step = activeStoryStep, step.world == .village else { return }
+        guard let step = activeStoryStep, step.world == .villagePrototype else { return }
         let positions: [Int: CGPoint] = [
             1: CGPoint(x: 1400, y: 545), 2: CGPoint(x: 1275, y: 520),
             3: CGPoint(x: 1220, y: 1005), 4: CGPoint(x: 1550, y: 320),

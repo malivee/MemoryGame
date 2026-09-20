@@ -5,14 +5,21 @@ import Foundation
 import CoreGraphics
 
 enum VillageAccess: Int, CaseIterable {
-    case opening = 1, barnRoute, wholeVillage
-    case maraYard, rolandRoute
+    case opening = 1
+    case barnRoute
+    case rolandRoute
+    case annethRoute
+    case berynRoute
+    case storehouseRoute
+    case wholeVillage
     var title: String {
         switch self {
         case .opening: return "Rumah & sumur"
-        case .maraYard: return "Halaman Bu Mara"
         case .barnRoute: return "Jalur lumbung"
         case .rolandRoute: return "Kandang Roland"
+        case .annethRoute: return "Rumah Anneth"
+        case .berynRoute: return "Rumah Kakek Beryn"
+        case .storehouseRoute: return "Gudang dekat sungai"
         case .wholeVillage: return "Seluruh desa"
         }
     }
@@ -35,17 +42,17 @@ enum VillageMap {
     static let landmarks: [VillageLandmark] = [
         .init(id: "arthur", name: "Rumah Arthur & Kakek", rect: CGRect(x: 280, y: 570, width: 260, height: 195), stage: .opening,
               detail: "Teras kayu, meja, tungku, dan ambang pintu tempat Kakek memantau jalan."),
-        .init(id: "mara", name: "Rumah Bu Mara", rect: CGRect(x: 1160, y: 570, width: 230, height: 185), stage: .barnRoute,
+        .init(id: "mara", name: "Rumah Bu Mara", rect: CGRect(x: 1160, y: 570, width: 230, height: 185), stage: .opening,
               detail: "Halaman dekat sumur: pot tanah liat, rak miring, genangan cucian, dan pecahan bata."),
         .init(id: "barn", name: "Lumbung Desa", rect: CGRect(x: 1020, y: 1060, width: 300, height: 205), stage: .barnRoute,
               detail: "Lumbung Keneth: karung panen, dinding lembap, papan lapuk, dan engsel pintu miring."),
-        .init(id: "anneth", name: "Rumah Anneth", rect: CGRect(x: 290, y: 1050, width: 260, height: 205), stage: .wholeVillage,
+        .init(id: "anneth", name: "Rumah Anneth", rect: CGRect(x: 290, y: 1050, width: 260, height: 205), stage: .annethRoute,
               detail: "Dapur belakang yang rapi: stok umbi, papan inventori, panci, dan lumpang."),
-        .init(id: "beryn", name: "Rumah Kakek Beryn", rect: CGRect(x: 800, y: 230, width: 260, height: 185), stage: .wholeVillage,
+        .init(id: "beryn", name: "Rumah Kakek Beryn", rect: CGRect(x: 800, y: 230, width: 260, height: 185), stage: .berynRoute,
               detail: "Batu pipih besar di depan rumah menjadi tempat pertemuan warga."),
-        .init(id: "base", name: "Gudang Kosong", rect: CGRect(x: 1580, y: 980, width: 220, height: 170), stage: .wholeVillage,
+        .init(id: "base", name: "Gudang Kosong", rect: CGRect(x: 1580, y: 980, width: 220, height: 170), stage: .storehouseRoute,
               detail: "Gudang dekat sungai kecil; lokasi secret base Arthur dan teman-teman."),
-        .init(id: "pen", name: "Kandang & pagar Roland", rect: CGRect(x: 1340, y: 130, width: 245, height: 140), stage: .wholeVillage,
+        .init(id: "pen", name: "Kandang & pagar Roland", rect: CGRect(x: 1340, y: 130, width: 245, height: 140), stage: .rolandRoute,
               detail: "Kandang di ujung permukiman dengan tiang dan pagar kayu yang perlu diperbaiki.")
     ]
     static let well = CGRect(x: 865, y: 765, width: 80, height: 85)
@@ -83,15 +90,19 @@ enum VillageMap {
         if stage == .wholeVillage { return [bounds.insetBy(dx: 36, dy: 36)] }
         // Termasuk Rumah Arthur, Kakek, sumur, dan Rumah Bu Mara pada progresi awal.
         let opening = CGRect(x: 250, y: 445, width: 1300, height: 495)
-        let villageRoad = CGRect(x: 110, y: 445, width: 1440, height: 435)
         let barn = CGRect(x: 690, y: 820, width: 770, height: 570)
+        let roland = CGRect(x: 1050, y: 285, width: 580, height: 270)
+        let anneth = CGRect(x: 250, y: 880, width: 520, height: 520)
+        let beryn = CGRect(x: 760, y: 180, width: 390, height: 380)
+        let storehouse = CGRect(x: 1450, y: 850, width: 430, height: 430)
         switch stage {
         case .opening: return [opening]
-        case .maraYard: return [opening, villageRoad]
-        case .barnRoute: return [opening, villageRoad, barn]
-        case .rolandRoute:
-            return [opening, villageRoad, barn, CGRect(x: 1050, y: 285, width: 580, height: 270)]
-        case .wholeVillage: return [bounds]
+        case .barnRoute: return [opening, barn]
+        case .rolandRoute: return [opening, barn, roland]
+        case .annethRoute: return [opening, barn, roland, anneth]
+        case .berynRoute: return [opening, barn, roland, anneth, beryn]
+        case .storehouseRoute: return [opening, barn, roland, anneth, beryn, storehouse]
+        case .wholeVillage: return [bounds.insetBy(dx: 36, dy: 36)]
         }
     }
 }

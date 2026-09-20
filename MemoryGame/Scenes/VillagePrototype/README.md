@@ -18,9 +18,9 @@ Jalankan aplikasi, lalu ketuk Area Desa di layar puzzle setelah cutscene pembuka
 
 Untuk preview terpisah, buka VillagePrototypePreview.swift di Xcode → Editor → Canvas → Resume. Gunakan live preview landscape.
 
-Default seluruh desa terbuka. Stik dan ketuk tanah menggerakkan Arthur. Tombol Lihat peta berganti antara kamera jalan dan denah penuh; ketuk bangunan dalam mode peta untuk deskripsi.
+Default preview memakai tahap `.opening`. Stik dan ketuk tanah menggerakkan Arthur. Tombol Lihat peta berganti antara kamera jalan dan denah penuh; ketuk bangunan dalam mode peta untuk deskripsi.
 
-Tidak ada menu tahap atau debug baru pada HUD. Untuk menguji invisible wall, ubah konfigurasi host preview menjadi VillagePrototypePreview(access: .opening) atau .barnRoute. Pilihan .wholeVillage membuka seluruh desa. Seluruh bangunan tetap terlihat; hanya akses gerak yang dibatasi. Ini konfigurasi pengujian, bukan perubahan sistem unlock game utama.
+Tidak ada menu tahap pada HUD. `StoryProgression.villageAccess(for:)` adalah sumber urutan pembukaan kabut: opening, lumbung, kandang Roland, rumah Anneth, rumah Kakek Beryn, gudang, lalu seluruh desa. `VillageMap.accessibleAreas(stage:)` menentukan mask kabut sekaligus batas navigasi untuk setiap tahap. Preview dapat memakai salah satu nilai `VillageAccess` untuk memeriksa tahap tertentu.
 
 ## File
 

@@ -50,16 +50,26 @@ enum StoryProgression {
         for progress: PrologueProgress
     ) -> VillageAccess {
         switch progress.storyProgress {
-        case ...1:
-            // Masih mengerjakan sumur, Bu Mara, atau Kakek.
+        case ...0:
+            // Rumah Arthur, sumur, dan halaman Bu Mara.
             return .opening
-
-        case 2:
-            // Dialog Kakek selesai: lumbung terbuka.
+        case 1...2:
+            // Step 1 selesai: lumbung dan jalannya terbuka.
             return .barnRoute
-
+        case 3:
+            // Step 3 selesai: kandang Roland dan jalan depannya terbuka.
+            return .rolandRoute
+        case 4...7:
+            // Step 4 selesai: rumah Anneth terbuka.
+            return .annethRoute
+        case 8...9:
+            // Step 8 selesai: rumah Kakek Beryn terbuka.
+            return .berynRoute
+        case 10:
+            // Step 10 selesai: gudang dekat sungai terbuka.
+            return .storehouseRoute
         default:
-            // Keneth selesai: seluruh cabang desa terbuka.
+            // Step 11 selesai: seluruh wilayah desa terbuka.
             return .wholeVillage
         }
     }

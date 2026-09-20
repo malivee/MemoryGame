@@ -27,6 +27,10 @@ extension RightDeckPuzzleScene {
                 enterDebugWorld(world)
                 return
             }
+            if names.contains("debug-close") {
+                toggleDebugMenu()
+                return
+            }
             if names.contains("debug-b1") { toggleDebugMenu(); enterDebugBoundaryStage(.rockSalt); return }
             if names.contains("debug-b2") { toggleDebugMenu(); enterDebugBoundaryStage(.herbalHills); return }
             if names.contains("debug-b3") { toggleDebugMenu(); enterDebugBoundaryStage(.woodcutterSlope); return }

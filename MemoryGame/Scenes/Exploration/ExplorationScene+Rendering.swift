@@ -62,13 +62,113 @@ extension ExplorationScene {
         ])
         settle.timingMode = .easeOut
         world.run(settle)
-        let title = storyLabel(entry.region == .house ? "Rumah di lembah" : (entry.region == .village ? "Desa di lembah" : "Kaki perbukitan"),
-                               at: CGPoint(x: size.width / 2, y: size.height / 2), size: 28,
-                               color: SKColor(red: 0.98, green: 0.91, blue: 0.72, alpha: 1))
-        title.zPosition = 350
-        title.alpha = 0
-        title.run(.sequence([.fadeIn(withDuration: duration * 0.35), .wait(forDuration: duration * 0.35),
-                             .fadeOut(withDuration: duration * 0.35), .removeFromParent()]))
+        if entry.region == .boundary {
+            let stage = progress.mapBStage
+            let card = SKNode()
+            card.zPosition = 350
+            card.position = CGPoint(x: size.width / 2, y: size.height / 2)
+            card.alpha = 0
+
+            let stageTitle: String
+            let stageSubtitle: String
+            let stageIcon: String
+            let stageColor: SKColor
+
+            switch stage {
+            case .rockSalt:
+                stageIcon = "🧂"
+                stageTitle = "TAMBANG ROCK SALT"
+                stageSubtitle = "Tahap I · Lereng Penambang & Mulut Gua"
+                stageColor = SKColor(red: 0.45, green: 0.88, blue: 0.98, alpha: 1.0)
+            case .herbalHills:
+                stageIcon = "🌿"
+                stageTitle = "PERBUKITAN HERBAL"
+                stageSubtitle = "Tahap II · Tepi Kebun & Puncak Menhir Batas Aman"
+                stageColor = SKColor(red: 0.55, green: 0.92, blue: 0.45, alpha: 1.0)
+            case .woodcutterSlope:
+                stageIcon = "🪵"
+                stageTitle = "LERENG PENEBANG KAYU"
+                stageSubtitle = "Tahap III · Teras Hutan & Rahasia Catatan Elias"
+                stageColor = SKColor(red: 0.95, green: 0.75, blue: 0.38, alpha: 1.0)
+            case .theBoundary:
+                stageIcon = "🎗️"
+                stageTitle = "THE BOUNDARY"
+                stageSubtitle = "Tahap IV · Titik Kumpul & Gerbang Deep Woods"
+                stageColor = SKColor(red: 0.98, green: 0.45, blue: 0.25, alpha: 1.0)
+            }
+
+            let cardW: CGFloat = min(size.width - 60, 460)
+            let cardH: CGFloat = 88
+
+            let shadow = SKShapeNode(rectOf: CGSize(width: cardW, height: cardH), cornerRadius: 20)
+            shadow.fillColor = SKColor(white: 0, alpha: 0.45)
+            shadow.strokeColor = .clear
+            shadow.position = CGPoint(x: 0, y: -4)
+            card.addChild(shadow)
+
+            let bg = SKShapeNode(rectOf: CGSize(width: cardW, height: cardH), cornerRadius: 20)
+            bg.fillColor = SKColor(red: 0.08, green: 0.11, blue: 0.13, alpha: 0.96)
+            bg.strokeColor = stageColor
+            bg.lineWidth = 2.0
+            card.addChild(bg)
+
+            let innerLine = SKShapeNode(rectOf: CGSize(width: cardW - 8, height: cardH - 8), cornerRadius: 16)
+            innerLine.fillColor = .clear
+            innerLine.strokeColor = SKColor(red: 0.92, green: 0.82, blue: 0.52, alpha: 0.35)
+            innerLine.lineWidth = 1.0
+            card.addChild(innerLine)
+
+            let chapterLbl = SKLabelNode(text: "✦ MAP B · ZONA TRANSISI LEMBAH ✦")
+            chapterLbl.fontName = "AvenirNext-Bold"
+            chapterLbl.fontSize = 10
+            chapterLbl.fontColor = SKColor(red: 0.92, green: 0.82, blue: 0.52, alpha: 0.9)
+            chapterLbl.position = CGPoint(x: 0, y: 22)
+            card.addChild(chapterLbl)
+
+            let titleLbl = SKLabelNode(text: "\(stageIcon)  \(stageTitle)")
+            titleLbl.fontName = "AvenirNext-Heavy"
+            titleLbl.fontSize = 19
+            titleLbl.fontColor = stageColor
+            titleLbl.position = CGPoint(x: 0, y: -2)
+            card.addChild(titleLbl)
+
+            let subLbl = SKLabelNode(text: stageSubtitle)
+            subLbl.fontName = "AvenirNext-Medium"
+            subLbl.fontSize = 11.5
+            subLbl.fontColor = SKColor(red: 0.92, green: 0.92, blue: 0.88, alpha: 0.88)
+            subLbl.position = CGPoint(x: 0, y: -24)
+            card.addChild(subLbl)
+
+            addChild(card)
+
+            let scaleIn = SKAction.group([
+                .fadeIn(withDuration: duration * 0.4),
+                .scale(to: 1.0, duration: duration * 0.4)
+            ])
+            scaleIn.timingMode = .easeOut
+
+            let scaleOut = SKAction.group([
+                .fadeOut(withDuration: duration * 0.35),
+                .moveBy(x: 0, y: 15, duration: duration * 0.35)
+            ])
+            scaleOut.timingMode = .easeIn
+
+            card.setScale(0.85)
+            card.run(.sequence([
+                scaleIn,
+                .wait(forDuration: 2.0),
+                scaleOut,
+                .removeFromParent()
+            ]))
+        } else {
+            let title = storyLabel(entry.region == .house ? "Rumah di lembah" : (entry.region == .village ? "Desa di lembah" : "Kaki perbukitan"),
+                                   at: CGPoint(x: size.width / 2, y: size.height / 2), size: 28,
+                                   color: SKColor(red: 0.98, green: 0.91, blue: 0.72, alpha: 1))
+            title.zPosition = 350
+            title.alpha = 0
+            title.run(.sequence([.fadeIn(withDuration: duration * 0.35), .wait(forDuration: duration * 0.35),
+                                 .fadeOut(withDuration: duration * 0.35), .removeFromParent()]))
+        }
         hud.run(.sequence([.wait(forDuration: duration * 0.55), .fadeIn(withDuration: duration * 0.45)]))
         run(.sequence([.wait(forDuration: duration), .run { [weak self] in
             guard let self else { return }
@@ -221,6 +321,84 @@ extension ExplorationScene {
         sceneryNode = scenery
     }
 
+    func createWorldBadge(icon: String, title: String, subtitle: String? = nil, accentColor: SKColor) -> SKNode {
+        let root = SKNode()
+        root.zPosition = 45
+
+        let titleLbl = SKLabelNode(text: title)
+        titleLbl.fontName = "AvenirNext-Bold"
+        titleLbl.fontSize = 10.0
+        titleLbl.fontColor = SKColor(red: 0.98, green: 0.96, blue: 0.90, alpha: 1.0)
+        titleLbl.verticalAlignmentMode = .center
+
+        let textWidth = titleLbl.frame.width
+        let badgeW = max(textWidth + 56, 134)
+        let badgeH: CGFloat = subtitle != nil ? 34 : 26
+
+        // 1. Soft ground shadow
+        let shadow = SKShapeNode(rectOf: CGSize(width: badgeW, height: badgeH), cornerRadius: badgeH / 2)
+        shadow.fillColor = SKColor(white: 0, alpha: 0.42)
+        shadow.strokeColor = .clear
+        shadow.position = CGPoint(x: 0, y: -2.5)
+        root.addChild(shadow)
+
+        // 2. Glassmorphism backing pill
+        let bg = SKShapeNode(rectOf: CGSize(width: badgeW, height: badgeH), cornerRadius: badgeH / 2)
+        bg.fillColor = SKColor(red: 0.08, green: 0.11, blue: 0.13, alpha: 0.95)
+        bg.strokeColor = accentColor
+        bg.lineWidth = 1.6
+        root.addChild(bg)
+
+        // Inner subtle golden rim
+        let innerRim = SKShapeNode(rectOf: CGSize(width: badgeW - 4, height: badgeH - 4), cornerRadius: (badgeH - 4) / 2)
+        innerRim.fillColor = .clear
+        innerRim.strokeColor = SKColor(red: 0.95, green: 0.85, blue: 0.50, alpha: 0.25)
+        innerRim.lineWidth = 0.8
+        root.addChild(innerRim)
+
+        // Left circular icon badge
+        let iconCircle = SKShapeNode(circleOfRadius: (badgeH - 8) / 2)
+        iconCircle.fillColor = accentColor.withAlphaComponent(0.25)
+        iconCircle.strokeColor = accentColor.withAlphaComponent(0.8)
+        iconCircle.lineWidth = 1.0
+        iconCircle.position = CGPoint(x: -badgeW / 2 + badgeH / 2 + 1, y: 0)
+        root.addChild(iconCircle)
+
+        let iconLbl = SKLabelNode(text: icon)
+        iconLbl.fontSize = badgeH > 30 ? 12 : 10
+        iconLbl.verticalAlignmentMode = .center
+        iconLbl.position = .zero
+        iconCircle.addChild(iconLbl)
+
+        // Texts offset to the right of icon
+        let textCenterX: CGFloat = (iconCircle.position.x + (badgeH / 2) + badgeW / 2) / 2 - 2
+
+        if let sub = subtitle {
+            titleLbl.position = CGPoint(x: textCenterX, y: 5.5)
+            titleLbl.fontSize = 9.5
+            root.addChild(titleLbl)
+
+            let subLbl = SKLabelNode(text: sub)
+            subLbl.fontName = "AvenirNext-Medium"
+            subLbl.fontSize = 8.0
+            subLbl.fontColor = accentColor.withAlphaComponent(0.95)
+            subLbl.verticalAlignmentMode = .center
+            subLbl.position = CGPoint(x: textCenterX, y: -6.5)
+            root.addChild(subLbl)
+        } else {
+            titleLbl.position = CGPoint(x: textCenterX, y: 0)
+            root.addChild(titleLbl)
+        }
+
+        // Floating bobbing animation
+        root.run(.repeatForever(.sequence([
+            .moveBy(x: 0, y: 3.5, duration: 0.85),
+            .moveBy(x: 0, y: -3.5, duration: 0.85)
+        ])))
+
+        return root
+    }
+
     func buildBoundaryWorldObjects() {
         switch progress.mapBStage {
         case .rockSalt:
@@ -231,40 +409,68 @@ extension ExplorationScene {
                 saltContainer.position = CGPoint(x: 330, y: 350)
                 saltContainer.zPosition = 35
 
-                let crystalAura = SKShapeNode(circleOfRadius: 22)
-                crystalAura.fillColor = SKColor(red: 0.7, green: 0.9, blue: 1.0, alpha: 0.25)
-                crystalAura.strokeColor = SKColor(red: 0.8, green: 0.95, blue: 1.0, alpha: 0.6)
-                crystalAura.lineWidth = 1.5
+                // Bayangan tanah
+                let shadow = SKShapeNode(ellipseOf: CGSize(width: 38, height: 14))
+                shadow.fillColor = SKColor(red: 0.10, green: 0.12, blue: 0.14, alpha: 0.40)
+                shadow.strokeColor = .clear
+                shadow.position = CGPoint(x: 0, y: -8)
+                saltContainer.addChild(shadow)
+
+                // Halo kristal es biru berdenyut
+                let crystalAura = SKShapeNode(circleOfRadius: 26)
+                crystalAura.fillColor = SKColor(red: 0.65, green: 0.88, blue: 1.0, alpha: 0.28)
+                crystalAura.strokeColor = SKColor(red: 0.75, green: 0.95, blue: 1.0, alpha: 0.75)
+                crystalAura.lineWidth = 1.6
                 saltContainer.addChild(crystalAura)
                 crystalAura.run(.repeatForever(.sequence([
-                    .scale(to: 1.25, duration: 0.8),
-                    .scale(to: 0.95, duration: 0.8)
+                    .scale(to: 1.25, duration: 0.9),
+                    .scale(to: 0.95, duration: 0.9)
                 ])))
 
-                let c1 = SKShapeNode(rectOf: CGSize(width: 14, height: 18), cornerRadius: 3)
-                c1.fillColor = SKColor(red: 0.95, green: 0.98, blue: 1.0, alpha: 0.95)
-                c1.strokeColor = SKColor(red: 0.75, green: 0.88, blue: 0.98, alpha: 1.0)
-                c1.zRotation = 0.2
+                // Kristal 1: Prisma tengah
+                let c1 = SKShapeNode(rectOf: CGSize(width: 15, height: 22), cornerRadius: 3)
+                c1.fillColor = SKColor(red: 0.95, green: 0.98, blue: 1.0, alpha: 0.98)
+                c1.strokeColor = SKColor(red: 0.65, green: 0.85, blue: 0.98, alpha: 1.0)
+                c1.lineWidth = 1.4
+                c1.zRotation = 0.18
                 saltContainer.addChild(c1)
 
-                let c2 = SKShapeNode(rectOf: CGSize(width: 11, height: 14), cornerRadius: 2)
-                c2.fillColor = SKColor(red: 0.90, green: 0.95, blue: 1.0, alpha: 0.90)
-                c2.strokeColor = SKColor(red: 0.70, green: 0.85, blue: 0.95, alpha: 1.0)
-                c2.position = CGPoint(x: 8, y: -4)
-                c2.zRotation = -0.35
+                // Kristal 2: Sayap kanan
+                let c2 = SKShapeNode(rectOf: CGSize(width: 12, height: 16), cornerRadius: 2)
+                c2.fillColor = SKColor(red: 0.88, green: 0.95, blue: 1.0, alpha: 0.92)
+                c2.strokeColor = SKColor(red: 0.60, green: 0.82, blue: 0.96, alpha: 1.0)
+                c2.lineWidth = 1.2
+                c2.position = CGPoint(x: 10, y: -4)
+                c2.zRotation = -0.32
                 saltContainer.addChild(c2)
 
-                let sparkle = SKShapeNode(circleOfRadius: 3)
-                sparkle.fillColor = .white
-                sparkle.strokeColor = .clear
-                sparkle.position = CGPoint(x: -3, y: 6)
-                saltContainer.addChild(sparkle)
-                sparkle.run(.repeatForever(.sequence([
-                    .fadeAlpha(to: 0.2, duration: 0.4),
-                    .fadeAlpha(to: 1.0, duration: 0.4)
-                ])))
+                // Kristal 3: Sayap kiri
+                let c3 = SKShapeNode(rectOf: CGSize(width: 10, height: 14), cornerRadius: 2)
+                c3.fillColor = SKColor(red: 0.92, green: 0.96, blue: 1.0, alpha: 0.90)
+                c3.strokeColor = SKColor(red: 0.60, green: 0.82, blue: 0.96, alpha: 1.0)
+                c3.lineWidth = 1.2
+                c3.position = CGPoint(x: -9, y: -5)
+                c3.zRotation = 0.40
+                saltContainer.addChild(c3)
 
-                saltContainer.storyLabel("💎 Rock Salt Murni", at: CGPoint(x: 0, y: 22), size: 10, color: SKColor(red: 0.85, green: 0.95, blue: 1.0, alpha: 0.95))
+                // 4 Partikel kerlap-kerlip bintang berkilau
+                for i in 0..<4 {
+                    let sparkle = SKLabelNode(text: "✨")
+                    sparkle.fontSize = 11
+                    sparkle.position = CGPoint(x: (i % 2 == 0 ? -14 : 14) + CGFloat(i * 3), y: CGFloat(i * 6) - 4)
+                    saltContainer.addChild(sparkle)
+                    sparkle.run(.repeatForever(.sequence([
+                        .wait(forDuration: Double(i) * 0.35),
+                        .group([.scale(to: 1.3, duration: 0.4), .fadeIn(withDuration: 0.25)]),
+                        .group([.scale(to: 0.7, duration: 0.4), .fadeOut(withDuration: 0.35)])
+                    ])))
+                }
+
+                // Storybook Badge Melayang Carto
+                let badge = createWorldBadge(icon: "💎", title: "Bongkahan Rock Salt", subtitle: "Endapan Murni Mulut Tambang", accentColor: SKColor(red: 0.45, green: 0.88, blue: 0.98, alpha: 1.0))
+                badge.position = CGPoint(x: 0, y: 32)
+                saltContainer.addChild(badge)
+
                 world.addChild(saltContainer)
                 self.rockSaltNode = saltContainer
             }
@@ -274,23 +480,27 @@ extension ExplorationScene {
             shaftContainer.name = "mineShaftEntrance"
             shaftContainer.position = CGPoint(x: 330, y: 395)
             shaftContainer.zPosition = 30
-            let barrier = SKShapeNode(rectOf: CGSize(width: 55, height: 16), cornerRadius: 3)
-            barrier.fillColor = SKColor(red: 0.25, green: 0.18, blue: 0.12, alpha: 0.85)
-            barrier.strokeColor = SKColor(red: 0.85, green: 0.45, blue: 0.20, alpha: 0.9)
-            barrier.lineWidth = 1.5
+
+            let barrier = SKShapeNode(rectOf: CGSize(width: 60, height: 18), cornerRadius: 4)
+            barrier.fillColor = SKColor(red: 0.22, green: 0.16, blue: 0.10, alpha: 0.92)
+            barrier.strokeColor = SKColor(red: 0.92, green: 0.52, blue: 0.20, alpha: 0.95)
+            barrier.lineWidth = 1.8
             shaftContainer.addChild(barrier)
-            shaftContainer.storyLabel("⛔ Lorong Tambang Gelap", at: CGPoint(x: 0, y: 18), size: 9.5, color: SKColor(red: 0.95, green: 0.75, blue: 0.5, alpha: 0.9))
+
+            let shaftBadge = createWorldBadge(icon: "⛔", title: "Lorong Tambang Gelap", subtitle: "Rawan Runtuh · Akses Ditutup", accentColor: SKColor(red: 0.95, green: 0.55, blue: 0.22, alpha: 1.0))
+            shaftBadge.position = CGPoint(x: 0, y: 26)
+            shaftContainer.addChild(shaftBadge)
+
             world.addChild(shaftContainer)
             self.mineShaftNode = shaftContainer
 
             // 3. Papan Penunjuk Kembali ke Desa di (40, 120)
-            let exitSign = SKShapeNode(rectOf: CGSize(width: 65, height: 45), cornerRadius: 6)
-            exitSign.position = CGPoint(x: 40, y: 120)
-            exitSign.fillColor = SKColor(red: 0.18, green: 0.25, blue: 0.20, alpha: 0.8)
-            exitSign.strokeColor = SKColor(red: 0.75, green: 0.80, blue: 0.60, alpha: 0.9)
-            exitSign.zPosition = 25
-            exitSign.storyLabel("🏡 Ke Desa", at: CGPoint(x: 0, y: 0), size: 10, color: .white)
-            world.addChild(exitSign)
+            let exitNode = SKNode()
+            exitNode.position = CGPoint(x: 40, y: 120)
+            exitNode.zPosition = 25
+            let exitBadge = createWorldBadge(icon: "🏡", title: "Jalur ke Desa", subtitle: "Rumah Anneth", accentColor: SKColor(red: 0.72, green: 0.85, blue: 0.58, alpha: 1.0))
+            exitNode.addChild(exitBadge)
+            world.addChild(exitNode)
 
         case .herbalHills:
             // 1. Tanaman herbal di atas batu menjorok (710, 340)
@@ -300,27 +510,54 @@ extension ExplorationScene {
                 herbContainer.position = CGPoint(x: 710, y: 340)
                 herbContainer.zPosition = 35
 
-                let aura = SKShapeNode(circleOfRadius: 20)
-                aura.fillColor = SKColor(red: 0.4, green: 0.9, blue: 0.3, alpha: 0.2)
-                aura.strokeColor = SKColor(red: 0.8, green: 1.0, blue: 0.4, alpha: 0.6)
+                // Bayangan tanah
+                let shadow = SKShapeNode(ellipseOf: CGSize(width: 32, height: 12))
+                shadow.fillColor = SKColor(red: 0.12, green: 0.18, blue: 0.10, alpha: 0.35)
+                shadow.strokeColor = .clear
+                shadow.position = CGPoint(x: 0, y: -6)
+                herbContainer.addChild(shadow)
+
+                // Halo zamrud-emas berdenyut
+                let aura = SKShapeNode(circleOfRadius: 24)
+                aura.fillColor = SKColor(red: 0.45, green: 0.92, blue: 0.35, alpha: 0.22)
+                aura.strokeColor = SKColor(red: 0.85, green: 1.0, blue: 0.45, alpha: 0.65)
                 aura.lineWidth = 1.5
                 herbContainer.addChild(aura)
                 aura.run(.repeatForever(.sequence([
-                    .scale(to: 1.25, duration: 0.75),
-                    .scale(to: 0.95, duration: 0.75)
+                    .scale(to: 1.25, duration: 0.85),
+                    .scale(to: 0.95, duration: 0.85)
                 ])))
 
-                for i in 0..<5 {
-                    let flower = SKShapeNode(circleOfRadius: 4.5)
+                // Rumpun 7 kuntum chamomile berbunga emas
+                for i in 0..<7 {
+                    let angle = CGFloat(i) * .pi * 2 / 7
+                    let rad: CGFloat = i == 0 ? 0 : 8
+                    let flower = SKShapeNode(circleOfRadius: 4.8)
                     flower.fillColor = SKColor(red: 0.98, green: 0.88, blue: 0.22, alpha: 1.0)
                     flower.strokeColor = .white
-                    flower.lineWidth = 1.0
-                    let angle = CGFloat(i) * .pi * 2 / 5
-                    flower.position = CGPoint(x: cos(angle) * 7, y: sin(angle) * 6)
+                    flower.lineWidth = 1.2
+                    flower.position = CGPoint(x: cos(angle) * rad, y: sin(angle) * (rad * 0.75))
                     herbContainer.addChild(flower)
                 }
 
-                herbContainer.storyLabel("🌿 Chamomile Emas", at: CGPoint(x: 0, y: 22), size: 10, color: SKColor(red: 0.95, green: 0.95, blue: 0.70, alpha: 0.95))
+                // Butir serbuk sari emas melayang
+                for i in 0..<3 {
+                    let spark = SKLabelNode(text: "✨")
+                    spark.fontSize = 10
+                    spark.position = CGPoint(x: (i == 0 ? -12 : (i == 1 ? 12 : 0)), y: 8)
+                    herbContainer.addChild(spark)
+                    spark.run(.repeatForever(.sequence([
+                        .wait(forDuration: Double(i) * 0.4),
+                        .group([.fadeIn(withDuration: 0.3), .moveBy(x: 0, y: 10, duration: 0.9), .scale(to: 1.2, duration: 0.9)]),
+                        .fadeOut(withDuration: 0.3),
+                        .moveBy(x: 0, y: -10, duration: 0)
+                    ])))
+                }
+
+                let badge = createWorldBadge(icon: "🌿", title: "Chamomile Emas Langka", subtitle: "Puncak Batu Menjorok", accentColor: SKColor(red: 0.96, green: 0.88, blue: 0.25, alpha: 1.0))
+                badge.position = CGPoint(x: 0, y: 32)
+                herbContainer.addChild(badge)
+
                 world.addChild(herbContainer)
                 self.herbalNode = herbContainer
             }
@@ -331,8 +568,19 @@ extension ExplorationScene {
                 let stoneAnchor = SKNode()
                 stoneAnchor.position = CGPoint(x: sx, y: 120)
                 stoneAnchor.zPosition = 25
+
+                // Ornamen spiral runik bercahaya pada batu
+                let rune = SKShapeNode(circleOfRadius: 4.5)
+                rune.fillColor = .clear
+                rune.strokeColor = SKColor(red: 0.65, green: 0.85, blue: 0.65, alpha: 0.7)
+                rune.lineWidth = 1.0
+                rune.position = CGPoint(x: 0, y: 8)
+                stoneAnchor.addChild(rune)
+
                 if idx == 1 {
-                    stoneAnchor.storyLabel("🗿 Batas Aman Desa", at: CGPoint(x: 0, y: 25), size: 9.5, color: SKColor(red: 0.85, green: 0.88, blue: 0.80, alpha: 0.9))
+                    let badge = createWorldBadge(icon: "🗿", title: "Batu Pembatas Kuno", subtitle: "Batas Aman Desa", accentColor: SKColor(red: 0.65, green: 0.85, blue: 0.65, alpha: 1.0))
+                    badge.position = CGPoint(x: 60, y: 35)
+                    stoneAnchor.addChild(badge)
                 }
                 world.addChild(stoneAnchor)
                 boundaryStoneNodes.append(stoneAnchor)
@@ -345,51 +593,69 @@ extension ExplorationScene {
                 hollowContainer.position = CGPoint(x: 850, y: 220)
                 hollowContainer.zPosition = 35
 
-                let darkAura = SKShapeNode(circleOfRadius: 24)
-                darkAura.fillColor = SKColor(red: 0.10, green: 0.05, blue: 0.18, alpha: 0.6)
-                darkAura.strokeColor = SKColor(red: 0.55, green: 0.20, blue: 0.75, alpha: 0.8)
-                darkAura.lineWidth = 1.5
+                // Aura bayangan gelap berviolet pekat
+                let darkAura = SKShapeNode(circleOfRadius: 28)
+                darkAura.fillColor = SKColor(red: 0.08, green: 0.03, blue: 0.16, alpha: 0.75)
+                darkAura.strokeColor = SKColor(red: 0.65, green: 0.25, blue: 0.88, alpha: 0.9)
+                darkAura.lineWidth = 1.8
                 hollowContainer.addChild(darkAura)
                 darkAura.run(.repeatForever(.sequence([
-                    .scale(to: 1.25, duration: 1.1),
-                    .scale(to: 0.9, duration: 1.1)
+                    .scale(to: 1.25, duration: 1.2),
+                    .scale(to: 0.90, duration: 1.2)
                 ])))
 
-                let phantomBody = SKShapeNode(rectOf: CGSize(width: 18, height: 38), cornerRadius: 8)
-                phantomBody.fillColor = SKColor(red: 0.05, green: 0.04, blue: 0.08, alpha: 0.95)
-                phantomBody.strokeColor = SKColor(red: 0.35, green: 0.15, blue: 0.50, alpha: 0.8)
-                phantomBody.lineWidth = 1.0
+                // Badan bayangan
+                let phantomBody = SKShapeNode(rectOf: CGSize(width: 20, height: 42), cornerRadius: 9)
+                phantomBody.fillColor = SKColor(red: 0.04, green: 0.02, blue: 0.07, alpha: 0.98)
+                phantomBody.strokeColor = SKColor(red: 0.45, green: 0.18, blue: 0.65, alpha: 0.85)
+                phantomBody.lineWidth = 1.2
                 hollowContainer.addChild(phantomBody)
 
-                let eyeL = SKShapeNode(circleOfRadius: 2.2)
-                eyeL.fillColor = SKColor(red: 0.7, green: 0.85, blue: 1.0, alpha: 0.95)
+                // Sepasang mata dingin menyala di kegelapan
+                let eyeL = SKShapeNode(circleOfRadius: 2.5)
+                eyeL.fillColor = SKColor(red: 0.75, green: 0.90, blue: 1.0, alpha: 0.98)
                 eyeL.strokeColor = .clear
-                eyeL.position = CGPoint(x: -4, y: 9)
-                let eyeR = SKShapeNode(circleOfRadius: 2.2)
-                eyeR.fillColor = SKColor(red: 0.7, green: 0.85, blue: 1.0, alpha: 0.95)
+                eyeL.position = CGPoint(x: -4.5, y: 11)
+                let eyeR = SKShapeNode(circleOfRadius: 2.5)
+                eyeR.fillColor = SKColor(red: 0.75, green: 0.90, blue: 1.0, alpha: 0.98)
                 eyeR.strokeColor = .clear
-                eyeR.position = CGPoint(x: 4, y: 9)
+                eyeR.position = CGPoint(x: 4.5, y: 11)
                 hollowContainer.addChild(eyeL)
                 hollowContainer.addChild(eyeR)
 
-                hollowContainer.run(.repeatForever(.sequence([
-                    .moveBy(x: 0, y: 5, duration: 1.2),
-                    .moveBy(x: 0, y: -5, duration: 1.2)
+                // Kedip misterius pada mata Hollow
+                eyeL.run(.repeatForever(.sequence([
+                    .wait(forDuration: 2.5),
+                    .scaleY(to: 0.1, duration: 0.12),
+                    .scaleY(to: 1.0, duration: 0.12)
+                ])))
+                eyeR.run(.repeatForever(.sequence([
+                    .wait(forDuration: 2.5),
+                    .scaleY(to: 0.1, duration: 0.12),
+                    .scaleY(to: 1.0, duration: 0.12)
                 ])))
 
-                hollowContainer.storyLabel("👁️ Sosok Bayangan", at: CGPoint(x: 0, y: 30), size: 10, color: SKColor(red: 0.85, green: 0.70, blue: 1.0, alpha: 0.95))
+                // Gerak mengambang di udara
+                hollowContainer.run(.repeatForever(.sequence([
+                    .moveBy(x: 0, y: 6, duration: 1.3),
+                    .moveBy(x: 0, y: -6, duration: 1.3)
+                ])))
+
+                let badge = createWorldBadge(icon: "👁️", title: "Sosok Bayangan", subtitle: "The Hollow di Balik Kabut", accentColor: SKColor(red: 0.78, green: 0.45, blue: 0.95, alpha: 1.0))
+                badge.position = CGPoint(x: 0, y: 38)
+                hollowContainer.addChild(badge)
+
                 world.addChild(hollowContainer)
                 self.hollowNode = hollowContainer
             }
 
             // 4. Exit Sign to Village (50, 110)
-            let exitSignH = SKShapeNode(rectOf: CGSize(width: 65, height: 45), cornerRadius: 6)
-            exitSignH.position = CGPoint(x: 50, y: 110)
-            exitSignH.fillColor = SKColor(red: 0.18, green: 0.25, blue: 0.20, alpha: 0.8)
-            exitSignH.strokeColor = SKColor(red: 0.75, green: 0.80, blue: 0.60, alpha: 0.9)
-            exitSignH.zPosition = 25
-            exitSignH.storyLabel("🏡 Ke Desa", at: CGPoint(x: 0, y: 0), size: 10, color: .white)
-            world.addChild(exitSignH)
+            let exitNode = SKNode()
+            exitNode.position = CGPoint(x: 50, y: 110)
+            exitNode.zPosition = 25
+            let exitBadge = createWorldBadge(icon: "🏡", title: "Jalur ke Desa", subtitle: "Kakek Beryn", accentColor: SKColor(red: 0.72, green: 0.85, blue: 0.58, alpha: 1.0))
+            exitNode.addChild(exitBadge)
+            world.addChild(exitNode)
 
         case .woodcutterSlope:
             // 1. Tumpukan kayu bakar di (180, 140)
@@ -397,12 +663,25 @@ extension ExplorationScene {
             woodContainer.name = "woodcutterLogs"
             woodContainer.position = CGPoint(x: 180, y: 140)
             woodContainer.zPosition = 25
-            let logStack = SKShapeNode(rectOf: CGSize(width: 38, height: 22), cornerRadius: 4)
-            logStack.fillColor = SKColor(red: 0.45, green: 0.32, blue: 0.20, alpha: 0.9)
-            logStack.strokeColor = SKColor(red: 0.75, green: 0.58, blue: 0.38, alpha: 0.9)
-            logStack.lineWidth = 1.5
+
+            let logStack = SKShapeNode(rectOf: CGSize(width: 42, height: 24), cornerRadius: 4)
+            logStack.fillColor = SKColor(red: 0.48, green: 0.35, blue: 0.22, alpha: 0.95)
+            logStack.strokeColor = SKColor(red: 0.85, green: 0.65, blue: 0.42, alpha: 0.95)
+            logStack.lineWidth = 1.6
             woodContainer.addChild(logStack)
-            woodContainer.storyLabel("🪵 Kayu Bakar", at: CGPoint(x: 0, y: 18), size: 10, color: SKColor(red: 0.95, green: 0.88, blue: 0.70, alpha: 0.95))
+
+            // Kapak kecil penebang
+            let axe = SKShapeNode(rectOf: CGSize(width: 3, height: 16), cornerRadius: 1)
+            axe.fillColor = SKColor(red: 0.65, green: 0.48, blue: 0.30, alpha: 1.0)
+            axe.strokeColor = .clear
+            axe.zRotation = -0.4
+            axe.position = CGPoint(x: 8, y: 6)
+            woodContainer.addChild(axe)
+
+            let badge = createWorldBadge(icon: "🪵", title: "Kayu Bakar Kering", subtitle: "Jalur Pencari Kayu", accentColor: SKColor(red: 0.95, green: 0.75, blue: 0.38, alpha: 1.0))
+            badge.position = CGPoint(x: 0, y: 28)
+            woodContainer.addChild(badge)
+
             world.addChild(woodContainer)
             self.firewoodNode = woodContainer
 
@@ -413,45 +692,64 @@ extension ExplorationScene {
                 eliasContainer.position = CGPoint(x: 480, y: 220)
                 eliasContainer.zPosition = 35
 
-                let goldAura = SKShapeNode(circleOfRadius: 20)
-                goldAura.fillColor = SKColor(red: 1.0, green: 0.85, blue: 0.30, alpha: 0.25)
-                goldAura.strokeColor = SKColor(red: 1.0, green: 0.90, blue: 0.50, alpha: 0.8)
-                goldAura.lineWidth = 1.5
+                // Suar emas penemuan
+                let goldAura = SKShapeNode(circleOfRadius: 24)
+                goldAura.fillColor = SKColor(red: 1.0, green: 0.85, blue: 0.30, alpha: 0.28)
+                goldAura.strokeColor = SKColor(red: 1.0, green: 0.92, blue: 0.55, alpha: 0.85)
+                goldAura.lineWidth = 1.6
                 eliasContainer.addChild(goldAura)
                 goldAura.run(.repeatForever(.sequence([
-                    .scale(to: 1.25, duration: 0.8),
-                    .scale(to: 0.95, duration: 0.8)
+                    .scale(to: 1.25, duration: 0.85),
+                    .scale(to: 0.95, duration: 0.85)
                 ])))
 
-                let bookCover = SKShapeNode(rectOf: CGSize(width: 18, height: 14), cornerRadius: 2.5)
-                bookCover.fillColor = SKColor(red: 0.50, green: 0.28, blue: 0.16, alpha: 1.0)
-                bookCover.strokeColor = SKColor(red: 0.95, green: 0.85, blue: 0.55, alpha: 1.0)
-                bookCover.lineWidth = 1.2
+                // Buku Elias bersampul kulit tua
+                let bookCover = SKShapeNode(rectOf: CGSize(width: 22, height: 16), cornerRadius: 3)
+                bookCover.fillColor = SKColor(red: 0.52, green: 0.26, blue: 0.14, alpha: 1.0)
+                bookCover.strokeColor = SKColor(red: 0.98, green: 0.88, blue: 0.55, alpha: 1.0)
+                bookCover.lineWidth = 1.4
                 eliasContainer.addChild(bookCover)
 
-                eliasContainer.storyLabel(progress.gatheredWood ? "📖 Buku Catatan Elias" : "🔍 Celah Akar & Longsor", at: CGPoint(x: 0, y: 22), size: 10, color: SKColor(red: 1.0, green: 0.92, blue: 0.65, alpha: 0.95))
+                // Simbol bintang emas di sampul
+                let star = SKLabelNode(text: "✦")
+                star.fontSize = 11
+                star.fontColor = SKColor(red: 0.98, green: 0.90, blue: 0.45, alpha: 1.0)
+                star.verticalAlignmentMode = .center
+                eliasContainer.addChild(star)
+
+                let eliasBadge = createWorldBadge(
+                    icon: "📖",
+                    title: progress.gatheredWood ? "Buku Catatan Elias" : "Celah Akar & Longsor",
+                    subtitle: progress.gatheredWood ? "Terselip di Sela Akar" : "Bisa Diperiksa",
+                    accentColor: SKColor(red: 1.0, green: 0.85, blue: 0.35, alpha: 1.0)
+                )
+                eliasBadge.position = CGPoint(x: 0, y: 32)
+                eliasContainer.addChild(eliasBadge)
+
                 world.addChild(eliasContainer)
                 self.eliasBookNode = eliasContainer
             }
 
             // 3. Exit Sign to Village (45, 210)
-            let exitSignW = SKShapeNode(rectOf: CGSize(width: 65, height: 45), cornerRadius: 6)
-            exitSignW.position = CGPoint(x: 45, y: 210)
-            exitSignW.fillColor = SKColor(red: 0.18, green: 0.25, blue: 0.20, alpha: 0.8)
-            exitSignW.strokeColor = SKColor(red: 0.75, green: 0.80, blue: 0.60, alpha: 0.9)
-            exitSignW.zPosition = 25
-            exitSignW.storyLabel("🏡 Ke Desa", at: CGPoint(x: 0, y: 0), size: 10, color: .white)
-            world.addChild(exitSignW)
+            let exitNode = SKNode()
+            exitNode.position = CGPoint(x: 45, y: 210)
+            exitNode.zPosition = 25
+            let exitBadge = createWorldBadge(icon: "🏡", title: "Jalur ke Desa", subtitle: "Wilayah Warga", accentColor: SKColor(red: 0.72, green: 0.85, blue: 0.58, alpha: 1.0))
+            exitNode.addChild(exitBadge)
+            world.addChild(exitNode)
 
         case .theBoundary:
             // 1. Lingkaran 12 Batu Kumpul Sahabat di (420, 200)
             let ring = SKShapeNode(circleOfRadius: 48)
             ring.position = CGPoint(x: 420, y: 200)
-            ring.strokeColor = SKColor(red: 0.85, green: 0.80, blue: 0.55, alpha: 0.85)
+            ring.strokeColor = SKColor(red: 0.88, green: 0.82, blue: 0.55, alpha: 0.9)
             ring.fillColor = SKColor(white: 1, alpha: 0.05)
             ring.lineWidth = 2.0
             world.addChild(ring)
-            ring.storyLabel("Titik Kumpul Ekspedisi", at: CGPoint(x: 0, y: -60), size: 10, color: SKColor(red: 0.95, green: 0.92, blue: 0.75, alpha: 0.95))
+
+            let councilBadge = createWorldBadge(icon: "⚔️", title: "Titik Kumpul Ekspedisi", subtitle: "Arthur & 3 Sahabat", accentColor: SKColor(red: 0.95, green: 0.88, blue: 0.55, alpha: 1.0))
+            councilBadge.position = CGPoint(x: 420, y: 140)
+            world.addChild(councilBadge)
 
             // Sahabat berdiri di titik kumpul
             if companions.isEmpty {
@@ -471,28 +769,32 @@ extension ExplorationScene {
             treeAnchor.position = CGPoint(x: 335, y: 225)
             treeAnchor.zPosition = 35
 
-            let treeAura = SKShapeNode(circleOfRadius: 24)
-            treeAura.fillColor = SKColor(red: 0.95, green: 0.45, blue: 0.20, alpha: 0.22)
-            treeAura.strokeColor = SKColor(red: 1.0, green: 0.60, blue: 0.25, alpha: 0.8)
-            treeAura.lineWidth = 1.5
+            let treeAura = SKShapeNode(circleOfRadius: 26)
+            treeAura.fillColor = SKColor(red: 0.96, green: 0.45, blue: 0.20, alpha: 0.25)
+            treeAura.strokeColor = SKColor(red: 1.0, green: 0.65, blue: 0.25, alpha: 0.85)
+            treeAura.lineWidth = 1.6
             treeAnchor.addChild(treeAura)
             treeAura.run(.repeatForever(.sequence([
-                .scale(to: 1.25, duration: 0.9),
-                .scale(to: 0.95, duration: 0.9)
+                .scale(to: 1.25, duration: 0.95),
+                .scale(to: 0.95, duration: 0.95)
             ])))
 
-            let ribbonFlag = SKShapeNode(rectOf: CGSize(width: 14, height: 8), cornerRadius: 2)
-            ribbonFlag.fillColor = SKColor(red: 0.96, green: 0.35, blue: 0.15, alpha: 1.0)
+            // Pita sutra jingga terang berkibar
+            let ribbonFlag = SKShapeNode(rectOf: CGSize(width: 16, height: 9), cornerRadius: 2)
+            ribbonFlag.fillColor = SKColor(red: 0.98, green: 0.35, blue: 0.15, alpha: 1.0)
             ribbonFlag.strokeColor = .white
             ribbonFlag.lineWidth = 1.0
-            ribbonFlag.position = CGPoint(x: 12, y: 14)
+            ribbonFlag.position = CGPoint(x: 14, y: 14)
             treeAnchor.addChild(ribbonFlag)
             ribbonFlag.run(.repeatForever(.sequence([
-                .scaleX(to: 0.7, duration: 0.4),
-                .scaleX(to: 1.0, duration: 0.4)
+                .scaleX(to: 0.65, duration: 0.35),
+                .scaleX(to: 1.0, duration: 0.35)
             ])))
 
-            treeAnchor.storyLabel("🎗️ Pohon Batas (Tanda 'X' & Pita)", at: CGPoint(x: 0, y: 30), size: 10, color: SKColor(red: 1.0, green: 0.88, blue: 0.65, alpha: 0.95))
+            let treeBadge = createWorldBadge(icon: "🎗️", title: "Pohon Batas", subtitle: "Torehan 'X' & Pita Terang", accentColor: SKColor(red: 0.98, green: 0.45, blue: 0.22, alpha: 1.0))
+            treeBadge.position = CGPoint(x: 0, y: 36)
+            treeAnchor.addChild(treeBadge)
+
             world.addChild(treeAnchor)
             self.boundaryTreeNode = treeAnchor
 
@@ -502,17 +804,20 @@ extension ExplorationScene {
             gateContainer.position = CGPoint(x: 920, y: 240)
             gateContainer.zPosition = 35
 
-            let gateArch = SKShapeNode(rectOf: CGSize(width: 70, height: 95), cornerRadius: 12)
-            gateArch.fillColor = SKColor(red: 0.10, green: 0.16, blue: 0.12, alpha: 0.45)
-            gateArch.strokeColor = SKColor(red: 0.70, green: 0.85, blue: 0.65, alpha: 0.95)
-            gateArch.lineWidth = 2.5
+            let gateArch = SKShapeNode(rectOf: CGSize(width: 76, height: 105), cornerRadius: 14)
+            gateArch.fillColor = SKColor(red: 0.08, green: 0.18, blue: 0.12, alpha: 0.5)
+            gateArch.strokeColor = SKColor(red: 0.65, green: 0.95, blue: 0.70, alpha: 0.95)
+            gateArch.lineWidth = 2.8
             gateContainer.addChild(gateArch)
             gateArch.run(.repeatForever(.sequence([
-                .fadeAlpha(to: 0.45, duration: 1.2),
-                .fadeAlpha(to: 1.0, duration: 1.2)
+                .fadeAlpha(to: 0.4, duration: 1.3),
+                .fadeAlpha(to: 1.0, duration: 1.3)
             ])))
 
-            gateContainer.storyLabel("🌲 Menuju Deep Woods (Map C)", at: CGPoint(x: 0, y: 62), size: 11, color: SKColor(red: 0.85, green: 0.95, blue: 0.80, alpha: 1.0))
+            let gateBadge = createWorldBadge(icon: "🌲", title: "Gerbang Deep Woods", subtitle: "Menuju Map C (Hutan Luar)", accentColor: SKColor(red: 0.50, green: 0.95, blue: 0.65, alpha: 1.0))
+            gateBadge.position = CGPoint(x: 0, y: 70)
+            gateContainer.addChild(gateBadge)
+
             world.addChild(gateContainer)
             self.deepWoodsGateNode = gateContainer
         }
@@ -789,47 +1094,146 @@ extension ExplorationScene {
     func buildHUD() {
         hud.removeAllChildren()
 
-        // 1. Kapsul tujuan misi melayang di atas tengah (Carto floating pill)
-        let objWidth = min(size.width * 0.52, 460)
-        let objBg = SKShapeNode(rectOf: CGSize(width: objWidth, height: 36), cornerRadius: 18)
-        objBg.fillColor = SKColor(red: 0.12, green: 0.16, blue: 0.14, alpha: 0.88)
-        objBg.strokeColor = SKColor(red: 0.88, green: 0.80, blue: 0.55, alpha: 0.45)
-        objBg.lineWidth = 1.2
-        objBg.position = CGPoint(x: size.width / 2, y: size.height - 34)
-        hud.addChild(objBg)
+        if entry.region == .boundary {
+            let stage = progress.mapBStage
+            let stageColor: SKColor
+            let stageIndex: Int
 
-        objective = hud.storyLabel(progress.currentObjective(for: entry.region), at: CGPoint(x: size.width / 2, y: size.height - 34), size: 13, width: objWidth - 28)
-        objective.fontColor = SKColor(red: 0.98, green: 0.94, blue: 0.82, alpha: 1)
+            switch stage {
+            case .rockSalt:
+                stageColor = SKColor(red: 0.45, green: 0.88, blue: 0.98, alpha: 1.0)
+                stageIndex = 1
+            case .herbalHills:
+                stageColor = SKColor(red: 0.55, green: 0.92, blue: 0.45, alpha: 1.0)
+                stageIndex = 2
+            case .woodcutterSlope:
+                stageColor = SKColor(red: 0.95, green: 0.75, blue: 0.38, alpha: 1.0)
+                stageIndex = 3
+            case .theBoundary:
+                stageColor = SKColor(red: 0.98, green: 0.45, blue: 0.25, alpha: 1.0)
+                stageIndex = 4
+            }
 
-        // 2. Tombol kembali ke foto floating di kanan atas
-        let photoBtn = hud.storyButton("Kembali ke foto", name: "photo", at: CGPoint(x: size.width - 92, y: size.height - 34), width: 145)
-        photoBtn.fillColor = SKColor(red: 0.12, green: 0.16, blue: 0.14, alpha: 0.88)
-        photoBtn.strokeColor = SKColor(red: 0.88, green: 0.80, blue: 0.55, alpha: 0.5)
+            // Container header terpadu Map B
+            let headerW = min(size.width - 240, 560)
+            let headerH: CGFloat = 58
+            let headerNode = SKNode()
+            headerNode.position = CGPoint(x: size.width / 2, y: size.height - headerH / 2 - 8)
+            hud.addChild(headerNode)
 
-        // Tombol DEBUG
-        addDebugButton()
+            // 1. Latar kaca gelap Carto dengan lis emas
+            let headerBg = SKShapeNode(rectOf: CGSize(width: headerW, height: headerH), cornerRadius: 16)
+            headerBg.fillColor = SKColor(red: 0.08, green: 0.11, blue: 0.13, alpha: 0.95)
+            headerBg.strokeColor = SKColor(red: 0.88, green: 0.78, blue: 0.45, alpha: 0.80)
+            headerBg.lineWidth = 1.6
+            headerNode.addChild(headerBg)
 
-        // 3. Tombol tas floating di kanan bawah
-        let bagBtn = hud.storyButton("Tas", name: "bag", at: CGPoint(x: size.width - 65, y: 55), width: 90)
-        bagBtn.fillColor = SKColor(red: 0.12, green: 0.16, blue: 0.14, alpha: 0.88)
-        bagBtn.strokeColor = SKColor(red: 0.88, green: 0.80, blue: 0.55, alpha: 0.5)
+            // Inner subtle border
+            let innerBorder = SKShapeNode(rectOf: CGSize(width: headerW - 6, height: headerH - 6), cornerRadius: 13)
+            innerBorder.fillColor = .clear
+            innerBorder.strokeColor = stageColor.withAlphaComponent(0.35)
+            innerBorder.lineWidth = 1.0
+            headerNode.addChild(innerBorder)
 
-        // 4. Stik analog floating di kiri bawah
-        let stick = SKShapeNode(circleOfRadius: 44)
-        stick.position = stickCenter
-        stick.fillColor = SKColor(white: 0.08, alpha: 0.45)
-        stick.strokeColor = SKColor(white: 1, alpha: 0.28)
-        stick.lineWidth = 1.5
-        hud.addChild(stick)
+            // 2. Baris Atas: Stepper 4 Tahap Terhubung
+            let stepperIcons = ["🧂", "🌿", "🪵", "🎗️"]
+            let stepperNames = ["Rock Salt", "Herbal", "Kayu", "Boundary"]
+            let stepSpacing: CGFloat = min((headerW - 90) / 3.0, 105)
+            let stepperStartX: CGFloat = -CGFloat(stepperIcons.count - 1) * stepSpacing / 2
 
-        stickKnob = SKShapeNode(circleOfRadius: 18)
-        stickKnob.position = stickCenter
-        stickKnob.fillColor = SKColor(white: 1, alpha: 0.45)
-        stickKnob.strokeColor = .clear
-        hud.addChild(stickKnob)
+            // Garis rel penghubung antar tahap
+            let lineTrack = SKShapeNode(rectOf: CGSize(width: CGFloat(stepperIcons.count - 1) * stepSpacing, height: 2), cornerRadius: 1)
+            lineTrack.fillColor = SKColor(white: 1.0, alpha: 0.22)
+            lineTrack.strokeColor = .clear
+            lineTrack.position = CGPoint(x: 0, y: 12)
+            headerNode.addChild(lineTrack)
 
-        // 5. Indikator kecurigaan di bawah kapsul misi
-        suspicionLabel = hud.storyLabel("Aman", at: CGPoint(x: size.width / 2, y: size.height - 58), size: 11, color: .lightGray)
+            for i in 0..<stepperIcons.count {
+                let sx = stepperStartX + CGFloat(i) * stepSpacing
+                let stepNumber = i + 1
+                let isCompleted = stepNumber < stageIndex
+                let isCurrent = stepNumber == stageIndex
+
+                let pipW: CGFloat = isCurrent ? 68 : 22
+                let pipH: CGFloat = 20
+                let pip = SKShapeNode(rectOf: CGSize(width: pipW, height: pipH), cornerRadius: 10)
+                pip.position = CGPoint(x: sx, y: 12)
+                pip.lineWidth = 1.4
+
+                if isCurrent {
+                    pip.fillColor = stageColor.withAlphaComponent(0.35)
+                    pip.strokeColor = stageColor
+
+                    // Pulsing glow aura di tahap aktif
+                    let aura = SKShapeNode(rectOf: CGSize(width: pipW + 8, height: pipH + 8), cornerRadius: 14)
+                    aura.fillColor = .clear
+                    aura.strokeColor = stageColor.withAlphaComponent(0.65)
+                    aura.lineWidth = 1.2
+                    pip.addChild(aura)
+                    aura.run(.repeatForever(.sequence([
+                        .scale(to: 1.15, duration: 0.8),
+                        .scale(to: 0.95, duration: 0.8)
+                    ])))
+
+                    let pipLbl = SKLabelNode(text: "\(stepperIcons[i]) \(stepperNames[i])")
+                    pipLbl.fontName = "AvenirNext-Bold"
+                    pipLbl.fontSize = 9.5
+                    pipLbl.fontColor = SKColor(red: 0.98, green: 0.98, blue: 0.96, alpha: 1.0)
+                    pipLbl.verticalAlignmentMode = .center
+                    pip.addChild(pipLbl)
+                } else if isCompleted {
+                    pip.fillColor = SKColor(red: 0.25, green: 0.72, blue: 0.35, alpha: 0.45)
+                    pip.strokeColor = SKColor(red: 0.45, green: 0.88, blue: 0.52, alpha: 0.95)
+
+                    let pipLbl = SKLabelNode(text: "✓")
+                    pipLbl.fontName = "AvenirNext-Bold"
+                    pipLbl.fontSize = 11
+                    pipLbl.fontColor = SKColor(red: 0.55, green: 0.95, blue: 0.60, alpha: 1.0)
+                    pipLbl.verticalAlignmentMode = .center
+                    pip.addChild(pipLbl)
+                } else {
+                    pip.fillColor = SKColor(white: 0.15, alpha: 0.75)
+                    pip.strokeColor = SKColor(white: 0.45, alpha: 0.55)
+
+                    let pipLbl = SKLabelNode(text: stepperIcons[i])
+                    pipLbl.fontSize = 10
+                    pipLbl.verticalAlignmentMode = .center
+                    pipLbl.alpha = 0.6
+                    pip.addChild(pipLbl)
+                }
+                headerNode.addChild(pip)
+            }
+
+            // 3. Baris Bawah: Misi Aktif dalam Kapsul Emas
+            let objPillW = headerW - 28
+            let objPill = SKShapeNode(rectOf: CGSize(width: objPillW, height: 22), cornerRadius: 11)
+            objPill.fillColor = SKColor(red: 0.12, green: 0.16, blue: 0.15, alpha: 0.92)
+            objPill.strokeColor = SKColor(red: 0.95, green: 0.82, blue: 0.42, alpha: 0.55)
+            objPill.lineWidth = 1.0
+            objPill.position = CGPoint(x: 0, y: -14)
+            headerNode.addChild(objPill)
+
+            let questText = "📜 " + progress.currentObjective(for: entry.region)
+            objective = headerNode.storyLabel(questText, at: CGPoint(x: 0, y: -14), size: 11, width: objPillW - 20)
+            objective.fontColor = SKColor(red: 0.98, green: 0.94, blue: 0.82, alpha: 1.0)
+
+            // Status keamanan zona di bawah header
+            suspicionLabel = hud.storyLabel("🛡️ Status: Aman (Zona Transisi Desa)", at: CGPoint(x: size.width / 2, y: size.height - headerH - 18), size: 10, color: SKColor(red: 0.65, green: 0.88, blue: 0.65, alpha: 0.9))
+        } else {
+            // Standard single-pill HUD
+            let objWidth = min(size.width * 0.52, 460)
+            let objBg = SKShapeNode(rectOf: CGSize(width: objWidth, height: 36), cornerRadius: 18)
+            objBg.fillColor = SKColor(red: 0.12, green: 0.16, blue: 0.14, alpha: 0.88)
+            objBg.strokeColor = SKColor(red: 0.88, green: 0.80, blue: 0.55, alpha: 0.45)
+            objBg.lineWidth = 1.2
+            objBg.position = CGPoint(x: size.width / 2, y: size.height - 34)
+            hud.addChild(objBg)
+
+            objective = hud.storyLabel(progress.currentObjective(for: entry.region), at: CGPoint(x: size.width / 2, y: size.height - 34), size: 13, width: objWidth - 28)
+            objective.fontColor = SKColor(red: 0.98, green: 0.94, blue: 0.82, alpha: 1)
+
+            suspicionLabel = hud.storyLabel("Aman", at: CGPoint(x: size.width / 2, y: size.height - 58), size: 11, color: .lightGray)
+        }
 
         // 6. Petunjuk kontrol halus di bagian bawah
         let hint = hud.storyLabel("Berlindung di balik benda • Bidang kuning = pandangan warga",
@@ -858,6 +1262,9 @@ extension ExplorationScene {
 
         hudInteractButton = interactBtn
         hudInteractLabel = interactLbl
+
+        // Tombol Debug di pojok kanan atas
+        addDebugButton()
 
         updateBookAccess()
     }
@@ -903,6 +1310,20 @@ extension ExplorationScene {
         case .deepWoodsGate:
             text = "🌲 Masuki Deep Woods"
         }
+        let accentColor: SKColor
+        switch target {
+        case .rockSalt: accentColor = SKColor(red: 0.45, green: 0.88, blue: 0.98, alpha: 1.0)
+        case .darkMineEntrance: accentColor = SKColor(red: 0.95, green: 0.55, blue: 0.25, alpha: 1.0)
+        case .herbalPlant: accentColor = SKColor(red: 0.98, green: 0.88, blue: 0.25, alpha: 1.0)
+        case .boundaryStone: accentColor = SKColor(red: 0.65, green: 0.85, blue: 0.65, alpha: 1.0)
+        case .hollowEncounter: accentColor = SKColor(red: 0.78, green: 0.45, blue: 0.95, alpha: 1.0)
+        case .firewood: accentColor = SKColor(red: 0.95, green: 0.75, blue: 0.38, alpha: 1.0)
+        case .landslideEliasBook: accentColor = SKColor(red: 1.0, green: 0.85, blue: 0.35, alpha: 1.0)
+        case .boundaryTreeMarker: accentColor = SKColor(red: 0.98, green: 0.45, blue: 0.22, alpha: 1.0)
+        case .deepWoodsGate: accentColor = SKColor(red: 0.50, green: 0.95, blue: 0.65, alpha: 1.0)
+        default: accentColor = SKColor(red: 0.98, green: 0.84, blue: 0.42, alpha: 1.0)
+        }
+        btn.strokeColor = accentColor
         lbl.text = text
         if btn.isHidden || btn.alpha < 0.1 {
             btn.isHidden = false
@@ -1013,6 +1434,20 @@ extension ExplorationScene {
         root.name = "contextInteract"
         root.zPosition = 90
 
+        let accentColor: SKColor
+        switch target {
+        case .rockSalt: accentColor = SKColor(red: 0.45, green: 0.88, blue: 0.98, alpha: 1.0)
+        case .darkMineEntrance: accentColor = SKColor(red: 0.95, green: 0.55, blue: 0.25, alpha: 1.0)
+        case .herbalPlant: accentColor = SKColor(red: 0.98, green: 0.88, blue: 0.25, alpha: 1.0)
+        case .boundaryStone: accentColor = SKColor(red: 0.65, green: 0.85, blue: 0.65, alpha: 1.0)
+        case .hollowEncounter: accentColor = SKColor(red: 0.78, green: 0.45, blue: 0.95, alpha: 1.0)
+        case .firewood: accentColor = SKColor(red: 0.95, green: 0.75, blue: 0.38, alpha: 1.0)
+        case .landslideEliasBook: accentColor = SKColor(red: 1.0, green: 0.85, blue: 0.35, alpha: 1.0)
+        case .boundaryTreeMarker: accentColor = SKColor(red: 0.98, green: 0.45, blue: 0.22, alpha: 1.0)
+        case .deepWoodsGate: accentColor = SKColor(red: 0.50, green: 0.95, blue: 0.65, alpha: 1.0)
+        default: accentColor = SKColor(red: 1.0, green: 0.85, blue: 0.42, alpha: 1.0)
+        }
+
         // 1. Area sentuh toleran tak terlihat (radius 65pt) untuk menangkap ketukan di sekitar target
         let hitArea = SKShapeNode(circleOfRadius: 65)
         hitArea.name = "contextInteract"
@@ -1021,13 +1456,13 @@ extension ExplorationScene {
         hitArea.zPosition = -1
         root.addChild(hitArea)
 
-        // 2. Lingkaran sorot interaksi emas Carto di tanah (pulsing ground indicator)
+        // 2. Lingkaran sorot interaksi berdenyut di tanah (pulsing ground indicator)
         let groundRadius: CGFloat = target == .book ? 26 : 32
         let groundRing = SKShapeNode(circleOfRadius: groundRadius)
         groundRing.name = "contextInteract"
-        groundRing.strokeColor = SKColor(red: 1.0, green: 0.85, blue: 0.40, alpha: 0.95)
-        groundRing.fillColor = SKColor(red: 1.0, green: 0.82, blue: 0.30, alpha: 0.18)
-        groundRing.lineWidth = 2.5
+        groundRing.strokeColor = accentColor
+        groundRing.fillColor = accentColor.withAlphaComponent(0.20)
+        groundRing.lineWidth = 2.4
         groundRing.position = CGPoint(x: 0, y: -4)
         root.addChild(groundRing)
         groundRing.run(.repeatForever(.sequence([
@@ -1038,7 +1473,7 @@ extension ExplorationScene {
         // Cincin aura halus
         let outerAura = SKShapeNode(circleOfRadius: groundRadius + 8)
         outerAura.name = "contextInteract"
-        outerAura.strokeColor = SKColor(red: 1.0, green: 0.92, blue: 0.60, alpha: 0.4)
+        outerAura.strokeColor = accentColor.withAlphaComponent(0.40)
         outerAura.fillColor = .clear
         outerAura.lineWidth = 1.0
         outerAura.position = CGPoint(x: 0, y: -4)
@@ -1105,8 +1540,8 @@ extension ExplorationScene {
 
         let bubbleY: CGFloat = target == .book ? 50 : 62
         let button = root.storyButton(title, name: "contextInteract", at: CGPoint(x: 0, y: bubbleY), width: width)
-        button.fillColor = SKColor(red: 0.16, green: 0.22, blue: 0.17, alpha: 0.97)
-        button.strokeColor = SKColor(red: 1.0, green: 0.85, blue: 0.42, alpha: 1.0)
+        button.fillColor = SKColor(red: 0.12, green: 0.16, blue: 0.14, alpha: 0.96)
+        button.strokeColor = accentColor
         button.lineWidth = 2.0
 
         let pointer = SKShapeNode(path: {
@@ -1119,7 +1554,7 @@ extension ExplorationScene {
         }())
         pointer.name = "contextInteract"
         pointer.fillColor = button.fillColor
-        pointer.strokeColor = button.strokeColor
+        pointer.strokeColor = accentColor
         root.addChild(pointer)
 
         // Animasi melayang naik-turun lembut (bobbing)

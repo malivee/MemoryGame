@@ -6,7 +6,16 @@ import CoreGraphics
 
 enum VillageAccess: Int, CaseIterable {
     case opening = 1, barnRoute, wholeVillage
-    var title: String { ["1 · Rumah & sumur", "2 · Jalur lumbung", "3 · Seluruh desa"][rawValue - 1] }
+    case maraYard, rolandRoute
+    var title: String {
+        switch self {
+        case .opening: return "Rumah & sumur"
+        case .maraYard: return "Halaman Bu Mara"
+        case .barnRoute: return "Jalur lumbung"
+        case .rolandRoute: return "Kandang Roland"
+        case .wholeVillage: return "Seluruh desa"
+        }
+    }
 }
 struct VillageLandmark {
     let id: String
@@ -26,7 +35,7 @@ enum VillageMap {
     static let landmarks: [VillageLandmark] = [
         .init(id: "arthur", name: "Rumah Arthur & Kakek", rect: CGRect(x: 280, y: 570, width: 260, height: 195), stage: .opening,
               detail: "Teras kayu, meja, tungku, dan ambang pintu tempat Kakek memantau jalan."),
-        .init(id: "mara", name: "Rumah Bu Mara", rect: CGRect(x: 1160, y: 570, width: 230, height: 185), stage: .opening,
+        .init(id: "mara", name: "Rumah Bu Mara", rect: CGRect(x: 1160, y: 570, width: 230, height: 185), stage: .barnRoute,
               detail: "Halaman dekat sumur: pot tanah liat, rak miring, genangan cucian, dan pecahan bata."),
         .init(id: "barn", name: "Lumbung Desa", rect: CGRect(x: 1020, y: 1060, width: 300, height: 205), stage: .barnRoute,
               detail: "Lumbung Keneth: karung panen, dinding lembap, papan lapuk, dan engsel pintu miring."),
@@ -68,9 +77,21 @@ enum VillageMap {
     }
     // Gabungan area akses bertahap mencegah pemain memutari ujung sebuah invisible wall.
     static func accessible(_ point: CGPoint, stage: VillageAccess) -> Bool {
-        if stage == .wholeVillage { return bounds.insetBy(dx: 36, dy: 36).contains(point) }
-        let opening = CGRect(x: 110, y: 445, width: 1440, height: 435)
+        accessibleAreas(stage: stage).contains { $0.contains(point) }
+    }
+    static func accessibleAreas(stage: VillageAccess) -> [CGRect] {
+        if stage == .wholeVillage { return [bounds.insetBy(dx: 36, dy: 36)] }
+        // Termasuk Rumah Arthur, Kakek, sumur, dan Rumah Bu Mara pada progresi awal.
+        let opening = CGRect(x: 250, y: 445, width: 1180, height: 495)
+        let villageRoad = CGRect(x: 110, y: 445, width: 1440, height: 435)
         let barn = CGRect(x: 690, y: 820, width: 770, height: 570)
-        return opening.contains(point) || (stage == .barnRoute && barn.contains(point))
+        switch stage {
+        case .opening: return [opening]
+        case .maraYard: return [opening, villageRoad]
+        case .barnRoute: return [opening, villageRoad, barn]
+        case .rolandRoute:
+            return [opening, villageRoad, barn, CGRect(x: 1050, y: 285, width: 580, height: 270)]
+        case .wholeVillage: return [bounds]
+        }
     }
 }

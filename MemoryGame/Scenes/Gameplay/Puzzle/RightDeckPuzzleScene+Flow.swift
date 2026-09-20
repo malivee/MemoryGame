@@ -10,6 +10,7 @@ extension RightDeckPuzzleScene {
         trackedTouch = nil
         dragPiece = nil
         let village = VillagePrototypeScene(size: view.bounds.size)
+        village.storyProgress = progress
         village.scaleMode = .resizeFill
         village.onExit = { [weak view] in
             guard let view else { return }

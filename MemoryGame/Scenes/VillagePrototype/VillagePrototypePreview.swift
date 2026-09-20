@@ -4,7 +4,7 @@
 import SwiftUI
 import SpriteKit
 struct VillagePrototypePreview: UIViewRepresentable {
-    var access: VillageAccess = .wholeVillage
+    var access: VillageAccess = .opening
     func makeUIView(context: Context) -> SKView {
         let view = SKView()
         let scene = VillagePrototypeScene(size: view.bounds.size)

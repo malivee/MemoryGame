@@ -78,6 +78,8 @@ final class PrologueProgress: Codable {
     var leftVillage = false
     var noticedChangedRoute = false
     var assembled = false
+    /// Completed story steps. Each completed step grants one additional fragment.
+    var storyProgress = 0
 
     // Map B (Pinggiran / Zona Transisi) progressive unlock flags
     var mapBStage: MapBStage = .rockSalt

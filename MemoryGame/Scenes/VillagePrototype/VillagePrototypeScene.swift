@@ -1,6 +1,6 @@
 // Penjelasan file: VillagePrototypeScene.swift
-// Scene desa terpisah untuk review visual dan eksplorasi. Tidak membaca/menulis save utama.
-// Default semua area terbuka. Tahap 1/2 mensimulasikan invisible wall sesuai Story.docx.
+// Dunia desa memakai progres tersimpan; Canvas tanpa storyProgress tetap menjadi preview mandiri.
+// Awal eksplorasi dibatasi ke rumah Arthur, Kakek, dan sumur.
 import SpriteKit
 final class VillagePrototypeScene: SKScene {
     let mapNode = SKNode(), hud = SKNode()
@@ -8,7 +8,14 @@ final class VillagePrototypeScene: SKScene {
     // Host menentukan tujuan kembali; Canvas tetap dapat berjalan tanpa callback.
     var onExit: (() -> Void)?
     var isLeaving = false
-    var access: VillageAccess = .wholeVillage
+    var access: VillageAccess = .opening
+    var storyProgress: PrologueProgress?
+    let storyNPCs = SKNode()
+    var activeStoryStep: StoryProgressionStep?
+    var dialogueIndex: Int?
+    var isWellConversation = false
+    var wellResidentIndex = 0
+    let storyPanel = SKNode()
     var navigation: VillageNavigation { VillageNavigation(stage: access) }
     var route: [CGPoint] = []
     var overview = false, showBounds = false
@@ -20,25 +27,29 @@ final class VillagePrototypeScene: SKScene {
     var info = SKLabelNode(), stageLabel = SKLabelNode()
     var hintUntil: TimeInterval = 0
     var collisionOverlay = SKNode()
+    let memoryFog = SKCropNode()
     override func didMove(to view: SKView) {
         guard mapNode.parent == nil else { return }
+        if storyProgress == nil { storyProgress = PrologueStore.shared.progress }
         backgroundColor = SKColor(red:0.10,green:0.16,blue:0.13,alpha:1)
         addChild(mapNode); addChild(hud); hud.zPosition=1000
+        if let storyProgress { access = StoryProgression.villageAccess(for: storyProgress) }
         buildMap(); buildHUD(); actor.position=VillageMap.spawn
+        refreshStory()
         updateCamera(immediate: true)
     }
     func setAccess(_ value: VillageAccess) {
         access=value; route=[]; stick = .zero; stickTouch=nil; knob.position=stickCenter
         if !navigation.walkable(actor.position) { actor.position=VillageMap.spawn }
         stageLabel.text="Desa di lembah"
-        updateCollisionOverlay(); updateCamera(immediate: true)
+        updateMemoryFog(); updateCollisionOverlay(); updateCamera(immediate: true)
     }
     // Rumus zoom dan interpolasi sama dengan ExplorationScene bawaan proyek.
     var worldScale: CGFloat { max(1.45, min(1.85, size.height / 250)) }
     override func didChangeSize(_ oldSize: CGSize) {
         guard mapNode.parent != nil else { return }
         stickTouch=nil;stick = .zero
-        buildHUD();updateCamera(immediate: true)
+        buildHUD();renderStoryDialogue();updateCamera(immediate: true)
     }
     func updateCamera(dt: CGFloat = 0, immediate: Bool = false) {
         let bounds=VillageMap.bounds
@@ -57,7 +68,7 @@ final class VillagePrototypeScene: SKScene {
     }
     override func update(_ currentTime: TimeInterval) {
         let dt=CGFloat(min(0.04,max(0,lastTime == 0 ? 0:currentTime-lastTime))); lastTime=currentTime
-        if !overview {
+        if !overview && dialogueIndex == nil {
             var delta=CGVector(dx:stick.dx*140*dt,dy:stick.dy*140*dt)
             if hypot(stick.dx,stick.dy)<0.05, let target=route.first {
                 let dx=target.x-actor.position.x,dy=target.y-actor.position.y,d=hypot(dx,dy)
@@ -74,7 +85,7 @@ final class VillagePrototypeScene: SKScene {
         }
         if currentTime>hintUntil {
             let nearest=VillageMap.landmarks.min { hypot($0.approach.x-actor.position.x,$0.approach.y-actor.position.y)<hypot($1.approach.x-actor.position.x,$1.approach.y-actor.position.y) }
-            info.text = nearest.map { hypot($0.approach.x-actor.position.x,$0.approach.y-actor.position.y)<110 ? $0.name : "Jelajahi jalan desa · ketuk tanah atau gunakan stik" }
+            info.text = activeStoryStep?.title ?? nearest.map { hypot($0.approach.x-actor.position.x,$0.approach.y-actor.position.y)<110 ? $0.name : "Jelajahi jalan desa · ketuk tanah atau gunakan stik" }
         }
     }
     func hint(_ text: String) { info.text=text; hintUntil=lastTime+4 }

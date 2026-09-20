@@ -51,8 +51,10 @@ enum JigsawCatalog {
     }
     // Menghitung keping yang diperoleh dari misi, termasuk hadiah yang sudah dimiliki pada save lama.
     static func availableIDs(progress: PrologueProgress) -> Set<Int> {
-        PuzzleWorld.allCases.filter { $0.isUnlocked(in: progress) }
+        var ids = PuzzleWorld.allCases.filter { $0.isUnlocked(in: progress) }
             .reduce(into: Set<Int>()) { $0.formUnion($1.pieceIDs) }
+        ids.formUnion(StoryProgression.unlockedPieceIDs(for: progress))
+        return ids
     }
     static func legacyAvailableIDs(progress: PrologueProgress) -> Set<Int> {
         Set(allIDs.filter { id in

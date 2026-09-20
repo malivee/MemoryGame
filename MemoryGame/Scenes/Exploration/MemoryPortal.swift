@@ -52,7 +52,7 @@ enum MemoryPortal {
         let result = SKTexture(cgImage: image); result.filteringMode = .linear
         return result
     }
-    private static let mist = [texture(seed: 17), texture(seed: 83), texture(seed: 149)]
+    static let mist = [texture(seed: 17), texture(seed: 83), texture(seed: 149)]
 
     // Lembaran kabut memenuhi layar dan bergeser silang dengan kecepatan berbeda.
     // Tidak ada gerak radial, tepi lingkaran, atau percikan yang menyerupai gelembung.

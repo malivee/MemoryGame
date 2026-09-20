@@ -1,6 +1,7 @@
 // Penjelasan file: VillagePrototypeScene+Rendering.swift
 // Membuat gambar dunia, label landmark, NPC dekoratif, HUD, dan overlay collision opsional.
 import SpriteKit
+import UIKit
 extension VillagePrototypeScene {
     @discardableResult
     func label(_ text:String, at p:CGPoint, size:CGFloat, on parent:SKNode, color:SKColor = .white) -> SKLabelNode {
@@ -30,10 +31,54 @@ extension VillagePrototypeScene {
             ("Keneth",CGPoint(x:1220,y:1005),SKColor.orange),
             ("Anneth",CGPoint(x:565,y:1280),SKColor.systemTeal),
             ("Roland",CGPoint(x:1550,y:320),SKColor.systemYellow)] {
-            let node=MemoryCharacter(title:name,color:color);node.position=p;node.zPosition=12;mapNode.addChild(node)
+            if storyProgress == nil || name == "Kakek" {
+                let node=MemoryCharacter(title:name,color:color);node.position=p;node.zPosition=12;mapNode.addChild(node)
+            }
         }
+        mapNode.addChild(storyNPCs);storyNPCs.zPosition=25;storyNPCs.isHidden=false
         actor.zPosition=20;mapNode.addChild(actor)
+        memoryFog.zPosition=30;mapNode.addChild(memoryFog)
+        updateMemoryFog()
         mapNode.addChild(collisionOverlay);collisionOverlay.zPosition=40
+    }
+    func updateMemoryFog() {
+        memoryFog.removeAllChildren()
+        memoryFog.maskNode = nil
+        guard access != .wholeVillage else { return }
+        let bounds = VillageMap.bounds
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        let image = UIGraphicsImageRenderer(size: bounds.size, format: format).image { context in
+            UIColor.white.setFill()
+            context.fill(bounds)
+            // UIKit's vertical axis is reversed relative to the map.
+            for area in VillageMap.accessibleAreas(stage: access) {
+                context.cgContext.clear(CGRect(x: area.minX, y: bounds.height-area.maxY,
+                                              width: area.width, height: area.height))
+            }
+        }
+        let mask = SKSpriteNode(texture: SKTexture(image: image))
+        mask.anchorPoint = .zero
+        mask.size = bounds.size
+        memoryFog.maskNode = mask
+        let veil = SKSpriteNode(color: SKColor(red: 0.83, green: 0.87, blue: 0.78, alpha: 0.96), size: bounds.size)
+        veil.anchorPoint = .zero
+        memoryFog.addChild(veil)
+        for (index, texture) in MemoryPortal.mist.enumerated() {
+            let cloud = SKSpriteNode(texture: texture)
+            cloud.size = CGSize(width: bounds.width+160, height: bounds.height+160)
+            cloud.position = CGPoint(x: bounds.midX, y: bounds.midY)
+            cloud.alpha = 0.45
+            memoryFog.addChild(cloud)
+            if !UIAccessibility.isReduceMotionEnabled {
+                let distance: CGFloat = index % 2 == 0 ? 45 : -45
+                cloud.run(.repeatForever(.sequence([
+                    .moveBy(x: distance, y: 20, duration: 8+Double(index)),
+                    .moveBy(x: -distance, y: -20, duration: 8+Double(index))
+                ])))
+            }
+        }
     }
     func buildHUD() {
         // HUD tetap di koordinat layar sehingga tidak ikut membesar bersama dunia.

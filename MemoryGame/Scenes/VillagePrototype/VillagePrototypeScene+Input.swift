@@ -15,9 +15,28 @@ extension VillagePrototypeScene {
             isLeaving=true;route=[];stick = .zero;stickTouch=nil
             onExit();return
         }
+        if dialogueIndex != nil { advanceStoryDialogue(); return }
         if names.contains("overview") { overview.toggle();route=[];stick = .zero;stickTouch=nil;knob.position=stickCenter;buildHUD();updateCamera(immediate: true);return }
         if !overview && hypot(p.x-stickCenter.x,p.y-stickCenter.y)<65 { stickTouch=t;route=[];updateStick(t);return }
         let destination=t.location(in:mapNode)
+        if !overview, let npc = storyNPCs.children.first(where: {
+            hypot($0.position.x-destination.x, $0.position.y-destination.y) < 85
+        }) {
+            if hypot(npc.position.x-actor.position.x, npc.position.y-actor.position.y) <= 145 {
+                route=[];stick = .zero;stickTouch=nil;knob.position=stickCenter
+                isWellConversation = npc.name?.hasPrefix("well-resident-") == true
+                if isWellConversation,
+                   let suffix = npc.name?.split(separator: "-").last,
+                   let index = Int(suffix) {
+                    wellResidentIndex = index
+                }
+                dialogueIndex=0;renderStoryDialogue()
+            } else {
+                route=navigation.route(from: actor.position, to: npc.position)
+                hint("Dekati lalu ketuk tokoh untuk berbicara.")
+            }
+            return
+        }
         if overview {
             if let place=VillageMap.landmarks.first(where: { $0.rect.insetBy(dx:-30,dy:-30).contains(destination) }) { hint(place.detail) }
             return

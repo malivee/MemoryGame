@@ -82,7 +82,7 @@ enum VillageMap {
     static func accessibleAreas(stage: VillageAccess) -> [CGRect] {
         if stage == .wholeVillage { return [bounds.insetBy(dx: 36, dy: 36)] }
         // Termasuk Rumah Arthur, Kakek, sumur, dan Rumah Bu Mara pada progresi awal.
-        let opening = CGRect(x: 250, y: 445, width: 1180, height: 495)
+        let opening = CGRect(x: 250, y: 445, width: 1300, height: 495)
         let villageRoad = CGRect(x: 110, y: 445, width: 1440, height: 435)
         let barn = CGRect(x: 690, y: 820, width: 770, height: 570)
         switch stage {

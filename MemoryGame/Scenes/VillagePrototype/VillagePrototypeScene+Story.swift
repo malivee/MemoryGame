@@ -4,6 +4,7 @@ extension VillagePrototypeScene {
     func refreshStory() {
         guard let storyProgress else { return }
         setAccess(StoryProgression.villageAccess(for: storyProgress))
+        rackInteraction.isHidden = storyProgress.storyProgress != 0
         storyNPCs.removeAllChildren()
         if StoryProgression.showsWellResidents(for: storyProgress) {
             let positions = [CGPoint(x: 805, y: 720), CGPoint(x: 905, y: 700), CGPoint(x: 1005, y: 720)]
@@ -93,10 +94,41 @@ extension VillagePrototypeScene {
             return
         }
         guard let step = activeStoryStep, let storyProgress else { return }
+        if step.id == 1 {
+            hint("Bu Mara menunggu Arthur mengangkat rak yang miring.")
+            return
+        }
         if StoryProgression.complete(step, in: storyProgress) {
             PrologueStore.shared.save()
             refreshStory()
             hint("Bagian kenangan berikutnya terbuka.")
         }
+    }
+
+    func startRackQTE() {
+        guard activeQTE == nil, let storyProgress,
+              StoryProgression.currentStep(for: storyProgress)?.id == 1 else { return }
+        route=[];stick = .zero;stickTouch=nil;knob.position=stickCenter
+        let event = QuickTimeEventNode(config: QuickTimeEventConfig(
+            requiredTaps: 15, buttonPrompt: "ANGKAT", allowTouchAnywhere: false
+        ))
+        event.position=CGPoint(x:size.width/2,y:size.height/2)
+        event.zPosition=2000
+        event.onComplete = { [weak self, weak event] success in
+            guard success, let self, let event, self.activeQTE === event,
+                  let progress=self.storyProgress,
+                  let step=StoryProgression.currentStep(for: progress), step.id == 1 else { return }
+            if StoryProgression.complete(step, in: progress) {
+                PrologueStore.shared.save()
+            }
+        }
+        event.onDismiss = { [weak self, weak event] in
+            guard let self, self.activeQTE === event else { return }
+            self.activeQTE=nil
+            self.refreshStory()
+            self.hint("Rak berhasil ditegakkan. Jalan kenangan berikutnya terbuka.")
+        }
+        activeQTE=event
+        addChild(event);event.start()
     }
 }

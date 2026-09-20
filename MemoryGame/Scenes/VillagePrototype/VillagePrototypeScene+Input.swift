@@ -9,6 +9,7 @@ extension VillagePrototypeScene {
     }
     override func touchesBegan(_ touches:Set<UITouch>,with event:UIEvent?) {
         guard !isLeaving, let t=touches.first else { return }
+        guard activeQTE == nil else { return }
         let p=t.location(in:hud), names=Set(hud.nodes(at:p).compactMap(\.name))
         // Hentikan gerak dan cegah transisi berulang ketika Kembali diketuk.
         if names.contains("exitVillage"), let onExit {
@@ -19,6 +20,20 @@ extension VillagePrototypeScene {
         if names.contains("overview") { overview.toggle();route=[];stick = .zero;stickTouch=nil;knob.position=stickCenter;buildHUD();updateCamera(immediate: true);return }
         if !overview && hypot(p.x-stickCenter.x,p.y-stickCenter.y)<65 { stickTouch=t;route=[];updateStick(t);return }
         let destination=t.location(in:mapNode)
+        if !overview,
+           hypot(rackInteraction.position.x-destination.x,
+                 rackInteraction.position.y-destination.y) < 70,
+           rackInteraction.isHidden == false {
+            if hypot(rackInteraction.position.x-actor.position.x,
+                     rackInteraction.position.y-actor.position.y) <= 150 {
+                startRackQTE()
+            } else {
+                let approach=CGPoint(x:1415,y:545)
+                route=navigation.route(from:actor.position,to:approach)
+                hint("Dekati rak miring di halaman Bu Mara.")
+            }
+            return
+        }
         if !overview, let npc = storyNPCs.children.first(where: {
             hypot($0.position.x-destination.x, $0.position.y-destination.y) < 85
         }) {

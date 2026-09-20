@@ -16,6 +16,8 @@ final class VillagePrototypeScene: SKScene {
     var isWellConversation = false
     var wellResidentIndex = 0
     let storyPanel = SKNode()
+    let rackInteraction = SKNode()
+    weak var activeQTE: QuickTimeEventNode?
     var navigation: VillageNavigation { VillageNavigation(stage: access) }
     var route: [CGPoint] = []
     var overview = false, showBounds = false
@@ -68,7 +70,7 @@ final class VillagePrototypeScene: SKScene {
     }
     override func update(_ currentTime: TimeInterval) {
         let dt=CGFloat(min(0.04,max(0,lastTime == 0 ? 0:currentTime-lastTime))); lastTime=currentTime
-        if !overview && dialogueIndex == nil {
+        if !overview && dialogueIndex == nil && activeQTE == nil {
             var delta=CGVector(dx:stick.dx*140*dt,dy:stick.dy*140*dt)
             if hypot(stick.dx,stick.dy)<0.05, let target=route.first {
                 let dx=target.x-actor.position.x,dy=target.y-actor.position.y,d=hypot(dx,dy)
@@ -84,6 +86,12 @@ final class VillagePrototypeScene: SKScene {
             actor.position=next; actor.zPosition=20; updateCamera(dt: dt)
         }
         if currentTime>hintUntil {
+            if rackInteraction.isHidden == false,
+               hypot(rackInteraction.position.x-actor.position.x,
+                     rackInteraction.position.y-actor.position.y) < 150 {
+                info.text = "Ketuk rak miring untuk membantu Bu Mara"
+                return
+            }
             let nearest=VillageMap.landmarks.min { hypot($0.approach.x-actor.position.x,$0.approach.y-actor.position.y)<hypot($1.approach.x-actor.position.x,$1.approach.y-actor.position.y) }
             info.text = activeStoryStep?.title ?? nearest.map { hypot($0.approach.x-actor.position.x,$0.approach.y-actor.position.y)<110 ? $0.name : "Jelajahi jalan desa · ketuk tanah atau gunakan stik" }
         }

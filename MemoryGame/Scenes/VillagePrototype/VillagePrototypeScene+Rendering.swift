@@ -36,6 +36,14 @@ extension VillagePrototypeScene {
             }
         }
         mapNode.addChild(storyNPCs);storyNPCs.zPosition=25;storyNPCs.isHidden=false
+        let rackPrompt = SKShapeNode(circleOfRadius: 15)
+        rackPrompt.fillColor = SKColor(red:0.30,green:0.55,blue:0.28,alpha:0.95)
+        rackPrompt.strokeColor = .white;rackPrompt.lineWidth=2
+        rackPrompt.name = "mara-rack"
+        rackPrompt.storyLabel("!", at: .zero, size: 17, color: .white)
+        rackInteraction.addChild(rackPrompt)
+        rackInteraction.position=CGPoint(x:1455,y:640);rackInteraction.zPosition=28
+        mapNode.addChild(rackInteraction)
         actor.zPosition=20;mapNode.addChild(actor)
         memoryFog.zPosition=30;mapNode.addChild(memoryFog)
         updateMemoryFog()

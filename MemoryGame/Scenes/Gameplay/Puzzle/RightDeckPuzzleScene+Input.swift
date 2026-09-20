@@ -12,9 +12,34 @@ extension RightDeckPuzzleScene {
         guard trackedTouch == nil, let touch = touches.first else { return }
         let point = touch.location(in: canvas)
         let names = Set(canvas.nodes(at: point).compactMap(\.name))
-        if names.contains("debug") { toggleDebugMenu(); return }
-        for world in PuzzleWorld.allCases where names.contains("debug-world-\(world.rawValue)") {
-            enterDebugWorld(world)
+
+        // 1. Debug button (hits by node name OR by proximity to debug button position)
+        let isDebugBtnHit = names.contains("debug") || (canvas.childNode(withName: "debug").map { hypot(point.x - $0.position.x, point.y - $0.position.y) < 55 } ?? false)
+        if isDebugBtnHit {
+            toggleDebugMenu()
+            return
+        }
+
+        // 2. When debug menu is open, handle choices FIRST!
+        if debugMenuVisible {
+            for world in PuzzleWorld.allCases where names.contains("debug-world-\(world.rawValue)") {
+                toggleDebugMenu()
+                enterDebugWorld(world)
+                return
+            }
+            if names.contains("debug-b1") { toggleDebugMenu(); enterDebugBoundaryStage(.rockSalt); return }
+            if names.contains("debug-b2") { toggleDebugMenu(); enterDebugBoundaryStage(.herbalHills); return }
+            if names.contains("debug-b3") { toggleDebugMenu(); enterDebugBoundaryStage(.woodcutterSlope); return }
+            if names.contains("debug-b4") { toggleDebugMenu(); enterDebugBoundaryStage(.theBoundary); return }
+            
+            // If tapped on the panel background, absorb touch
+            if names.contains("debugMenuPanel") { return }
+            
+            // If tapped outside the panel (backdrop), dismiss menu
+            if names.contains("debug-backdrop") {
+                toggleDebugMenu()
+                return
+            }
             return
         }
         if names.contains("villagePreview") { openVillagePreview(); return }

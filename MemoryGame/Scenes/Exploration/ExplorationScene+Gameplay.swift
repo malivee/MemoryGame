@@ -17,7 +17,7 @@ extension ExplorationScene {
         dialoguePanel?.removeFromParent(); dialoguePanel = nil
         let finish = dialogueCompletion; dialogueCompletion = nil
         finish?()
-        objective.text = progress.objective
+        objective.text = progress.currentObjective(for: entry.region)
         PrologueStore.shared.save()
         // Reading pauses the world; resume with time to regain control.
         catchGrace = 1.2
@@ -177,6 +177,180 @@ extension ExplorationScene {
             arthur.wakeUp()
             arthur.position = navigation.nearestOpen(to: CGPoint(x: 450, y: 78))
             say("Arthur bangun dengan segar!", duration: 2)
+
+        case .rockSalt:
+            clearNearbyInteraction()
+            HapticsService.shared.playNotification(.success)
+            progress.hasRockSalt = true
+            PrologueStore.shared.save()
+            rockSaltNode?.removeFromParent()
+            rockSaltNode = nil
+            objective.text = progress.currentObjective(for: entry.region)
+            startDialogue([
+                .init(speaker: "Arthur", text: "Kristal garam batu murni! Berkilau seperti es di bawah sinar matahari lereng."),
+                .init(speaker: "Anneth", text: "Bagus sekali, Arthur! Endapan di dekat mulut tambang ini cukup untuk persediaan garam dapur kita."),
+                .init(speaker: "Arthur", text: "Lorong tambang di baliknya gelap gulita dan berbahaya. Sekarang ayo kita bawa rock salt ini kembali ke rumah Anneth di desa.")
+            ]) { [weak self] in
+                self?.showAnnouncementBanner(
+                    icon: "💎",
+                    title: "Rock Salt Diperoleh!",
+                    subtitle: "Bongkahan garam batu terkumpul. Kembali ke Rumah Anneth di Desa!"
+                )
+            }
+
+        case .darkMineEntrance:
+            clearNearbyInteraction()
+            HapticsService.shared.playSelection()
+            startDialogue([
+                .init(speaker: "Arthur", text: "Lorong tambang menusuk jauh ke perut tebing garam. Di dalam gelap gulita dan bersuhu dingin pekat."),
+                .init(speaker: "Arthur", text: "Balok-balok kayu penyangga tampak rapuh. Sesuai pesan Anneth, aku hanya boleh mengambil garam di dekat pintu masuk."),
+                .init(speaker: "Arthur", text: "Masuk lebih jauh tanpa obor dan perlengkapan penambang sama saja mencari bahaya.")
+            ])
+
+        case .herbalPlant:
+            clearNearbyInteraction()
+            HapticsService.shared.playNotification(.success)
+            progress.hasHerbal = true
+            PrologueStore.shared.save()
+            herbalNode?.removeFromParent()
+            herbalNode = nil
+            objective.text = progress.currentObjective(for: entry.region)
+            startDialogue([
+                .init(speaker: "Arthur", text: "Daun Chamomile Emas! Tumbuh subur di atas batu menjorok ini."),
+                .init(speaker: "Arthur", text: "Aroma bunganya manis dan menenangkan. Ini tepat seperti yang dipesan Kakek Beryn untuk ramuan obatnya."),
+                .init(speaker: "Arthur", text: "Tapi tunggu... angin dingin berhembus dari arah timur. Ada sesuatu yang mengawasi dari pinggir hutan...")
+            ]) { [weak self] in
+                self?.showAnnouncementBanner(
+                    icon: "🌿",
+                    title: "Herbal Langka Dipetik!",
+                    subtitle: "Ada sosok misterius memperhatikan dari batas pohon di timur!"
+                )
+            }
+
+        case .boundaryStone:
+            clearNearbyInteraction()
+            HapticsService.shared.playSelection()
+            startDialogue([
+                .init(speaker: "Arthur", text: "Batu pembatas kuno terukir simbol spiral. Lumut tebal menyelimuti permukaannya."),
+                .init(speaker: "Arthur", text: "Kakek Beryn selalu mengingatkan: deretan batu ini adalah batas aman desa."),
+                .init(speaker: "Arthur", text: "Di seberang batu ini, hutan liar membentang tanpa perlindungan desa. Jangan pernah melangkah sendirian.")
+            ])
+
+        case .hollowEncounter:
+            clearNearbyInteraction()
+            HapticsService.shared.playNotification(.warning)
+            progress.encounteredHollow = true
+            PrologueStore.shared.save()
+            objective.text = progress.currentObjective(for: entry.region)
+            if let h = hollowNode {
+                h.run(.sequence([
+                    .wait(forDuration: 1.5),
+                    .group([.fadeOut(withDuration: 1.8), .moveBy(x: 40, y: 10, duration: 1.8)]),
+                    .removeFromParent()
+                ]))
+            }
+            startDialogue([
+                .init(speaker: "Arthur", text: "A-apa itu?! Sosok bayangan tinggi melayang di sela-sela pepohonan!"),
+                .init(speaker: "The Hollow", text: "... ... ..."),
+                .init(speaker: "Arthur", text: "Hawa dingin menusuk tulang... matanya memancarkan cahaya redup di balik kabut!"),
+                .init(speaker: "Arthur", text: "Apakah itu... 'The Hollow' yang sering diceritakan dalam dongeng desa?!"),
+                .init(speaker: "Arthur", text: "Sosok itu memudar ke balik pohon. Aku harus segera kembali ke desa dan melaporkan ini ke Kakek Beryn!")
+            ]) { [weak self] in
+                self?.showAnnouncementBanner(
+                    icon: "⚠️",
+                    title: "Pertemuan dengan The Hollow!",
+                    subtitle: "Arthur merasakan firasat buruk. Segera kembali ke desa menemui Kakek Beryn!"
+                )
+            }
+
+        case .firewood:
+            clearNearbyInteraction()
+            HapticsService.shared.playNotification(.success)
+            progress.gatheredWood = true
+            PrologueStore.shared.save()
+            objective.text = progress.currentObjective(for: entry.region)
+            startDialogue([
+                .init(speaker: "Arthur", text: "Tumpukan kayu pinus kering ini cukup untuk persediaan musim dingin."),
+                .init(speaker: "Arthur", text: "Tebangan kayu warga di lereng ini rapi, tapi... ada bekas longsoran baru di dekat akar pohon tua."),
+                .init(speaker: "Arthur", text: "Akar pohon raksasa itu mencengkeram tebing yang runtuh. Tampak ada sesuatu yang terselip di sana! Mari kita periksa.")
+            ]) { [weak self] in
+                self?.showAnnouncementBanner(
+                    icon: "🪵",
+                    title: "Kayu Bakar Dikumpulkan!",
+                    subtitle: "Tanah longsor & akar pohon tua di timur kini bisa diperiksa!"
+                )
+            }
+
+        case .landslideEliasBook:
+            clearNearbyInteraction()
+            guard progress.gatheredWood else {
+                startDialogue([
+                    .init(speaker: "Arthur", text: "Tanah longsor kecil di dekat akar pohon tua ini tampak gembur dan rapuh."),
+                    .init(speaker: "Arthur", text: "Aku sebaiknya menyelesaikan mengumpulkan kayu bakar dulu sebelum menyelidikinya.")
+                ])
+                return
+            }
+            HapticsService.shared.playNotification(.success)
+            progress.hasEliasBook = true
+            progress.hasBook = true
+            progress.foundMarker = true
+            PrologueStore.shared.save()
+            eliasBookNode?.removeFromParent()
+            eliasBookNode = nil
+            objective.text = progress.currentObjective(for: entry.region)
+            startDialogue([
+                .init(speaker: "Arthur", text: "Tanah longsor mengikis lereng dan menyingkapkan jalinan akar pohon tua..."),
+                .init(speaker: "Arthur", text: "Ada sesuatu yang terlindung di rongga akar... Sebuah buku bersampul kulit tua!"),
+                .init(speaker: "Arthur", text: "Ini... Buku Catatan Elias! Peta kuno dan catatan jalur perbatasan tersimpan di dalamnya!"),
+                .init(speaker: "Arthur", text: "Dengan buku ini, misteri di balik The Boundary bisa kita ungkap! Aku harus membicarakan ekspedisi ini dengan teman-teman.")
+            ]) { [weak self] in
+                self?.showUnlockCard(
+                    title: "📖 BUKU ELIAS DITEMUKAN!",
+                    body: "Buku Catatan Elias berhasil diselamatkan dari sela akar pohon tua! Peta perbatasan kini lengkap. Bicarakan rencana ekspedisi ke The Boundary bersama para sahabat."
+                )
+            }
+
+        case .boundaryTreeMarker:
+            clearNearbyInteraction()
+            HapticsService.shared.playNotification(.success)
+            progress.boundaryMarked = true
+            PrologueStore.shared.save()
+            objective.text = progress.currentObjective(for: entry.region)
+            startDialogue([
+                .init(speaker: "Anneth", text: "Ini pohon terbesar di tepi hutan perbatasan. Aku akan menorehkan tanda 'X' dengan pisauku di kulit kayunya."),
+                .init(speaker: "Roland", text: "Bagus! Dan aku mengikatkan pita kain jingga terang ini pada dahan terendah."),
+                .init(speaker: "Keneth", text: "Dengan tanda sayatan dan kain terang ini, kita punya patokan pasti untuk pulang nanti."),
+                .init(speaker: "Arthur", text: "Sekarang batas telah ditandai. Tidak ada keraguan lagi, mari kita masuki Deep Woods!")
+            ]) { [weak self] in
+                self?.showAnnouncementBanner(
+                    icon: "🎗️",
+                    title: "Batas Ditandai!",
+                    subtitle: "Torehan pisau 'X' dan pita kain terpasang! Gerbang ke Deep Woods (Map C) terbuka."
+                )
+            }
+
+        case .deepWoodsGate:
+            clearNearbyInteraction()
+            guard progress.boundaryMarked else {
+                startDialogue([
+                    .init(speaker: "Arthur", text: "Kabut di depan sangat tebal. Kita tidak boleh masuk tanpa menandai pohon perbatasan dulu agar tidak tersesat!"),
+                    .init(speaker: "Anneth", text: "Arthur benar. Mari kita torehkan tanda 'X' dan ikat pita pada pohon penanda terlebih dahulu.")
+                ])
+                return
+            }
+            HapticsService.shared.playNotification(.success)
+            startDialogue([
+                .init(speaker: "Arthur", text: "Kain penanda telah terikat. Semuanya siap?"),
+                .init(speaker: "Anneth", text: "Bekal dan pisauku siap. Aku di belakangmu, Arthur."),
+                .init(speaker: "Roland", text: "Formasi siap, tongkat kayu di tangan. Apapun yang ada di balik kabut, kita hadapi bersama!"),
+                .init(speaker: "Keneth", text: "Aku memegang Buku Elias untuk memandu rute."),
+                .init(speaker: "Arthur", text: "Melangkah bersama... Masuki Deep Woods!")
+            ]) { [weak self] in
+                self?.showUnlockCard(
+                    title: "🌲 MENUJU MAP C: DEEP WOODS!",
+                    body: "Arthur dan ketiga sahabatnya berhasil menembus perbatasan! Wilayah yang dikenal warga kini tertinggal di belakang. Babak Prolog Selesai — Petualangan di Hutan Luar Segera Dimulai!"
+                )
+            }
         }
     }
 
@@ -221,6 +395,40 @@ extension ExplorationScene {
                     let anchor = i < stumpNodes.count ? stumpNodes[i] : arthur
                     candidates.append((.sitStump(stump), anchor, d))
                 }
+            }
+        }
+
+        // Interaksi khusus Map B (Pinggiran / Zona Transisi)
+        if entry.region == .boundary {
+            if let node = rockSaltNode, node.parent != nil {
+                candidates.append((.rockSalt, node, distance(arthur.position, node.position)))
+            }
+            if let node = mineShaftNode, node.parent != nil {
+                candidates.append((.darkMineEntrance, node, distance(arthur.position, node.position)))
+            }
+            if let node = herbalNode, node.parent != nil {
+                candidates.append((.herbalPlant, node, distance(arthur.position, node.position)))
+            }
+            for stone in boundaryStoneNodes {
+                let d = distance(arthur.position, stone.position)
+                if d <= 70 {
+                    candidates.append((.boundaryStone, stone, d))
+                }
+            }
+            if let node = hollowNode, node.parent != nil {
+                candidates.append((.hollowEncounter, node, distance(arthur.position, node.position)))
+            }
+            if let node = firewoodNode, node.parent != nil {
+                candidates.append((.firewood, node, distance(arthur.position, node.position)))
+            }
+            if let node = eliasBookNode, node.parent != nil {
+                candidates.append((.landslideEliasBook, node, distance(arthur.position, node.position)))
+            }
+            if let node = boundaryTreeNode, node.parent != nil {
+                candidates.append((.boundaryTreeMarker, node, distance(arthur.position, node.position)))
+            }
+            if let node = deepWoodsGateNode, node.parent != nil {
+                candidates.append((.deepWoodsGate, node, distance(arthur.position, node.position)))
             }
         }
 
@@ -284,6 +492,39 @@ extension ExplorationScene {
             return
         }
         checkGroupProgress()
+        if entry.region == .boundary, let exit = level.exit, distance(arthur.position, exit) < 60, warningCooldown == 0 {
+            warningCooldown = 6
+            switch progress.mapBStage {
+            case .rockSalt:
+                if progress.hasRockSalt {
+                    say("Arthur kembali ke desa membawa bongkahan rock salt murni untuk Anneth.")
+                } else {
+                    say("Ambil rock salt terlebih dahulu di dekat mulut tambang sebelum kembali.")
+                }
+            case .herbalHills:
+                if progress.encounteredHollow {
+                    say("Arthur bergegas kembali ke desa untuk melaporkan penampakan The Hollow ke Kakek Beryn.")
+                } else if progress.hasHerbal {
+                    say("Selidiki sosok bayangan di pinggir pohon sebelum kembali ke desa.")
+                } else {
+                    say("Petik daun herbal di atas batu menjorok terlebih dahulu.")
+                }
+            case .woodcutterSlope:
+                if progress.hasEliasBook {
+                    say("Arthur kembali ke desa membawa Buku Catatan Elias untuk bertemu teman-teman.")
+                } else if progress.gatheredWood {
+                    say("Periksa celah tanah longsor dan akar pohon tua terlebih dahulu.")
+                } else {
+                    say("Kumpulkan kayu bakar terlebih dahulu.")
+                }
+            case .theBoundary:
+                if progress.boundaryMarked {
+                    say("Gerbang Deep Woods terbuka! Masuki celah kabut di sebelah timur.")
+                } else {
+                    say("Kita harus menandai pohon penanda terlebih dahulu sebelum menembus kabut.")
+                }
+            }
+        }
     }
 
     func updateCompanions(dt: CGFloat) {
@@ -358,7 +599,7 @@ extension ExplorationScene {
     }
 
     func worldInstalled(_ location: MemoryPiece) -> Bool {
-        worldLocations.contains(location) && progress.installed(location)
+        worldLocations.contains(location) || progress.installed(location)
     }
 
     func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }

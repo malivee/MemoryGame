@@ -128,6 +128,7 @@ extension DeckPuzzleScene {
         case .house: return "Rumah"
         case .village: return "Desa"
         case .foothills: return "Bukit"
+        case .boundary: return "Batas Desa"
         case .echoes: return PuzzleWorld.echoesBoundary.title
         }
     }

@@ -8,6 +8,12 @@ swiftc -module-cache-path "$build_dir/modules" \
   MemoryGame/Models/JigsawProgress.swift \
   MemoryGame/Models/PuzzleWorld.swift \
   MemoryGame/Models/PuzzlePieceData.swift \
+  MemoryGame/Models/EchoesBoundaryLevel.swift \
+  MemoryGame/Models/BoundaryLevel.swift \
+  MemoryGame/Models/Boundary/RockSaltMineLevel.swift \
+  MemoryGame/Models/Boundary/HerbalHillsLevel.swift \
+  MemoryGame/Models/Boundary/WoodcutterSlopeLevel.swift \
+  MemoryGame/Models/Boundary/TheBoundaryLevel.swift \
   MemoryGame/Models/PrologueLevel.swift \
   MemoryGame/Systems/PuzzleSession.swift \
   MemoryGame/Systems/ExplorationCollisionGeometry.swift \

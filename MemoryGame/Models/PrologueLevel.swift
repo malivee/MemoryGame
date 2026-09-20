@@ -117,14 +117,16 @@ struct PrologueLevel {
                     .init(title: "Penjaga", points: [CGPoint(x: 785, y: 90), CGPoint(x: 785, y: 415)], speed: 48, range: 175)],
                 book: nil, friends: [:], marker: rotate(CGPoint(x: 555, y: 350)),
                 gathering: CGPoint(x: 710, y: 110), exit: CGPoint(x: 915, y: 390))
+        case .boundary:
+            return BoundaryLevel.make(region: region, progress: progress)
         case .echoes:
             return EchoesBoundaryLevel.make(region: region)
         }
     }
 
     func available(_ zone: MemoryZone, progress: PrologueProgress) -> Bool {
+        if zone.piece == .boundary || zone.piece == .closing { return true }
         if zone.piece == .lake { return progress.lakeVariant != nil }
-        if zone.piece == .boundary { return progress.installed(.boundary) || progress.installed(.closing) }
         return progress.installed(zone.piece)
     }
     // Menghasilkan persegi area yang belum tersedia untuk visual kabut dan penghalang navigasi.
@@ -142,7 +144,13 @@ struct PrologueLevel {
         case .mountain: return CGPoint(x: 90, y: 95)
         case .oldPath: return CGPoint(x: 465, y: 350)
         case .lake, .dryLake: return CGPoint(x: 465, y: 25)
-        case .boundary, .closing: return CGPoint(x: 710, y: 110)
+        case .boundary, .closing:
+            switch progress.mapBStage {
+            case .rockSalt: return CGPoint(x: 90, y: 130)
+            case .herbalHills: return CGPoint(x: 90, y: 120)
+            case .woodcutterSlope: return CGPoint(x: 80, y: 210)
+            case .theBoundary: return CGPoint(x: 120, y: 200)
+            }
         }
     }
 }

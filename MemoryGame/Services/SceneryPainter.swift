@@ -22,6 +22,8 @@ final class SceneryPainter {
     private let woodWarm   = CGColor(red: 0.54, green: 0.39, blue: 0.25, alpha: 1)
     private let woodLight  = CGColor(red: 0.74, green: 0.59, blue: 0.41, alpha: 1)
     private let oceanNavy  = CGColor(red: 0.08, green: 0.16, blue: 0.24, alpha: 1)
+    private var currentRegion: MemoryRegion?
+    private var currentStage: MapBStage?
 
     // Membuat bitmap peta dalam sudut pandang 3/4 oblique
     func image(level: PrologueLevel, progress: PrologueProgress, scale: CGFloat = 2) -> CGImage? {
@@ -32,17 +34,32 @@ final class SceneryPainter {
                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
         c = context
         c.scaleBy(x: scale, y: scale)
+        currentRegion = level.region
+        currentStage = progress.mapBStage
 
         if level.region == .house {
             interior()
         } else {
-            fill(level.mapBounds, grassBase)
+            let baseColor: CGColor
+            if level.region == .boundary && progress.mapBStage == .rockSalt {
+                baseColor = color(0.88, 0.87, 0.83) // Dasar kapur garam mineral pucat (Foto 1 Cardona)
+            } else if level.region == .boundary && progress.mapBStage == .woodcutterSlope {
+                baseColor = color(0.46, 0.44, 0.32) // Dasar tanah lereng hutan basah lembap (Panel 6)
+            } else if level.region == .boundary && progress.mapBStage == .theBoundary {
+                baseColor = color(0.32, 0.38, 0.26) // Dasar lantai hutan lebat berlumut (Panel 7)
+            } else {
+                baseColor = grassBase
+            }
+            fill(level.mapBounds, baseColor)
             landscape(level: level, progress: progress)
 
             // Urutkan rintangan dari atas ke bawah (Y tertinggi ke terendah) untuk depth sorting 3/4
             let sortedObstacles = level.obstacles.sorted { $0.rect.maxY > $1.rect.maxY }
             for obstacle in sortedObstacles {
                 paint(obstacle)
+            }
+            if level.region == .boundary {
+                paintBoundaryScenery(level: level, progress: progress)
             }
             borderStones()
 
@@ -538,16 +555,25 @@ final class SceneryPainter {
     // MARK: - 2. LANSKAP PADANG RUMPUT & LUAR RUANGAN (SCREENSHOT 2)
     // =========================================================================
     private func landscape(level: PrologueLevel, progress: PrologueProgress) {
-        // 1. Sapuan warna air lembut pada kertas rumput sage/lime hangat
+        // 1. Sapuan warna air lembut pada tanah (wash) disesuaikan autentik per stage
         for _ in 0..<1200 {
             let x = random() * 960, y = random() * 480
             let v = random()
-            ellipse(CGRect(x: x, y: y, width: 22 + random() * 55, height: 10 + random() * 25),
-                    color(0.72 + v * 0.12, 0.82 + v * 0.10, 0.46 + v * 0.10, 0.22))
+            let washColor: CGColor
+            if level.region == .boundary && progress.mapBStage == .rockSalt {
+                washColor = color(0.89 + v * 0.08, 0.88 + v * 0.08, 0.84 + v * 0.08, 0.35)
+            } else if level.region == .boundary && progress.mapBStage == .woodcutterSlope {
+                washColor = color(0.42 + v * 0.10, 0.38 + v * 0.08, 0.26 + v * 0.08, 0.35)
+            } else if level.region == .boundary && progress.mapBStage == .theBoundary {
+                washColor = color(0.24 + v * 0.08, 0.32 + v * 0.08, 0.22 + v * 0.06, 0.38)
+            } else {
+                washColor = color(0.72 + v * 0.12, 0.82 + v * 0.10, 0.46 + v * 0.10, 0.22)
+            }
+            ellipse(CGRect(x: x, y: y, width: 22 + random() * 55, height: 10 + random() * 25), washColor)
         }
 
         // 2. Garis pantai tebing dan laut biru tua Carto (jika di region pesisir)
-        if level.region != .village && level.region != .house {
+        if level.region != .village && level.region != .house && level.region != .boundary {
             if progress.lakeVariant == .dryLake {
                 rounded(CGRect(x: 343, y: 38, width: 244, height: 135), radius: 35, color: color(0.83, 0.76, 0.60))
                 for _ in 0..<60 {
@@ -559,7 +585,7 @@ final class SceneryPainter {
             }
         }
 
-        // 3. Jalur jalan tanah berpasir lembut khas Carto
+        // 3. Jalur jalan tanah berpasir lembut Carto sesuai storyboard
         if level.region == .echoes {
             trail([CGPoint(x: 30, y: 240), CGPoint(x: level.mapBounds.maxX, y: 240)], width: 78)
         } else if level.region == .village {
@@ -567,6 +593,28 @@ final class SceneryPainter {
             trail([CGPoint(x: 140, y: 0), CGPoint(x: 160, y: 80), CGPoint(x: 245, y: 275), CGPoint(x: 170, y: 365), CGPoint(x: 210, y: 480)], width: 32)
             trail([CGPoint(x: 465, y: 80), CGPoint(x: 470, y: 255), CGPoint(x: 510, y: 420), CGPoint(x: 550, y: 480)], width: 36)
             trail([CGPoint(x: 670, y: 110), CGPoint(x: 700, y: 280), CGPoint(x: 830, y: 310), CGPoint(x: 960, y: 330)], width: 30)
+        } else if level.region == .boundary {
+            switch progress.mapBStage {
+            case .rockSalt:
+                // Panel 4: Jalur sempit mendaki tebing garam & rel tambang kayu
+                trail([CGPoint(x: 0, y: 120), CGPoint(x: 120, y: 160), CGPoint(x: 230, y: 230), CGPoint(x: 330, y: 310)], width: 40)
+                woodenRail(from: CGPoint(x: 330, y: 340), to: CGPoint(x: 420, y: 275))
+            case .herbalHills:
+                // Panel 5: Jalur setapak mendaki bercabang di perbukitan
+                trail([CGPoint(x: 0, y: 110), CGPoint(x: 220, y: 160), CGPoint(x: 420, y: 220)], width: 44)
+                trail([CGPoint(x: 420, y: 220), CGPoint(x: 550, y: 260), CGPoint(x: 650, y: 300)], width: 36) // ke Batu Menjorok
+                trail([CGPoint(x: 420, y: 220), CGPoint(x: 380, y: 300), CGPoint(x: 450, y: 380)], width: 34) // ke Lereng Bukit
+            case .woodcutterSlope:
+                // Panel 6: Jalur pencari kayu dengan bekas roda gerobak di tanah basah
+                trail([CGPoint(x: 0, y: 210), CGPoint(x: 280, y: 200), CGPoint(x: 500, y: 190), CGPoint(x: 750, y: 190)], width: 44)
+                wagonRuts([CGPoint(x: 0, y: 210), CGPoint(x: 280, y: 200), CGPoint(x: 500, y: 190), CGPoint(x: 750, y: 190)], offset: 12)
+            case .theBoundary:
+                // Panel 7: Jalur bercabang di tengah hutan berkabut
+                trail([CGPoint(x: 0, y: 220), CGPoint(x: 250, y: 220), CGPoint(x: 420, y: 210)], width: 44)
+                trail([CGPoint(x: 420, y: 210), CGPoint(x: 540, y: 290), CGPoint(x: 650, y: 340)], width: 32)
+                trail([CGPoint(x: 420, y: 210), CGPoint(x: 680, y: 215), CGPoint(x: 960, y: 240)], width: 44) // ke Deep Woods
+                trail([CGPoint(x: 420, y: 210), CGPoint(x: 540, y: 140), CGPoint(x: 660, y: 110)], width: 32)
+            }
         } else {
             trail([CGPoint(x: 30, y: 100), CGPoint(x: 140, y: 150), CGPoint(x: 245, y: 200), CGPoint(x: 280, y: 370)], width: 38)
             trail([CGPoint(x: 640, y: 65), CGPoint(x: 710, y: 105), CGPoint(x: 790, y: 205), CGPoint(x: 810, y: 370), CGPoint(x: 960, y: 400)], width: 40)
@@ -581,35 +629,63 @@ final class SceneryPainter {
             c.restoreGState()
         }
 
-        // 4. ARSIR PENSIL VERTIKAL RAPAT KHAS CARTO (DENSE VERTICAL PENCIL HATCHING - SCREENSHOT 2)
-        // Ini adalah ciri khas visual utama Carto: goresan pensil tegak di seluruh permukaan padang rumput
+        // 4. ARSIR PENSIL VERTIKAL RAPAT KHAS CARTO disesuaikan per stage
         for _ in 0..<2400 {
             let x = random() * 960
             let y = random() * 480
             let h: CGFloat = 5 + random() * 10
             let v = random()
-            let pencilColor = color(0.52 + v * 0.12, 0.65 + v * 0.10, 0.32 + v * 0.08, 0.42)
+            let pencilColor: CGColor
+            if level.region == .boundary && progress.mapBStage == .rockSalt {
+                pencilColor = color(0.65 + v * 0.10, 0.65 + v * 0.10, 0.68 + v * 0.10, 0.40)
+            } else if level.region == .boundary && progress.mapBStage == .woodcutterSlope {
+                pencilColor = color(0.35 + v * 0.08, 0.28 + v * 0.08, 0.18 + v * 0.06, 0.38)
+            } else if level.region == .boundary && progress.mapBStage == .theBoundary {
+                pencilColor = color(0.20 + v * 0.06, 0.26 + v * 0.06, 0.16 + v * 0.05, 0.45)
+            } else {
+                pencilColor = color(0.52 + v * 0.12, 0.65 + v * 0.10, 0.32 + v * 0.08, 0.42)
+            }
             line([CGPoint(x: x, y: y), CGPoint(x: x + (random() - 0.5) * 1.5, y: y + h)], pencilColor, 0.85)
         }
 
-        // 5. Tanda panah / chevron rumput kapur putih Carto (^ ^ dan v v - seperti screenshot 2)
-        let chevronSpots = [
-            CGPoint(x: 45, y: 310), CGPoint(x: 65, y: 325), CGPoint(x: 40, y: 280),
-            CGPoint(x: 320, y: 160), CGPoint(x: 340, y: 175),
-            CGPoint(x: 620, y: 340), CGPoint(x: 640, y: 355),
-            CGPoint(x: 880, y: 210), CGPoint(x: 900, y: 225)
-        ]
-        for sp in chevronSpots {
-            let whiteChalk = color(0.96, 0.98, 0.92, 0.65)
-            line([CGPoint(x: sp.x - 7, y: sp.y - 8), CGPoint(x: sp.x, y: sp.y), CGPoint(x: sp.x + 7, y: sp.y - 8)],
-                 whiteChalk, 1.5)
-        }
+        // 5. Flora & Kilau Mineral spesifik per stage
+        if level.region == .boundary && progress.mapBStage == .rockSalt {
+            // Panel 4: 160 kilau kristal garam di lantai tambang. Tidak ada rumput/bunga padang!
+            for _ in 0..<160 {
+                let p = CGPoint(x: random() * 960, y: random() * 480)
+                saltCrystalGlint(at: p)
+            }
+        } else if level.region == .boundary && progress.mapBStage == .woodcutterSlope {
+            // Panel 6: Serpihan tatal kayu dan serbuk gergaji di lereng hutan penebangan
+            for _ in 0..<70 {
+                let p = CGPoint(x: random() * 960, y: random() * 480)
+                ellipse(CGRect(x: p.x, y: p.y, width: 3 + random() * 3, height: 2), color(0.78, 0.65, 0.42, 0.7))
+            }
+        } else if level.region == .boundary && progress.mapBStage == .theBoundary {
+            // Panel 7: Jarum-jarum cemara kering dan lumut di lantai hutan berkabut
+            for _ in 0..<60 {
+                let p = CGPoint(x: random() * 960, y: random() * 480)
+                line([p, CGPoint(x: p.x + 4, y: p.y + 2)], color(0.30, 0.22, 0.14, 0.6), 1.0)
+            }
+        } else {
+            // Padang Rumput / Perbukitan Herbal (Foto 3): Bunga alpine liar chamomile & aster melimpah
+            let chevronSpots = [
+                CGPoint(x: 45, y: 310), CGPoint(x: 65, y: 325), CGPoint(x: 40, y: 280),
+                CGPoint(x: 320, y: 160), CGPoint(x: 340, y: 175),
+                CGPoint(x: 620, y: 340), CGPoint(x: 640, y: 355),
+                CGPoint(x: 880, y: 210), CGPoint(x: 900, y: 225)
+            ]
+            for sp in chevronSpots {
+                let whiteChalk = color(0.96, 0.98, 0.92, 0.65)
+                line([CGPoint(x: sp.x - 7, y: sp.y - 8), CGPoint(x: sp.x, y: sp.y), CGPoint(x: sp.x + 7, y: sp.y - 8)],
+                     whiteChalk, 1.5)
+            }
 
-        // 6. Rumpun bunga liar putih bertangkai tegak (seperti di screenshot 2)
-        for _ in 0..<90 {
-            let p = CGPoint(x: random() * 960, y: random() * 480)
-            if level.obstacles.contains(where: { $0.rect.insetBy(dx: -15, dy: -15).contains(p) }) { continue }
-            flowerStalk(at: p)
+            for _ in 0..<110 {
+                let p = CGPoint(x: random() * 960, y: random() * 480)
+                if level.obstacles.contains(where: { $0.rect.insetBy(dx: -15, dy: -15).contains(p) }) { continue }
+                flowerStalk(at: p)
+            }
         }
     }
 
@@ -925,6 +1001,37 @@ final class SceneryPainter {
 
     // Bebatuan sungai lembut berbatu & dinding batu mortar Carto
     private func rocks(_ r: CGRect, wall: Bool) {
+        if currentRegion == .boundary && currentStage == .rockSalt {
+            if wall && (r.width > 90 || r.height > 90) {
+                // Formasi Tebing Masif Batu Garam Berlapis (Cardona Salt Cliff Face - Foto 1)
+                let cliff = r
+                rounded(cliff, radius: 10, color: color(0.76, 0.77, 0.80))
+                let tiers = max(2, Int(cliff.height / 35))
+                for t in 0..<tiers {
+                    let ty = cliff.minY + CGFloat(t) * (cliff.height / CGFloat(tiers))
+                    let th = cliff.height / CGFloat(tiers)
+                    rounded(CGRect(x: cliff.minX + 2, y: ty + 1, width: cliff.width - 4, height: th - 2), radius: 6, color: color(0.86, 0.87, 0.89))
+                    // Alur lipatan fluting garam kristal putih
+                    let flutes = max(3, Int(cliff.width / 16))
+                    for f in 0..<flutes {
+                        let fx = cliff.minX + 6 + CGFloat(f) * (cliff.width / CGFloat(flutes))
+                        line([CGPoint(x: fx, y: ty + 2), CGPoint(x: fx + (random() - 0.5) * 6, y: ty + th - 2)],
+                             color(0.96, 0.96, 0.98, 0.9), 1.8)
+                        if f % 3 == 0 {
+                            line([CGPoint(x: fx + 2, y: ty + 3), CGPoint(x: fx + 2, y: ty + th - 4)],
+                                 color(0.88, 0.74, 0.82, 0.65), 1.3)
+                        }
+                    }
+                }
+                return
+            }
+            let rockRect = CGRect(x: r.minX + 2, y: r.minY, width: r.width - 4, height: r.height * 0.85)
+            rounded(rockRect, radius: min(rockRect.width, rockRect.height) * 0.40, color: color(0.82, 0.83, 0.86))
+            rounded(rockRect.insetBy(dx: 4, dy: 4).offsetBy(dx: -2, dy: 3), radius: 5, color: color(0.94, 0.95, 0.97, 0.9))
+            line([CGPoint(x: rockRect.minX + 5, y: rockRect.midY - 2), CGPoint(x: rockRect.maxX - 5, y: rockRect.midY + 3)],
+                 color(0.88, 0.75, 0.80, 0.7), 1.2)
+            return
+        }
         if !wall {
             let rockRect = CGRect(x: r.minX + 2, y: r.minY, width: r.width - 4, height: r.height * 0.85)
             rounded(rockRect, radius: min(rockRect.width, rockRect.height) * 0.45, color: color(0.58, 0.60, 0.54))
@@ -966,9 +1073,536 @@ final class SceneryPainter {
     }
 
     private func borderStones() {
+        if currentRegion == .boundary && currentStage == .rockSalt {
+            for x in stride(from: CGFloat(0), to: 960, by: 25) {
+                rounded(CGRect(x: x, y: 472, width: 20, height: 7), radius: 3, color: color(0.84, 0.85, 0.88))
+                ellipse(CGRect(x: x, y: 1, width: 18, height: 5), color(0.80, 0.81, 0.84, 0.8))
+            }
+            return
+        }
+        if currentRegion == .boundary && currentStage == .woodcutterSlope {
+            for x in stride(from: CGFloat(0), to: 960, by: 25) {
+                rounded(CGRect(x: x, y: 472, width: 20, height: 7), radius: 3, color: color(0.40, 0.34, 0.24))
+                ellipse(CGRect(x: x, y: 1, width: 18, height: 5), color(0.36, 0.30, 0.20, 0.7))
+            }
+            return
+        }
+        if currentRegion == .boundary && currentStage == .theBoundary {
+            for x in stride(from: CGFloat(0), to: 960, by: 25) {
+                rounded(CGRect(x: x, y: 472, width: 20, height: 7), radius: 3, color: color(0.32, 0.40, 0.25))
+                ellipse(CGRect(x: x, y: 1, width: 18, height: 5), color(0.28, 0.35, 0.22, 0.75))
+            }
+            return
+        }
         for x in stride(from: CGFloat(0), to: 960, by: 25) {
             rounded(CGRect(x: x, y: 472, width: 20, height: 7), radius: 3, color: color(0.58, 0.64, 0.46))
             ellipse(CGRect(x: x, y: 1, width: 18, height: 5), color(0.56, 0.60, 0.44, 0.65))
         }
     }
+
+    // =========================================================================
+    // MARK: - MAP B (PINGGIRAN / ZONA TRANSISI) - PROPS AUTENTIK SESUAI STORYBOARD
+    // =========================================================================
+    private func paintBoundaryScenery(level: PrologueLevel, progress: PrologueProgress) {
+        c.saveGState()
+        switch progress.mapBStage {
+        case .rockSalt:
+            paintRockSaltStage()
+        case .herbalHills:
+            paintHerbalHillsStage()
+        case .woodcutterSlope:
+            paintWoodcutterSlopeStage()
+        case .theBoundary:
+            paintTheBoundaryStage()
+        }
+        c.restoreGState()
+    }
+
+    private func woodenRail(from p1: CGPoint, to p2: CGPoint) {
+        let dx = p2.x - p1.x
+        let dy = p2.y - p1.y
+        let len = hypot(dx, dy)
+        guard len > 0 else { return }
+        let nx = -dy / len * 6
+        let ny = dx / len * 6
+        line([CGPoint(x: p1.x + nx, y: p1.y + ny), CGPoint(x: p2.x + nx, y: p2.y + ny)], color(0.42, 0.32, 0.20), 2.2)
+        line([CGPoint(x: p1.x - nx, y: p1.y - ny), CGPoint(x: p2.x - nx, y: p2.y - ny)], color(0.42, 0.32, 0.20), 2.2)
+        let ties = Int(len / 12)
+        for i in 0...ties {
+            let t = CGFloat(i) / CGFloat(ties)
+            let cx = p1.x + dx * t
+            let cy = p1.y + dy * t
+            line([CGPoint(x: cx + nx * 1.5, y: cy + ny * 1.5), CGPoint(x: cx - nx * 1.5, y: cy - ny * 1.5)], color(0.35, 0.25, 0.15), 2.5)
+        }
+    }
+
+    private func wagonRuts(_ points: [CGPoint], offset: CGFloat) {
+        guard points.count >= 2 else { return }
+        let rutColor = color(0.35, 0.28, 0.18, 0.75)
+        for i in 1..<points.count {
+            let p1 = points[i - 1], p2 = points[i]
+            let dx = p2.x - p1.x, dy = p2.y - p1.y
+            let len = hypot(dx, dy)
+            guard len > 0 else { continue }
+            let nx = -dy / len * offset, ny = dx / len * offset
+            line([CGPoint(x: p1.x + nx, y: p1.y + ny), CGPoint(x: p2.x + nx, y: p2.y + ny)], rutColor, 2.0)
+            line([CGPoint(x: p1.x - nx, y: p1.y - ny), CGPoint(x: p2.x - nx, y: p2.y - ny)], rutColor, 2.0)
+        }
+    }
+
+    private func saltCrystalGlint(at p: CGPoint) {
+        let size: CGFloat = 3 + random() * 4
+        let crystalPath = CGMutablePath()
+        crystalPath.move(to: CGPoint(x: p.x, y: p.y + size))
+        crystalPath.addLine(to: CGPoint(x: p.x + size * 0.7, y: p.y))
+        crystalPath.addLine(to: CGPoint(x: p.x, y: p.y - size))
+        crystalPath.addLine(to: CGPoint(x: p.x - size * 0.7, y: p.y))
+        crystalPath.closeSubpath()
+        let alpha = 0.65 + random() * 0.35
+        let glintCol = random() > 0.3 ? color(0.98, 0.98, 1.0, alpha) : color(0.95, 0.82, 0.88, alpha)
+        c.setFillColor(glintCol); c.addPath(crystalPath); c.fillPath()
+    }
+
+    // 1. TAHAP 1: TAMBANG ROCK SALT (Panel 4 Storyboard & Foto 1 Cardona Salt Mountain)
+    private func paintRockSaltStage() {
+        // Gunung Garam Batu Raksasa Cardona (y: 270...480)
+        let mountainBottom: CGFloat = 270
+        let mountainPath = CGMutablePath()
+        mountainPath.move(to: CGPoint(x: 0, y: mountainBottom))
+        mountainPath.addLine(to: CGPoint(x: 0, y: 390))
+        mountainPath.addLine(to: CGPoint(x: 110, y: 440))
+        mountainPath.addLine(to: CGPoint(x: 230, y: 420))
+        mountainPath.addLine(to: CGPoint(x: 350, y: 470))
+        mountainPath.addLine(to: CGPoint(x: 480, y: 480))
+        mountainPath.addLine(to: CGPoint(x: 640, y: 450))
+        mountainPath.addLine(to: CGPoint(x: 770, y: 465))
+        mountainPath.addLine(to: CGPoint(x: 880, y: 420))
+        mountainPath.addLine(to: CGPoint(x: 960, y: 380))
+        mountainPath.addLine(to: CGPoint(x: 960, y: mountainBottom))
+        mountainPath.closeSubpath()
+
+        c.setFillColor(color(0.68, 0.70, 0.72))
+        c.addPath(mountainPath); c.fillPath()
+
+        // Puncak lempung tererosi di bagian atas (Cardona summit)
+        for i in 0..<8 {
+            let px = CGFloat(i) * 125 + 20
+            ellipse(CGRect(x: px - 25, y: 445 + random() * 20, width: 75, height: 26), color(0.78, 0.58, 0.38, 0.85))
+        }
+
+        // 140 ALUR & LIPATAN FLUTING VERTIKAL TEBING GARAM (Iconic Vertical Salt Ridges - Foto 1)
+        let ridgeCount = 140
+        for i in 0..<ridgeCount {
+            let t = CGFloat(i) / CGFloat(ridgeCount)
+            let x = t * 960
+            let ridgeTop = 410 + (sin(t * .pi * 3) * 45) + random() * 20
+            let ridgeBottom = mountainBottom + random() * 25
+            let v = random()
+
+            let saltWhite = color(0.95 + v * 0.05, 0.95 + v * 0.05, 0.98, 0.85)
+            line([CGPoint(x: x, y: ridgeBottom),
+                  CGPoint(x: x + (random() - 0.5) * 6, y: (ridgeBottom + ridgeTop) * 0.5),
+                  CGPoint(x: x + (random() - 0.5) * 12, y: ridgeTop)], saltWhite, 2.4 + v * 2.2)
+
+            if i % 3 == 0 {
+                let darkFissure = color(0.32, 0.34, 0.38, 0.75)
+                line([CGPoint(x: x + 3, y: ridgeBottom),
+                      CGPoint(x: x + 3 + (random() - 0.5) * 5, y: ridgeTop - 10)], darkFissure, 1.4)
+            }
+
+            if i % 5 == 0 {
+                let pinkVein = color(0.88, 0.76, 0.82, 0.65)
+                line([CGPoint(x: x - 2, y: ridgeBottom + 10), CGPoint(x: x - 2, y: ridgeTop - 25)], pinkVein, 1.8)
+            }
+        }
+
+        // Talus runtuhan kristal garam di kaki tebing
+        for _ in 0..<160 {
+            let sx = random() * 960
+            let sy = mountainBottom - 15 + random() * 55
+            let sw: CGFloat = 3 + random() * 8
+            let sh: CGFloat = 2 + random() * 5
+            ellipse(CGRect(x: sx, y: sy, width: sw, height: sh), color(0.92, 0.93, 0.95, 0.85))
+            if random() > 0.6 {
+                ellipse(CGRect(x: sx + 1, y: sy + 1, width: sw * 0.6, height: sh * 0.6), color(1, 1, 1, 0.95))
+            }
+        }
+
+        // Jalur naik dari desa menuju lereng berbatu & Jalan Gerobak (Panel 4)
+        let wagonRoad: [CGPoint] = [
+            CGPoint(x: 20, y: 110),
+            CGPoint(x: 120, y: 140),
+            CGPoint(x: 210, y: 190),
+            CGPoint(x: 300, y: 240),
+            CGPoint(x: 415, y: 265)
+        ]
+        // Lapisan dasar jalan tanah berkerikil
+        for i in 1..<wagonRoad.count {
+            line([wagonRoad[i - 1], wagonRoad[i]], color(0.62, 0.56, 0.44, 0.6), 24)
+        }
+        wagonRuts(wagonRoad, offset: 7.5)
+        woodenRail(from: CGPoint(x: 260, y: 220), to: CGPoint(x: 415, y: 265))
+
+        // Mulut Gua Tambang Garam Gelap (Panel 4 di x: 270...390, y: 340...415)
+        let mineRect = CGRect(x: 270, y: 340, width: 120, height: 75)
+        rounded(mineRect, radius: 24, color: color(0.04, 0.05, 0.07))
+        c.saveGState()
+        let caveGrad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
+            color(0.02, 0.02, 0.03, 1.0),
+            color(0.20, 0.22, 0.26, 0.2)
+        ] as CFArray, locations: [0, 1])!
+        c.drawRadialGradient(caveGrad, startCenter: CGPoint(x: mineRect.midX, y: mineRect.midY), startRadius: 5,
+                             endCenter: CGPoint(x: mineRect.midX, y: mineRect.midY), endRadius: 65, options: [])
+        c.restoreGState()
+
+        // Balok kayu penyangga mulut tambang kokoh (timber frame & posts)
+        let beamY = mineRect.maxY - 8
+        fill(CGRect(x: mineRect.minX + 6, y: mineRect.minY, width: 14, height: mineRect.height), woodDark)
+        fill(CGRect(x: mineRect.maxX - 20, y: mineRect.minY, width: 14, height: mineRect.height), woodDark)
+        fill(CGRect(x: mineRect.minX - 6, y: beamY, width: mineRect.width + 12, height: 16), woodDark)
+        line([CGPoint(x: mineRect.minX + 18, y: beamY), CGPoint(x: mineRect.minX + 38, y: beamY - 22)], woodWarm, 3.5)
+        line([CGPoint(x: mineRect.maxX - 18, y: beamY), CGPoint(x: mineRect.maxX - 38, y: beamY - 22)], woodWarm, 3.5)
+
+        // Palang kayu peringatan lorong dalam tertutup (Inaccessible deeper shaft)
+        line([CGPoint(x: mineRect.minX + 18, y: mineRect.minY + 28), CGPoint(x: mineRect.maxX - 18, y: mineRect.minY + 28)], color(0.48, 0.32, 0.18), 3.0)
+        line([CGPoint(x: mineRect.minX + 22, y: mineRect.minY + 16), CGPoint(x: mineRect.maxX - 22, y: mineRect.minY + 40)], color(0.42, 0.28, 0.14), 2.2)
+
+        // Bagian Depan Tambang Rock Salt: Serpihan dan kristal rock salt berkilau (Panel 4)
+        for _ in 0..<35 {
+            let px = 280 + random() * 100
+            let py = 310 + random() * 45
+            saltCrystalGlint(at: CGPoint(x: px, y: py))
+        }
+
+        // Peneduh Kain / Kanopi Kanvas Penambang (Panel 4 di 230, 235)
+        let tentRect = CGRect(x: 230, y: 235, width: 65, height: 50)
+        fill(CGRect(x: tentRect.minX + 3, y: tentRect.minY, width: 4, height: tentRect.height), woodDark)
+        fill(CGRect(x: tentRect.maxX - 7, y: tentRect.minY, width: 4, height: tentRect.height), woodDark)
+        let tarp = CGMutablePath()
+        tarp.move(to: CGPoint(x: tentRect.minX - 2, y: tentRect.maxY - 6))
+        tarp.addLine(to: CGPoint(x: tentRect.midX, y: tentRect.maxY + 10))
+        tarp.addLine(to: CGPoint(x: tentRect.maxX + 2, y: tentRect.maxY - 6))
+        tarp.addLine(to: CGPoint(x: tentRect.maxX + 2, y: tentRect.maxY - 14))
+        tarp.addLine(to: CGPoint(x: tentRect.minX - 2, y: tentRect.maxY - 14))
+        tarp.closeSubpath()
+        c.setFillColor(color(0.92, 0.88, 0.78))
+        c.addPath(tarp); c.fillPath()
+        line([CGPoint(x: tentRect.minX, y: tentRect.maxY - 6), CGPoint(x: tentRect.minX - 10, y: tentRect.minY)], woodDark, 1.2)
+        line([CGPoint(x: tentRect.maxX, y: tentRect.maxY - 6), CGPoint(x: tentRect.maxX + 10, y: tentRect.minY)], woodDark, 1.2)
+        fill(CGRect(x: tentRect.minX + 12, y: tentRect.minY + 4, width: 28, height: 8), woodWarm)
+
+        // Area Kerja Penambang: Peti kayu, gentong mineral, dan beliung penambang
+        let crateBox = CGRect(x: 345, y: 235, width: 24, height: 22)
+        rounded(crateBox, radius: 2, color: color(0.50, 0.36, 0.22))
+        line([CGPoint(x: crateBox.minX, y: crateBox.minY), CGPoint(x: crateBox.maxX, y: crateBox.maxY)], color(0.35, 0.25, 0.15), 1.2)
+        let barrelRect = CGRect(x: 375, y: 230, width: 16, height: 24)
+        rounded(barrelRect, radius: 4, color: color(0.42, 0.30, 0.18))
+        line([CGPoint(x: barrelRect.minX, y: barrelRect.minY + 6), CGPoint(x: barrelRect.maxX, y: barrelRect.minY + 6)], color(0.25, 0.25, 0.26), 1.5)
+        line([CGPoint(x: barrelRect.minX, y: barrelRect.maxY - 6), CGPoint(x: barrelRect.maxX, y: barrelRect.maxY - 6)], color(0.25, 0.25, 0.26), 1.5)
+        // Beliung penambang bersandar di tiang
+        line([CGPoint(x: tentRect.minX + 2, y: tentRect.minY), CGPoint(x: tentRect.minX - 12, y: tentRect.minY + 26)], color(0.58, 0.44, 0.28), 2.0)
+        line([CGPoint(x: tentRect.minX - 16, y: tentRect.minY + 28), CGPoint(x: tentRect.minX - 8, y: tentRect.minY + 24)], color(0.35, 0.38, 0.42), 3.0)
+
+        // Gerobak Tambang Kayu Beroda Besi (Panel 4 di 415, 265)
+        let cartRect = CGRect(x: 415, y: 265, width: 65, height: 42)
+        ellipse(CGRect(x: cartRect.minX + 6, y: cartRect.minY - 2, width: 14, height: 14), color(0.18, 0.18, 0.20))
+        ellipse(CGRect(x: cartRect.maxX - 20, y: cartRect.minY - 2, width: 14, height: 14), color(0.18, 0.18, 0.20))
+        let binPath = CGMutablePath()
+        binPath.move(to: CGPoint(x: cartRect.minX + 4, y: cartRect.minY + 6))
+        binPath.addLine(to: CGPoint(x: cartRect.minX, y: cartRect.maxY))
+        binPath.addLine(to: CGPoint(x: cartRect.maxX, y: cartRect.maxY))
+        binPath.addLine(to: CGPoint(x: cartRect.maxX - 4, y: cartRect.minY + 6))
+        binPath.closeSubpath()
+        c.setFillColor(color(0.52, 0.38, 0.24))
+        c.addPath(binPath); c.fillPath()
+        line([CGPoint(x: cartRect.minX + 2, y: cartRect.midY + 3), CGPoint(x: cartRect.maxX - 2, y: cartRect.midY + 3)], color(0.28, 0.28, 0.30), 2.2)
+        for i in 0..<5 {
+            let gx = cartRect.minX + 8 + CGFloat(i) * 10
+            ellipse(CGRect(x: gx, y: cartRect.maxY - 5, width: 9, height: 8), color(0.96, 0.96, 0.98))
+        }
+
+        // Tebing Kecil di Kiri Bawah (Panel 4: Tebing kecil mengapit jalur sempit)
+        let cliffLeft = CGRect(x: 0, y: 0, width: 150, height: 95)
+        rounded(cliffLeft, radius: 10, color: color(0.72, 0.74, 0.76))
+        for r in 0..<3 {
+            let ly = cliffLeft.minY + CGFloat(r) * 28 + 10
+            line([CGPoint(x: 0, y: ly), CGPoint(x: 140, y: ly - 8)], color(0.85, 0.86, 0.88), 1.8)
+        }
+    }
+
+    // 2. TAHAP 2: PERBUKITAN HERBAL (Panel 5 Storyboard & Foto 3 Alpine Meadow)
+    private func paintHerbalHillsStage() {
+        // Kontur perbukitan hijau bergelombang di latar belakang (rolling green knolls)
+        let hill1 = CGMutablePath()
+        hill1.move(to: CGPoint(x: 350, y: 380))
+        hill1.addQuadCurve(to: CGPoint(x: 680, y: 460), control: CGPoint(x: 520, y: 470))
+        hill1.addQuadCurve(to: CGPoint(x: 960, y: 390), control: CGPoint(x: 820, y: 480))
+        hill1.addLine(to: CGPoint(x: 960, y: 330))
+        hill1.addLine(to: CGPoint(x: 350, y: 330))
+        hill1.closeSubpath()
+        c.setFillColor(color(0.68, 0.77, 0.44, 0.4))
+        c.addPath(hill1); c.fillPath()
+
+        // Jalur naik perbukitan (winding hill path)
+        let hillPath: [CGPoint] = [
+            CGPoint(x: 50, y: 110),
+            CGPoint(x: 180, y: 145),
+            CGPoint(x: 340, y: 170),
+            CGPoint(x: 480, y: 220),
+            CGPoint(x: 620, y: 260),
+            CGPoint(x: 700, y: 310)
+        ]
+        for i in 1..<hillPath.count {
+            line([hillPath[i - 1], hillPath[i]], color(0.64, 0.60, 0.46, 0.55), 18)
+        }
+
+        // Tepi Kebun Desa di barat daya (Panel 5)
+        for row in 0..<3 {
+            let ry = CGFloat(50 + row * 22)
+            rounded(CGRect(x: 250, y: ry, width: 95, height: 12), radius: 4, color: color(0.48, 0.38, 0.26, 0.7))
+            for cCol in 0..<5 {
+                let cx = 260 + CGFloat(cCol) * 18
+                ellipse(CGRect(x: cx, y: ry + 6, width: 8, height: 8), color(0.34, 0.60, 0.25))
+            }
+        }
+        // Pagar kayu pembatas kebun
+        line([CGPoint(x: 240, y: 40), CGPoint(x: 355, y: 40)], color(0.50, 0.36, 0.22), 2.0)
+        for px in [CGFloat(245), CGFloat(280), CGFloat(315), CGFloat(350)] {
+            line([CGPoint(x: px, y: 35), CGPoint(x: px, y: 55)], color(0.40, 0.28, 0.16), 2.5)
+        }
+
+        // Parit Kering (Panel 5: Parit dangkal kering berkerikil di 510, 175)
+        let ditchRect = CGRect(x: 510, y: 175, width: 140, height: 35)
+        rounded(ditchRect, radius: 14, color: color(0.58, 0.52, 0.38, 0.7))
+        rounded(ditchRect.insetBy(dx: 4, dy: 4), radius: 10, color: color(0.48, 0.42, 0.30, 0.8))
+        for _ in 0..<24 {
+            let kx = ditchRect.minX + 8 + random() * (ditchRect.width - 16)
+            let ky = ditchRect.minY + 5 + random() * (ditchRect.height - 10)
+            ellipse(CGRect(x: kx, y: ky, width: 3 + random() * 5, height: 2 + random() * 4), color(0.68, 0.62, 0.50))
+        }
+        for _ in 0..<8 {
+            let cx = ditchRect.minX + 12 + random() * (ditchRect.width - 24)
+            let cy = ditchRect.minY + 6 + random() * (ditchRect.height - 12)
+            line([CGPoint(x: cx, y: cy), CGPoint(x: cx + 7, y: cy + 3), CGPoint(x: cx + 13, y: cy - 2)], color(0.32, 0.26, 0.18, 0.6), 1.0)
+        }
+
+        // Deretan 4 Batu Pembatas / Batas Aman Desa (Panel 5 di 670...850, y: 120)
+        for sx in [CGFloat(670), CGFloat(730), CGFloat(790), CGFloat(850)] {
+            let stoneRect = CGRect(x: sx, y: 120, width: 26, height: 36)
+            ellipse(CGRect(x: stoneRect.minX - 3, y: stoneRect.minY - 3, width: stoneRect.width + 6, height: 10), color(0.18, 0.22, 0.14, 0.35))
+            rounded(stoneRect, radius: 6, color: color(0.56, 0.58, 0.52))
+            rounded(stoneRect.insetBy(dx: 3, dy: 3), radius: 4, color: color(0.68, 0.70, 0.64))
+            ellipse(CGRect(x: stoneRect.minX + 2, y: stoneRect.maxY - 8, width: stoneRect.width - 4, height: 7), color(0.38, 0.54, 0.26, 0.8))
+            // Ukiran simbol spiral kuno pada batu (tanda batas aman)
+            line([CGPoint(x: stoneRect.midX, y: stoneRect.minY + 8), CGPoint(x: stoneRect.midX, y: stoneRect.maxY - 10)], color(0.42, 0.44, 0.40, 0.8), 1.2)
+            line([CGPoint(x: stoneRect.midX - 4, y: stoneRect.midY), CGPoint(x: stoneRect.midX + 4, y: stoneRect.midY)], color(0.42, 0.44, 0.40, 0.8), 1.2)
+            ellipse(CGRect(x: stoneRect.midX - 2, y: stoneRect.midY - 2, width: 4, height: 4), color(0.42, 0.44, 0.40, 0.8))
+        }
+
+        // Batu Besar / Batu Menjorok (Panel 5: Boulder raksasa tempat tanaman herbal di 640, 270)
+        let cliffRect = CGRect(x: 640, y: 270, width: 130, height: 85)
+        rounded(cliffRect, radius: 14, color: color(0.52, 0.50, 0.46))
+        rounded(cliffRect.insetBy(dx: 4, dy: 4), radius: 10, color: color(0.62, 0.60, 0.56))
+        for row in 0..<4 {
+            let ly = cliffRect.minY + CGFloat(row) * 18
+            line([CGPoint(x: cliffRect.minX + 4, y: ly), CGPoint(x: cliffRect.maxX - 4, y: ly + 3)], color(0.38, 0.36, 0.32, 0.6), 1.4)
+        }
+        // Rumpun tanaman herbal berdaun emas dan hijau di puncak batu menjorok (Foto 3)
+        let herbCenter = CGPoint(x: 710, y: 340)
+        for i in 0..<11 {
+            let hx = herbCenter.x - 24 + CGFloat(i) * 5 + (random() - 0.5) * 4
+            let hy = herbCenter.y - 6 + (random() - 0.5) * 6
+            line([CGPoint(x: hx, y: hy), CGPoint(x: hx, y: hy + 12)], color(0.28, 0.52, 0.22), 1.5)
+            // Kuntum bunga chamomile kuning cerah
+            ellipse(CGRect(x: hx - 3, y: hy + 10, width: 6, height: 6), color(0.98, 0.86, 0.20))
+            ellipse(CGRect(x: hx - 1.5, y: hy + 11.5, width: 3, height: 3), color(0.96, 0.98, 0.92))
+        }
+
+        // Bagian awal pinggir hutan / tree line di timur (Panel 5 di 860...960)
+        for tx in stride(from: 865, through: 955, by: 30) {
+            for ty in stride(from: 140, through: 420, by: 45) {
+                let pBase = CGPoint(x: CGFloat(tx), y: CGFloat(ty))
+                line([pBase, CGPoint(x: pBase.x, y: pBase.y + 35)], color(0.24, 0.18, 0.12), 4.0)
+                let cPath = CGMutablePath()
+                cPath.move(to: CGPoint(x: pBase.x - 22, y: pBase.y + 12))
+                cPath.addLine(to: CGPoint(x: pBase.x, y: pBase.y + 48))
+                cPath.addLine(to: CGPoint(x: pBase.x + 22, y: pBase.y + 12))
+                cPath.closeSubpath()
+                c.setFillColor(color(0.12, 0.25, 0.15, 0.9))
+                c.addPath(cPath); c.fillPath()
+            }
+        }
+
+        // Siluet Penampakan The Hollow di sela pepohonan timur (850, 220)
+        let hollowPos = CGPoint(x: 850, y: 220)
+        ellipse(CGRect(x: hollowPos.x - 25, y: hollowPos.y - 10, width: 50, height: 50), color(0.08, 0.04, 0.14, 0.45))
+        rounded(CGRect(x: hollowPos.x - 8, y: hollowPos.y - 4, width: 16, height: 34), radius: 6, color: color(0.04, 0.03, 0.06, 0.85))
+        ellipse(CGRect(x: hollowPos.x - 4, y: hollowPos.y + 18, width: 3, height: 3), color(0.65, 0.85, 1.0, 0.9))
+        ellipse(CGRect(x: hollowPos.x + 1, y: hollowPos.y + 18, width: 3, height: 3), color(0.65, 0.85, 1.0, 0.9))
+    }
+
+    // 3. TAHAP 3: LERENG KAYU / PENEMUAN BUKU (Panel 6 Storyboard & Foto 2)
+    private func paintWoodcutterSlopeStage() {
+        // Kontur lereng terasering penebangan kayu
+        for s in 0..<4 {
+            let cy = CGFloat(110 + s * 70)
+            line([CGPoint(x: 0, y: cy), CGPoint(x: 480, y: cy - 15), CGPoint(x: 960, y: cy - 5)],
+                 color(0.38, 0.32, 0.22, 0.35), 2.0)
+        }
+
+        // Jalur pencari kayu dengan bekas roda gerobak basah berlumpur (Panel 6)
+        let woodRoad: [CGPoint] = [
+            CGPoint(x: 45, y: 210),
+            CGPoint(x: 160, y: 175),
+            CGPoint(x: 290, y: 185),
+            CGPoint(x: 430, y: 200),
+            CGPoint(x: 520, y: 215)
+        ]
+        for i in 1..<woodRoad.count {
+            line([woodRoad[i - 1], woodRoad[i]], color(0.48, 0.40, 0.28, 0.5), 22)
+        }
+        wagonRuts(woodRoad, offset: 8.0)
+
+        // Penanda jalur warga (patok kayu bertakik & rumput terinjak)
+        for stakeX in [CGFloat(150), CGFloat(280), CGFloat(410)] {
+            line([CGPoint(x: stakeX, y: 155), CGPoint(x: stakeX, y: 180)], color(0.45, 0.32, 0.20), 3.0)
+            line([CGPoint(x: stakeX - 3, y: 175), CGPoint(x: stakeX + 3, y: 175)], color(0.85, 0.70, 0.45), 2.0)
+        }
+
+        // POHON TUA BERAKAR TERBUKA RAKSASA DI KIRI (Panel 6: Pohon miring dengan akar raksasa)
+        let treeLeft = CGRect(x: 90, y: 200, width: 150, height: 180)
+        // Batang miring besar
+        let trunk = CGMutablePath()
+        trunk.move(to: CGPoint(x: treeLeft.minX + 30, y: treeLeft.minY + 30))
+        trunk.addLine(to: CGPoint(x: treeLeft.minX + 15, y: treeLeft.maxY))
+        trunk.addLine(to: CGPoint(x: treeLeft.minX + 75, y: treeLeft.maxY))
+        trunk.addLine(to: CGPoint(x: treeLeft.minX + 90, y: treeLeft.minY + 40))
+        trunk.closeSubpath()
+        c.setFillColor(color(0.35, 0.24, 0.15))
+        c.addPath(trunk); c.fillPath()
+
+        // Jalinan akar-akar raksasa mencengkeram tebing lereng ke kanan bawah
+        for i in 0..<7 {
+            let startP = CGPoint(x: treeLeft.minX + 35 + CGFloat(i) * 9, y: treeLeft.minY + 35)
+            let midP = CGPoint(x: treeLeft.minX + 75 + CGFloat(i) * 18, y: treeLeft.minY - 10 + CGFloat(i) * 5)
+            let endP = CGPoint(x: treeLeft.minX + 135 + CGFloat(i) * 26, y: treeLeft.minY - 45 - CGFloat(i) * 8)
+            line([startP, midP, endP], color(0.32, 0.22, 0.14), 4.5 - CGFloat(i) * 0.35)
+        }
+
+        // TANAH LONGSOR KECIL DI KANAN (Panel 6)
+        let slideRect = CGRect(x: 540, y: 170, width: 135, height: 95)
+        rounded(slideRect, radius: 10, color(0.68, 0.48, 0.32))
+        for s in 0..<5 {
+            let sy = slideRect.minY + CGFloat(s) * 18
+            line([CGPoint(x: slideRect.minX + 3, y: sy), CGPoint(x: slideRect.maxX - 3, y: sy - 5)], color(0.55, 0.38, 0.24, 0.65), 2.0)
+        }
+        for _ in 0..<18 {
+            let rx = slideRect.minX + random() * slideRect.width
+            let ry = slideRect.minY + random() * 30
+            ellipse(CGRect(x: rx, y: ry, width: 6 + random() * 6, height: 4 + random() * 4), color(0.52, 0.48, 0.44))
+        }
+
+        // AKAR DAN TANAH BASAH DI TENGAH & TITIK PENEMUAN BUKU ELIAS (Panel 6 X di 480, 220)
+        for i in 0..<6 {
+            let rx = 350 + CGFloat(i) * 24
+            line([CGPoint(x: rx, y: 245), CGPoint(x: rx + (i % 2 == 0 ? -10 : 12), y: 215), CGPoint(x: rx + 5, y: 185)],
+                 color(0.34, 0.22, 0.14), 3.0)
+        }
+
+        // Buku Elias di sela-sela akar pohon tua pada tanah longsor (Panel 6 X)
+        let bookRect = CGRect(x: 475, y: 215, width: 16, height: 12)
+        rounded(bookRect, radius: 2, color: color(0.45, 0.25, 0.15))
+        line([CGPoint(x: bookRect.minX + 2, y: bookRect.minY + 2), CGPoint(x: bookRect.maxX - 2, y: bookRect.minY + 2)], color(0.95, 0.88, 0.60), 1.4)
+        ellipse(CGRect(x: bookRect.midX - 2, y: bookRect.midY - 2, width: 4, height: 4), color(0.98, 0.90, 0.40, 0.95))
+
+        // Tunggul tebangan dan gelondongan kayu (kiri bawah)
+        for sp in [CGPoint(x: 110, y: 110), CGPoint(x: 230, y: 125)] {
+            let stumpRect = CGRect(x: sp.x, y: sp.y, width: 45, height: 35)
+            ellipse(CGRect(x: stumpRect.minX - 3, y: stumpRect.minY - 4, width: stumpRect.width + 6, height: 12), color(0.18, 0.16, 0.12, 0.35))
+            rounded(CGRect(x: stumpRect.minX + 4, y: stumpRect.minY, width: stumpRect.width - 8, height: stumpRect.height * 0.7), radius: 4, color: color(0.48, 0.34, 0.22))
+            let topEllipse = CGRect(x: stumpRect.minX + 2, y: stumpRect.maxY - 14, width: stumpRect.width - 4, height: 14)
+            ellipse(topEllipse, color(0.82, 0.68, 0.48))
+            ellipse(topEllipse.insetBy(dx: 5, dy: 3), color(0.72, 0.58, 0.40))
+            line([CGPoint(x: topEllipse.midX - 3, y: topEllipse.midY), CGPoint(x: topEllipse.midX + 5, y: topEllipse.midY + 2)], color(0.38, 0.24, 0.14), 1.5)
+        }
+        // Kapak penebang kayu tertancap di tunggul kiri (110, 110)
+        line([CGPoint(x: 132, y: 135), CGPoint(x: 148, y: 155)], color(0.60, 0.45, 0.28), 2.2)
+        line([CGPoint(x: 130, y: 133), CGPoint(x: 137, y: 130)], color(0.35, 0.38, 0.42), 3.0)
+
+        // Gelondongan kayu pinus yang diikat
+        for lp in [CGRect(x: 150, y: 80, width: 100, height: 30), CGRect(x: 310, y: 140, width: 85, height: 28)] {
+            for row in 0..<3 {
+                let ly = lp.minY + CGFloat(row) * 9
+                rounded(CGRect(x: lp.minX + CGFloat(row) * 4, y: ly, width: lp.width - CGFloat(row) * 8, height: 10), radius: 3, color: color(0.56, 0.42, 0.28))
+                ellipse(CGRect(x: lp.maxX - CGFloat(row) * 4 - 8, y: ly + 1, width: 8, height: 8), color(0.84, 0.70, 0.50))
+            }
+        }
+    }
+
+    // 4. TAHAP 4: JALUR HUTAN BERKABUT / THE BOUNDARY (Panel 7 Storyboard)
+    private func paintTheBoundaryStage() {
+        // Jalur ekspedisi dari lereng barat menuju celah hutan berkabut di timur
+        let expPath: [CGPoint] = [
+            CGPoint(x: 50, y: 200),
+            CGPoint(x: 200, y: 210),
+            CGPoint(x: 340, y: 210),
+            CGPoint(x: 480, y: 215),
+            CGPoint(x: 680, y: 225),
+            CGPoint(x: 920, y: 240)
+        ]
+        for i in 1..<expPath.count {
+            line([expPath[i - 1], expPath[i]], color(0.52, 0.48, 0.38, 0.45), 24)
+        }
+
+        // Kanopi pepohonan rapat di sekeliling hutan berkabut
+        // PENANDA POHON BESAR (Panel 7 di 310, 195: Ditandai goresan silang 'X' pisau & pita kain)
+        let treeRect = CGRect(x: 310, y: 195, width: 55, height: 60)
+        let trunk = CGRect(x: treeRect.minX + 14, y: treeRect.minY, width: 26, height: treeRect.height * 0.65)
+        rounded(trunk, radius: 5, color: color(0.40, 0.28, 0.18))
+        line([CGPoint(x: trunk.minX + 2, y: trunk.minY), CGPoint(x: trunk.minX - 10, y: trunk.minY - 6)], color(0.35, 0.24, 0.15), 3.5)
+        line([CGPoint(x: trunk.maxX - 2, y: trunk.minY), CGPoint(x: trunk.maxX + 12, y: trunk.minY - 5)], color(0.35, 0.24, 0.15), 3.5)
+
+        // Tajuk pohon lebat
+        ellipse(CGRect(x: treeRect.minX - 12, y: treeRect.minY + 22, width: treeRect.width + 24, height: 54), color(0.20, 0.44, 0.22))
+        ellipse(CGRect(x: treeRect.minX - 4, y: treeRect.minY + 30, width: treeRect.width + 8, height: 46), color(0.26, 0.52, 0.26))
+
+        // Tanda Silang 'X' Goresan Pisau Anneth (Panel 7: Penanda pohon ditandai goresan)
+        line([CGPoint(x: trunk.midX - 5, y: trunk.minY + 12), CGPoint(x: trunk.midX + 5, y: trunk.minY + 22)], color(0.96, 0.94, 0.85), 2.2)
+        line([CGPoint(x: trunk.midX - 5, y: trunk.minY + 22), CGPoint(x: trunk.midX + 5, y: trunk.minY + 12)], color(0.96, 0.94, 0.85), 2.2)
+
+        // Dahan Tempat Kain Terang Diikat (Pita Kain Merah-Oranye Terang Berkibar di Cabang Pohon)
+        line([CGPoint(x: trunk.maxX - 2, y: trunk.maxY - 6), CGPoint(x: trunk.maxX + 16, y: trunk.maxY - 2)], color(0.35, 0.24, 0.15), 2.5)
+        let ribbonPath = CGMutablePath()
+        ribbonPath.move(to: CGPoint(x: trunk.maxX + 12, y: trunk.maxY - 4))
+        ribbonPath.addLine(to: CGPoint(x: trunk.maxX + 28, y: trunk.maxY + 2))
+        ribbonPath.addLine(to: CGPoint(x: trunk.maxX + 24, y: trunk.maxY - 8))
+        ribbonPath.addLine(to: CGPoint(x: trunk.maxX + 32, y: trunk.maxY - 14))
+        ribbonPath.addLine(to: CGPoint(x: trunk.maxX + 10, y: trunk.maxY - 8))
+        ribbonPath.closeSubpath()
+        c.setFillColor(color(0.96, 0.30, 0.15))
+        c.addPath(ribbonPath); c.fillPath()
+
+        // Lingkaran 12 Batu Kumpul Sahabat di 420, 200
+        let gCenter = CGPoint(x: 420, y: 200)
+        for a in stride(from: 0.0, to: Double.pi * 2, by: Double.pi / 6) {
+            let sx = gCenter.x + CGFloat(cos(a)) * 36
+            let sy = gCenter.y + CGFloat(sin(a)) * 20
+            ellipse(CGRect(x: sx - 3, y: sy - 2, width: 7, height: 5), color(0.72, 0.70, 0.64))
+        }
+
+        // Gerbang Celah Cabang Pohon Kuno menuju Deep Woods di timur (920, 240)
+        let gateL = CGPoint(x: 880, y: 170)
+        let gateR = CGPoint(x: 880, y: 310)
+        line([gateL, CGPoint(x: 910, y: 240)], color(0.28, 0.18, 0.12), 4.5)
+        line([gateR, CGPoint(x: 910, y: 240)], color(0.28, 0.18, 0.12), 4.5)
+
+        // KABUT TEBAL MENYELIMUTI JALUR (Panel 7: Kabut & jarak pandang terbatas)
+        let mistGradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
+            color(0.12, 0.16, 0.14, 0.0),
+            color(0.16, 0.22, 0.20, 0.45),
+            color(0.10, 0.14, 0.12, 0.85)
+        ] as CFArray, locations: [0, 0.5, 1])!
+        c.drawLinearGradient(mistGradient, start: CGPoint(x: 750, y: 240), end: CGPoint(x: 960, y: 240), options: [])
+    }
 }
+

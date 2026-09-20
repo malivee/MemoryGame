@@ -19,13 +19,17 @@ extension ExplorationScene {
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard !enteringMemory, !readingBook, bag == nil, let touch = touches.first else { return }
+        guard let touch = touches.first else { return }
         let hudPoint = touch.location(in: hud)
         let names = Set(hud.nodes(at: hudPoint).compactMap(\.name))
+        if handleDebugWarpTouch(hudPoint: hudPoint, names: names) { return }
+        let isDebugHit = names.contains("debugWarp") || (hud.childNode(withName: "debugWarp").map { hypot(hudPoint.x - $0.position.x, hudPoint.y - $0.position.y) < 55 } ?? false)
+        if isDebugHit { toggleDebugWarp(); return }
         if names.contains("unlockCard") || names.contains("unlockCardDismiss") {
             dismissUnlockCard()
             return
         }
+        guard !enteringMemory, !readingBook, bag == nil else { return }
         if dialoguePanel != nil { advanceDialogue(); return }
         if names.contains("photo") { returnToPhoto(); return }
         if names.contains("bag") { openBag(); return }
@@ -61,6 +65,15 @@ extension ExplorationScene {
             case .sitStump(let p): targetPos = p
             case .standUp, .wakeUp: targetPos = arthur.position
             case .sleepBed: targetPos = houseBedSpot
+            case .rockSalt: targetPos = rockSaltNode?.position ?? (level.marker ?? .zero)
+            case .darkMineEntrance: targetPos = mineShaftNode?.position ?? CGPoint(x: 330, y: 395)
+            case .herbalPlant: targetPos = herbalNode?.position ?? (level.marker ?? .zero)
+            case .boundaryStone: targetPos = boundaryStoneNodes.first?.position ?? CGPoint(x: 730, y: 120)
+            case .hollowEncounter: targetPos = hollowNode?.position ?? (level.gathering ?? .zero)
+            case .firewood: targetPos = firewoodNode?.position ?? (level.marker ?? .zero)
+            case .landslideEliasBook: targetPos = eliasBookNode?.position ?? (level.book ?? .zero)
+            case .boundaryTreeMarker: targetPos = boundaryTreeNode?.position ?? (level.marker ?? .zero)
+            case .deepWoodsGate: targetPos = deepWoodsGateNode?.position ?? (level.exit ?? .zero)
             }
             if distance(worldPoint, targetPos) < 75 || (nearbyPrompt != nil && distance(worldPoint, nearbyPrompt!.position) < 75) {
                 interact()

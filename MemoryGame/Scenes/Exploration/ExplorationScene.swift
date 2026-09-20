@@ -47,6 +47,7 @@ final class ExplorationScene: SKScene {
     var hudInteractLabel: SKLabelNode?
     var echoesVillagePassed = false
     var sceneryNode: SKSpriteNode?
+    var debugMenuNode: SKNode?
 
     let houseStumpCushions: [CGPoint] = [
         CGPoint(x: 305, y: 335), // Atas karpet
@@ -57,6 +58,15 @@ final class ExplorationScene: SKScene {
     let houseBedSpot = CGPoint(x: 580, y: 78)
     var stumpNodes: [SKNode] = []
     var bedNode: SKNode?
+    var rockSaltNode: SKNode?
+    var mineShaftNode: SKNode?
+    var herbalNode: SKNode?
+    var boundaryStoneNodes: [SKNode] = []
+    var hollowNode: SKNode?
+    var firewoodNode: SKNode?
+    var eliasBookNode: SKNode?
+    var boundaryTreeNode: SKNode?
+    var deepWoodsGateNode: SKNode?
 
     init(size: CGSize, entry: MemoryPiece, worldLocations: Set<MemoryPiece>) {
         self.entry = entry
@@ -106,4 +116,14 @@ enum MemoryInteractionTarget: Equatable {
     case standUp
     case sleepBed
     case wakeUp
+    // Map B (Pinggiran / Zona Transisi)
+    case rockSalt
+    case darkMineEntrance
+    case herbalPlant
+    case boundaryStone
+    case hollowEncounter
+    case firewood
+    case landslideEliasBook
+    case boundaryTreeMarker
+    case deepWoodsGate
 }

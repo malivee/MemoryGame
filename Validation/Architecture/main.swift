@@ -13,16 +13,19 @@ let session = PuzzleSession(progress: progress)
 let starters = PuzzleWorld.house.pieceIDs.sorted()
 expect(JigsawCatalog.availableIDs(progress: progress) == Set(starters), "Only house pieces start unlocked")
 expect(!session.place(16, at: 16), "Locked pieces cannot be placed")
-expect(!session.place(starters[0], at: JigsawCatalog.count), "Out-of-bounds placement is rejected")
+expect(!session.place(starters[0], at: JigsawCatalog.boardSlotCount), "Out-of-bounds placement is rejected")
+func photoSlot(_ id: Int) -> Int {
+    (id / PuzzleCatalog.columns) * PuzzleCatalog.boardColumns + (id % PuzzleCatalog.columns)
+}
 for id in starters {
     session.rotate(id, quarterTurns: -(progress.jigsaw?.rotations[id] ?? 0))
-    expect(session.place(id, at: id), "Starter can occupy its photo slot")
+    expect(session.place(id, at: photoSlot(id)), "Starter can occupy its photo slot")
 }
 session.synchronize()
 expect(progress.installed(.house), "Three connected upright pieces open the house")
 expect(progress.jigsaw?.worldEntry(for: starters[0], progress: progress) == .house, "House portal has correct destination")
 let beforeCollision = progress.jigsaw!.placements
-expect(!session.place(starters[0], at: starters[1]), "Occupied slot cannot evict another piece")
+expect(!session.place(starters[0], at: photoSlot(starters[1])), "Occupied slot cannot evict another piece")
 expect(progress.jigsaw!.placements == beforeCollision, "Rejected drop preserves both pieces")
 session.rotate(starters[0])
 session.synchronize()

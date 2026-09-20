@@ -8,7 +8,7 @@ import SpriteKit
 enum SceneryTextures {
     private static var cache: [String: SKTexture] = [:]
     static func texture(level: PrologueLevel, progress: PrologueProgress) -> SKTexture? {
-        let key = "v5_carto:\(level.region.rawValue):\(level.obstacles.count):\(progress.placement(of: .villageRoad)?.turns ?? -1):\(progress.placement(of: .oldPath)?.turns ?? -1):\(progress.lakeVariant?.rawValue ?? "none")"
+        let key = "v6_carto:\(level.region.rawValue):\(progress.mapBStage.rawValue):\(level.obstacles.count):\(progress.placement(of: .villageRoad)?.turns ?? -1):\(progress.placement(of: .oldPath)?.turns ?? -1):\(progress.lakeVariant?.rawValue ?? "none")"
         if let texture = cache[key] { return texture }
         guard let image = SceneryPainter().image(level: level, progress: progress) else { return nil }
         let texture = SKTexture(cgImage: image)

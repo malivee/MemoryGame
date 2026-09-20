@@ -32,6 +32,7 @@ enum MemoryPiece: String, CaseIterable, Codable {
         switch self {
         case .house: return .house
         case .yard, .villageRoad, .garden: return .village
+        case .boundary, .closing: return .boundary
         case .echoesBoundary: return .echoes
         default: return .foothills
         }
@@ -39,8 +40,24 @@ enum MemoryPiece: String, CaseIterable, Codable {
     var location: MemoryPiece { self == .dryLake ? .lake : self }
 }
 
-enum MemoryRegion: String, Codable { case house, village, foothills, echoes }
+enum MemoryRegion: String, Codable { case house, village, foothills, boundary, echoes }
 enum FriendID: String, CaseIterable, Codable { case keneth = "Keneth", roland = "Roland", anneth = "Anneth" }
+
+enum MapBStage: String, CaseIterable, Codable {
+    case rockSalt = "rockSalt"
+    case herbalHills = "herbalHills"
+    case woodcutterSlope = "woodcutterSlope"
+    case theBoundary = "theBoundary"
+
+    var title: String {
+        switch self {
+        case .rockSalt: return "Tambang Garam"
+        case .herbalHills: return "Bukit Herbal"
+        case .woodcutterSlope: return "Lereng Kayu"
+        case .theBoundary: return "The Boundary"
+        }
+    }
+}
 
 struct PhotoPlacement: Codable, Equatable {
     let piece: MemoryPiece
@@ -62,11 +79,56 @@ final class PrologueProgress: Codable {
     var noticedChangedRoute = false
     var assembled = false
 
+    // Map B (Pinggiran / Zona Transisi) progressive unlock flags
+    var mapBStage: MapBStage = .rockSalt
+    var isRockSaltUnlocked = false
+    var hasRockSalt = false
+    var deliveredRockSalt = false
+    var isHerbalUnlocked = false
+    var hasHerbal = false
+    var encounteredHollow = false
+    var metBerynAfterHerbal = false
+    var gatheredWood = false
+    var hasEliasBook = false
+    var boundaryMarked = false
+
+    func boundaryObjective(stage: MapBStage) -> String {
+        switch stage {
+        case .rockSalt:
+            return hasRockSalt ? "Bongkahan garam batu terkumpul! Kembali ke rumah Anneth di desa." : "Ambil bongkahan garam batu di dekat mulut tambang."
+        case .herbalHills:
+            if !hasHerbal {
+                return "Cari dan petik daun herbal di atas batu menjorok untuk Kakek Beryn."
+            } else if !encounteredHollow {
+                return "Periksa semak tepi hutan berkabut di sebelah timur."
+            } else {
+                return "Kembali ke desa dan beritahu Kakek Beryn tentang daun herbal dan bayangan Hollow itu."
+            }
+        case .woodcutterSlope:
+            if !gatheredWood {
+                return "Kumpulkan kayu bakar di jalur pencari kayu lereng hutan."
+            } else if !hasEliasBook {
+                return "Periksa celah tanah longsor dan akar pohon tua untuk mencari Buku Elias."
+            } else {
+                return "Buku Elias ditemukan! Bicarakan rencana ekspedisi ke The Boundary bersama teman-teman."
+            }
+        case .theBoundary:
+            return boundaryMarked ? "Semua persiapan selesai! Masuki celah kabut menuju Deep Woods (Map C)." : "Tandai pohon penanda dengan goresan pisau dan kain terang bersama teman-teman."
+        }
+    }
+
     var inventory: [MemoryPiece] {
         MemoryPiece.allCases.filter { piece in
             discovered.contains(piece) && !placements.values.contains { $0.piece == piece }
         }
     }
+    func currentObjective(for region: MemoryRegion) -> String {
+        if region == .boundary {
+            return boundaryObjective(stage: mapBStage)
+        }
+        return objective
+    }
+
     var objective: String {
         if assembled { return "Kenangan tersusun" }
         if !hasBook {

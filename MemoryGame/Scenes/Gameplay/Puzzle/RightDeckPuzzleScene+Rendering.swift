@@ -96,8 +96,8 @@ extension RightDeckPuzzleScene {
         deck.fillColor = SKColor(red: 0.25, green: 0.20, blue: 0.15, alpha: 0.9)
         deck.strokeColor = SKColor(red: 0.65, green: 0.52, blue: 0.35, alpha: 1)
         canvas.safeAddChild(deck)
-        let deckTitle = canvas.storyLabel("Kepingan Puzzle", at: CGPoint(x: deckCenterX, y: deckBounds.maxY - 25), size: 14,
-                                         color: SKColor(red: 0.92, green: 0.84, blue: 0.67, alpha: 1))
+        let deckTitle = canvas.storyLabel("Kepingan Puzzle", at: CGPoint(x: deckCenterX, y: deckBounds.maxY - 18), size: 13,
+                                          color: SKColor(red: 0.92, green: 0.84, blue: 0.67, alpha: 1))
         deckTitle.zPosition = 70
         
         // HUD sits above the cropped board but below a dragged piece.
@@ -108,9 +108,9 @@ extension RightDeckPuzzleScene {
             inventoryPage = min(inventoryPage, pages - 1)
             let page = Array(inventory.dropFirst(inventoryPage * pageSize).prefix(pageSize))
             for (index, id) in page.enumerated() {
-                let top = deckBounds.maxY - 65
+                let top = deckBounds.maxY - 78
                 let bottom = deckBounds.minY + 16
-                let spacing = min(96, (top - bottom) / CGFloat(max(1, page.count)))
+                let spacing = min(88, (top - bottom) / CGFloat(max(1, page.count)))
                 let piecePosition = CGPoint(x: deckCenterX, y: top - spacing * (CGFloat(index) + 0.5))
                 addTile(id, at: piecePosition, inInventory: true)
             }
@@ -128,6 +128,7 @@ extension RightDeckPuzzleScene {
         case .house: return "Rumah"
         case .village: return "Desa"
         case .foothills: return "Bukit"
+        case .boundary: return "Batas Desa"
         case .echoes: return PuzzleWorld.echoesBoundary.title
         }
     }

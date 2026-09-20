@@ -1,18 +1,43 @@
-// Penjelasan file: PrologueProgress.swift
-// Menyimpan progres cerita: buku, teman yang bergabung, penanda jalan, dan keberangkatan kelompok.
-// Model lokasi lama dipertahankan untuk kompatibilitas dan menjadi hasil sinkronisasi puzzle 10x4.
-// Persistence lives in Services/PrologueStore.swift.
+// Menyimpan progres cerita, puzzle, dan tutorial desa.
+// Penyimpanan ke perangkat dilakukan oleh PrologueStore.
 
 import Foundation
 
 enum MemoryPiece: String, CaseIterable, Codable {
-    case mountain, oldPath, boundary, lake, garden, house, closing, yard, villageRoad, dryLake, echoesBoundary
+    case mountain
+    case oldPath
+    case boundary
+    case lake
+    case garden
+    case house
+    case closing
+    case yard
+    case villageRoad
+    case dryLake
+    case echoesBoundary
 
-    static let main: [MemoryPiece] = [.mountain, .oldPath, .boundary, .lake, .garden, .house, .closing, .yard, .villageRoad]
+    static let main: [MemoryPiece] = [
+        .mountain,
+        .oldPath,
+        .boundary,
+        .lake,
+        .garden,
+        .house,
+        .closing,
+        .yard,
+        .villageRoad
+    ]
+
     var slot: Int {
-        if self == .echoesBoundary { return 9 }
-        return self == .dryLake ? 3 : Self.main.firstIndex(of: self)!
+        if self == .echoesBoundary {
+            return 9
+        }
+
+        return self == .dryLake
+            ? 3
+            : Self.main.firstIndex(of: self)!
     }
+
     var title: String {
         switch self {
         case .mountain: return "Pegunungan"
@@ -28,20 +53,40 @@ enum MemoryPiece: String, CaseIterable, Codable {
         case .echoesBoundary: return "Zona Bahaya"
         }
     }
+
     var region: MemoryRegion {
         switch self {
-        case .house: return .house
-        case .yard, .villageRoad, .garden: return .village
-        case .boundary, .closing: return .boundary
-        case .echoesBoundary: return .echoes
-        default: return .foothills
+        case .house:
+            return .house
+        case .yard, .villageRoad, .garden:
+            return .village
+        case .boundary, .closing:
+            return .boundary
+        case .echoesBoundary:
+            return .echoes
+        default:
+            return .foothills
         }
     }
-    var location: MemoryPiece { self == .dryLake ? .lake : self }
+
+    var location: MemoryPiece {
+        self == .dryLake ? .lake : self
+    }
 }
 
-enum MemoryRegion: String, Codable { case house, village, foothills, boundary, echoes }
-enum FriendID: String, CaseIterable, Codable { case keneth = "Keneth", roland = "Roland", anneth = "Anneth" }
+enum MemoryRegion: String, Codable {
+    case house
+    case village
+    case foothills
+    case boundary
+    case echoes
+}
+
+enum FriendID: String, CaseIterable, Codable {
+    case keneth = "Keneth"
+    case roland = "Roland"
+    case anneth = "Anneth"
+}
 
 enum MapBStage: String, CaseIterable, Codable {
     case rockSalt = "rockSalt"
@@ -64,12 +109,21 @@ struct PhotoPlacement: Codable, Equatable {
     var turns: Int
 }
 
-/// Story progress is independent of scene lifetime, catches, and photo placement.
 final class PrologueProgress: Codable {
     var jigsaw: JigsawProgress?
-    var discovered: Set<MemoryPiece> = [.house, .yard, .villageRoad]
+
+    var discovered: Set<MemoryPiece> = [
+        .house, .yard, .villageRoad
+    ]
+
     var placements: [Int: PhotoPlacement] = [:]
-    var rotations: [MemoryPiece: Int] = [.house: 1, .yard: 0, .villageRoad: 3]
+
+    var rotations: [MemoryPiece: Int] = [
+        .house: 1,
+        .yard: 0,
+        .villageRoad: 3
+    ]
+
     var hasBook = false
     var shownBook: Set<FriendID> = []
     var joined: Set<FriendID> = []
@@ -78,10 +132,14 @@ final class PrologueProgress: Codable {
     var leftVillage = false
     var noticedChangedRoute = false
     var assembled = false
-    /// Completed story steps. Each completed step grants one additional fragment.
+
+    // ID langkah cerita terakhir yang sudah selesai.
     var storyProgress = 0
 
-    // Map B (Pinggiran / Zona Transisi) progressive unlock flags
+    // Optional supaya save lama tanpa field ini tetap terbaca.
+    var villageOpening: VillageOpeningState?
+
+    // Progres Map B dipertahankan.
     var mapBStage: MapBStage = .rockSalt
     var isRockSaltUnlocked = false
     var hasRockSalt = false
@@ -97,7 +155,10 @@ final class PrologueProgress: Codable {
     func boundaryObjective(stage: MapBStage) -> String {
         switch stage {
         case .rockSalt:
-            return hasRockSalt ? "Bongkahan garam batu terkumpul! Kembali ke rumah Anneth di desa." : "Ambil bongkahan garam batu di dekat mulut tambang."
+            return hasRockSalt
+                ? "Bongkahan garam batu terkumpul! Kembali ke rumah Anneth di desa."
+                : "Ambil bongkahan garam batu di dekat mulut tambang."
+
         case .herbalHills:
             if !hasHerbal {
                 return "Cari dan petik daun herbal di atas batu menjorok untuk Kakek Beryn."
@@ -106,6 +167,7 @@ final class PrologueProgress: Codable {
             } else {
                 return "Kembali ke desa dan beritahu Kakek Beryn tentang daun herbal dan bayangan Hollow itu."
             }
+
         case .woodcutterSlope:
             if !gatheredWood {
                 return "Kumpulkan kayu bakar di jalur pencari kayu lereng hutan."
@@ -114,100 +176,183 @@ final class PrologueProgress: Codable {
             } else {
                 return "Buku Elias ditemukan! Bicarakan rencana ekspedisi ke The Boundary bersama teman-teman."
             }
+
         case .theBoundary:
-            return boundaryMarked ? "Semua persiapan selesai! Masuki celah kabut menuju Deep Woods (Map C)." : "Tandai pohon penanda dengan goresan pisau dan kain terang bersama teman-teman."
+            return boundaryMarked
+                ? "Semua persiapan selesai! Masuki celah kabut menuju Deep Woods (Map C)."
+                : "Tandai pohon penanda dengan goresan pisau dan kain terang bersama teman-teman."
         }
     }
 
     var inventory: [MemoryPiece] {
         MemoryPiece.allCases.filter { piece in
-            discovered.contains(piece) && !placements.values.contains { $0.piece == piece }
+            discovered.contains(piece) &&
+            !placements.values.contains {
+                $0.piece == piece
+            }
         }
     }
+
     func currentObjective(for region: MemoryRegion) -> String {
         if region == .boundary {
             return boundaryObjective(stage: mapBStage)
         }
+
         return objective
     }
 
     var objective: String {
-        if assembled { return "Kenangan tersusun" }
+        if assembled {
+            return "Kenangan tersusun"
+        }
+
         if !hasBook {
-            if let jigsaw, !jigsaw.placements.values.contains(where: { JigsawCatalog.location(for: $0.id) == .house && jigsaw.canEnter($0.id) }) {
+            if let jigsaw,
+               !jigsaw.placements.values.contains(where: {
+                   JigsawCatalog.location(for: $0.id) == .house &&
+                   jigsaw.canEnter($0.id)
+               }) {
                 return "Susun 3 keping Rumah sesuai gambar untuk membuka map pertama."
             }
+
             return "Masuk ke rumah dan temukan buku lama."
         }
+
         if joined.count < 3 {
-            return installed(.yard) ? "Desa: tunjukkan buku kepada ketiga teman (\(joined.count)/3)." : "3 keping Desa terbuka! Susun untuk masuk ke map berikutnya."
+            return installed(.yard)
+                ? "Desa: tunjukkan buku kepada ketiga teman (\(joined.count)/3)."
+                : "3 keping Desa terbuka! Susun untuk masuk ke map berikutnya."
         }
+
         if !foundMarker {
-            return installed(.oldPath) ? "Bukit: cari dan baca penanda jalan." : "3 keping Bukit terbuka! Susun untuk mencari penanda jalan."
+            return installed(.oldPath)
+                ? "Bukit: cari dan baca penanda jalan."
+                : "3 keping Bukit terbuka! Susun untuk mencari penanda jalan."
         }
+
         if !leftVillage {
-            return installed(.boundary) ? "Batas Desa: berkumpul, lalu keluar bersama keempat anak." : "3 keping Batas Desa terbuka! Susun untuk melanjutkan perjalanan."
+            return installed(.boundary)
+                ? "Batas Desa: berkumpul, lalu keluar bersama keempat anak."
+                : "3 keping Batas Desa terbuka! Susun untuk melanjutkan perjalanan."
         }
+
         return "Lengkapi keempat rangkaian map, masing-masing 3 keping."
     }
+
     func placement(of piece: MemoryPiece) -> PhotoPlacement? {
-        placements.values.first { $0.piece == piece }
+        placements.values.first {
+            $0.piece == piece
+        }
     }
-    func installed(_ piece: MemoryPiece) -> Bool { placement(of: piece) != nil }
+
+    func installed(_ piece: MemoryPiece) -> Bool {
+        placement(of: piece) != nil
+    }
+
     var lakeVariant: MemoryPiece? {
-        if installed(.dryLake) { return .dryLake }
+        if installed(.dryLake) {
+            return .dryLake
+        }
+
         return installed(.lake) ? .lake : nil
     }
+
     func rotate(_ piece: MemoryPiece) {
         let turns = ((rotations[piece] ?? 0) + 1) % 4
         rotations[piece] = turns
-        if let slot = placements.first(where: { $0.value.piece == piece })?.key {
+
+        if let slot = placements.first(where: {
+            $0.value.piece == piece
+        })?.key {
             placements[slot]?.turns = turns
         }
+
         assembled = false
     }
+
     func remove(_ piece: MemoryPiece) {
-        placements = placements.filter { $0.value.piece != piece }
+        placements = placements.filter {
+            $0.value.piece != piece
+        }
+
         assembled = false
     }
+
     func place(_ piece: MemoryPiece, at slot: Int) {
-        guard discovered.contains(piece), (0..<9).contains(slot) else { return }
-        // All straight tile edges are compatible. Content/orientation is never rejected.
-        // The two lake states describe ONE location, so only one can be active.
-        placements = placements.filter { $0.value.piece.location != piece.location }
-        placements[slot] = PhotoPlacement(piece: piece, turns: rotations[piece] ?? 0)
+        guard discovered.contains(piece),
+              (0..<9).contains(slot) else {
+            return
+        }
+
+        placements = placements.filter {
+            $0.value.piece.location != piece.location
+        }
+
+        placements[slot] = PhotoPlacement(
+            piece: piece,
+            turns: rotations[piece] ?? 0
+        )
+
         assembled = false
     }
-    // Menandai buku ditemukan dan memberikan hadiah lokasi satu kali.
+
     func readBook() {
         guard !hasBook else { return }
+
         hasBook = true
-        discovered.formUnion([.garden, .mountain, .dryLake])
+        discovered.formUnion([
+            .garden, .mountain, .dryLake
+        ])
     }
-    // Mencatat teman yang bergabung dan membuka hadiah ketika ketiga teman sudah setuju.
+
     func finishConversation(with friend: FriendID) {
         guard hasBook else { return }
+
         shownBook.insert(friend)
         joined.insert(friend)
-        if joined.count == 3 { discovered.formUnion([.lake, .oldPath]) }
+
+        if joined.count == 3 {
+            discovered.formUnion([.lake, .oldPath])
+        }
     }
-    // Membuka batas desa setelah semua teman bergabung dan penanda ditemukan.
+
     func readMarker() {
-        guard joined.count == 3, !foundMarker else { return }
+        guard joined.count == 3,
+              !foundMarker else {
+            return
+        }
+
         foundMarker = true
         discovered.insert(.boundary)
     }
-    // Melanjutkan cerita hanya setelah kelompok berkumpul dan keempat nama hadir di titik keluar.
+
     func leaveVillage(childrenAtExit: Set<String>) {
-        let required: Set<String> = ["Arthur", "Keneth", "Roland", "Anneth"]
-        guard foundMarker, groupGathered, required.isSubset(of: childrenAtExit), !leftVillage else { return }
+        let required: Set<String> = [
+            "Arthur", "Keneth", "Roland", "Anneth"
+        ]
+
+        guard foundMarker,
+              groupGathered,
+              required.isSubset(of: childrenAtExit),
+              !leftVillage else {
+            return
+        }
+
         leftVillage = true
         discovered.insert(.closing)
     }
+
     var correctlyAssembled: Bool {
-        if let jigsaw { return leftVillage && jigsaw.solved }
-        return leftVillage && MemoryPiece.main.enumerated().allSatisfy { slot, piece in
-            placements[slot] == PhotoPlacement(piece: piece, turns: 0)
+        if let jigsaw {
+            return leftVillage && jigsaw.solved
+        }
+
+        return leftVillage &&
+        MemoryPiece.main.enumerated().allSatisfy { slot, piece in
+            placements[slot] == PhotoPlacement(
+                piece: piece,
+                turns: 0
+            )
         }
     }
 }

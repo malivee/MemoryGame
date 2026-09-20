@@ -17,7 +17,7 @@ final class VillagePrototypeScene: SKScene {
     var wellResidentIndex = 0
     let storyPanel = SKNode()
     let rackInteraction = SKNode()
-    weak var activeQTE: QuickTimeEventNode?
+    weak var activeQTE: SKNode?
     var navigation: VillageNavigation { VillageNavigation(stage: access) }
     var route: [CGPoint] = []
     var overview = false, showBounds = false

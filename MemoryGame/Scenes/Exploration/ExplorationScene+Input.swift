@@ -20,6 +20,40 @@ extension ExplorationScene {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
+        
+        // Jika QTE sedang aktif, alihkan sentuhan ke QTE
+        if let qte = activeQTE as? RockSaltQuickTimeEventNode {
+            qte.handleTap()
+            return
+        }
+        if let qte = activeQTE as? QuickTimeEventNode {
+            qte.handleTap()
+            return
+        }
+        if let qte = activeQTE as? HollowQuickTimeEventNode {
+            qte.handleTap()
+            return
+        }
+        if let qte = activeQTE as? ClassicTapQuickTimeEventNode {
+            qte.handleTap()
+            return
+        }
+        if let qte = activeQTE as? MudTapQuickTimeEventNode {
+            qte.handleTap()
+            return
+        }
+        if let qte = activeQTE as? HollowChaseTapQuickTimeEventNode {
+            qte.handleTap()
+            return
+        }
+        if let qte = activeQTE as? TapQuickTimeEventNode {
+            qte.handleTap()
+            return
+        }
+        if activeQTE != nil {
+            return
+        }
+
         let hudPoint = touch.location(in: hud)
         let names = Set(hud.nodes(at: hudPoint).compactMap(\.name))
         if handleDebugWarpTouch(hudPoint: hudPoint, names: names) { return }

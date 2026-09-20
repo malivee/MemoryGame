@@ -41,7 +41,7 @@ expect(session.place(starters[0], at: 9), "Tenth column is a valid destination")
 expect(session.place(starters[0], at: 39), "Last cell of the 10 by 4 board is reachable")
 expect(progress.jigsaw!.placements.values.filter { $0.id == starters[0] }.count == 1, "Moving cannot duplicate a piece")
 progress.readBook()
-expect(PuzzleWorld.village.pieceIDs.isSubset(of: JigsawCatalog.availableIDs(progress: progress)), "Book pickup unlocks the village")
+expect(PuzzleWorld.villagePrototype.pieceIDs.isSubset(of: JigsawCatalog.availableIDs(progress: progress)), "Book pickup unlocks the village")
 let decoded = try JSONDecoder().decode(PrologueProgress.self, from: JSONEncoder().encode(progress))
 expect(decoded.hasBook && decoded.jigsaw!.placements == progress.jigsaw!.placements, "Existing save format round-trips")
 

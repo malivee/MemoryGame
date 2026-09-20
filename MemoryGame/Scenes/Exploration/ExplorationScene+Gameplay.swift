@@ -180,23 +180,7 @@ extension ExplorationScene {
 
         case .rockSalt:
             clearNearbyInteraction()
-            HapticsService.shared.playNotification(.success)
-            progress.hasRockSalt = true
-            PrologueStore.shared.save()
-            rockSaltNode?.removeFromParent()
-            rockSaltNode = nil
-            objective.text = progress.currentObjective(for: entry.region)
-            startDialogue([
-                .init(speaker: "Arthur", text: "Kristal garam batu murni! Berkilau seperti es di bawah sinar matahari lereng."),
-                .init(speaker: "Anneth", text: "Bagus sekali, Arthur! Endapan di dekat mulut tambang ini cukup untuk persediaan garam dapur kita."),
-                .init(speaker: "Arthur", text: "Lorong tambang di baliknya gelap gulita dan berbahaya. Sekarang ayo kita bawa rock salt ini kembali ke rumah Anneth di desa.")
-            ]) { [weak self] in
-                self?.showAnnouncementBanner(
-                    icon: "💎",
-                    title: "Rock Salt Diperoleh!",
-                    subtitle: "Bongkahan garam batu terkumpul. Kembali ke Rumah Anneth di Desa!"
-                )
-            }
+            startRockSaltQTE()
 
         case .darkMineEntrance:
             clearNearbyInteraction()
@@ -238,30 +222,7 @@ extension ExplorationScene {
 
         case .hollowEncounter:
             clearNearbyInteraction()
-            HapticsService.shared.playNotification(.warning)
-            progress.encounteredHollow = true
-            PrologueStore.shared.save()
-            objective.text = progress.currentObjective(for: entry.region)
-            if let h = hollowNode {
-                h.run(.sequence([
-                    .wait(forDuration: 1.5),
-                    .group([.fadeOut(withDuration: 1.8), .moveBy(x: 40, y: 10, duration: 1.8)]),
-                    .removeFromParent()
-                ]))
-            }
-            startDialogue([
-                .init(speaker: "Arthur", text: "A-apa itu?! Sosok bayangan tinggi melayang di sela-sela pepohonan!"),
-                .init(speaker: "The Hollow", text: "... ... ..."),
-                .init(speaker: "Arthur", text: "Hawa dingin menusuk tulang... matanya memancarkan cahaya redup di balik kabut!"),
-                .init(speaker: "Arthur", text: "Apakah itu... 'The Hollow' yang sering diceritakan dalam dongeng desa?!"),
-                .init(speaker: "Arthur", text: "Sosok itu memudar ke balik pohon. Aku harus segera kembali ke desa dan melaporkan ini ke Kakek Beryn!")
-            ]) { [weak self] in
-                self?.showAnnouncementBanner(
-                    icon: "⚠️",
-                    title: "Pertemuan dengan The Hollow!",
-                    subtitle: "Arthur merasakan firasat buruk. Segera kembali ke desa menemui Kakek Beryn!"
-                )
-            }
+            startHollow2StageDialQTE()
 
         case .firewood:
             clearNearbyInteraction()
@@ -603,4 +564,207 @@ extension ExplorationScene {
     }
 
     func distance(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot(a.x - b.x, a.y - b.y) }
+
+    // MARK: - Rock Salt Mining Minigame (QTE)
+
+    func startRockSaltQTE() {
+        guard activeQTE == nil else { return }
+        // Hentikan pergerakan Arthur dan joystick saat minigame dimulai
+        arthur.route.removeAll()
+        stickVector = .zero
+        stickKnob.position = stickCenter
+
+        let config = QuickTimeEventConfig(
+            radius: 82,
+            stage1Duration: 1.40,
+            stage2Duration: 1.15,
+            stage1Zone: QTETargetZone(start: 0.58, end: 0.85, greatStart: 0.70, greatEnd: 0.75),
+            stage2Zone: QTETargetZone(start: 0.20, end: 0.45, greatStart: 0.28, greatEnd: 0.33),
+            buttonPrompt: "Pahat Garam",
+            allowTouchAnywhere: true,
+            autoDismissDelay: 0.65
+        )
+
+        let qte = RockSaltQuickTimeEventNode(config: config)
+        qte.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        qte.zPosition = 850
+        hud.addChild(qte)
+        activeQTE = qte
+
+        qte.onComplete = { [weak self] isSuccess in
+            guard let self else { return }
+            if isSuccess {
+                self.progress.hasRockSalt = true
+                PrologueStore.shared.save()
+                self.rockSaltNode?.removeFromParent()
+                self.rockSaltNode = nil
+                self.objective.text = self.progress.currentObjective(for: self.entry.region)
+                self.startDialogue([
+                    .init(speaker: "Arthur", text: "Berhasil memahat kristal garam batu murni! Berkilau seperti es di bawah sinar matahari lereng."),
+                    .init(speaker: "Anneth", text: "Bagus sekali, Arthur! Endapan di dekat mulut tambang ini cukup untuk persediaan garam dapur kita."),
+                    .init(speaker: "Arthur", text: "Lorong tambang di baliknya gelap gulita dan berbahaya. Sekarang ayo kita bawa rock salt ini kembali ke rumah Anneth di desa.")
+                ]) { [weak self] in
+                    self?.showAnnouncementBanner(
+                        icon: "💎",
+                        title: "Rock Salt Diperoleh!",
+                        subtitle: "Bongkahan garam batu terkumpul. Kembali ke Rumah Anneth di Desa!"
+                    )
+                }
+            } else {
+                self.say("Pahatan meleset dari rekahan kristal garam! Coba ketuk saat jarum tepat di endapan garam.", duration: 3.5)
+            }
+        }
+
+        qte.onDismiss = { [weak self] in
+            if self?.activeQTE === qte {
+                self?.activeQTE = nil
+            }
+        }
+
+        qte.start()
+    }
+
+    // MARK: - Hollow Chase Minigame (Tap-Tap Horor)
+
+    func startHollowChaseQTE() {
+        guard activeQTE == nil else { return }
+        arthur.route.removeAll()
+        stickVector = .zero
+        stickKnob.position = stickCenter
+
+        let config = TapQuickTimeEventConfig(
+            requiredTaps: 18,
+            buttonPrompt: "LARI!",
+            heading: "LARI DARI THE HOLLOW!",
+            instruction: "DIA MENDEKAT DARI BALIK KABUT... KETUK CEPAT!",
+            style: .hollowChase,
+            allowTouchAnywhere: true,
+            autoDismissDelay: 0.8,
+            decayPerSecond: 0.12
+        )
+
+        let qte = TapQuickTimeEventNode(config: config)
+        qte.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        qte.zPosition = 850
+        hud.addChild(qte)
+        activeQTE = qte
+
+        qte.onComplete = { [weak self] isSuccess in
+            guard let self else { return }
+            if isSuccess {
+                self.progress.encounteredHollow = true
+                PrologueStore.shared.save()
+                self.objective.text = self.progress.currentObjective(for: self.entry.region)
+                if let h = self.hollowNode {
+                    h.run(.sequence([
+                        .group([.fadeOut(withDuration: 1.2), .moveBy(x: 50, y: 10, duration: 1.2)]),
+                        .removeFromParent()
+                    ]))
+                }
+                self.startDialogue([
+                    .init(speaker: "Arthur", text: "Hah... hah... nyaris saja! Sosok bayangan tinggi itu terus membuntutiku di sela kabut!"),
+                    .init(speaker: "The Hollow", text: "... ... ..."),
+                    .init(speaker: "Arthur", text: "Hawa dingin menusuk tulang... matanya memancarkan cahaya merah redup di balik pepohonan!"),
+                    .init(speaker: "Arthur", text: "Apakah itu... 'The Hollow' yang sering diceritakan dalam dongeng desa?!"),
+                    .init(speaker: "Arthur", text: "Sosok itu memudar ke balik pohon. Aku harus segera kembali ke desa dan melaporkan ini ke Kakek Beryn!")
+                ]) { [weak self] in
+                    self?.showAnnouncementBanner(
+                        icon: "⚠️",
+                        title: "Lolos dari The Hollow!",
+                        subtitle: "Arthur berhasil melarikan diri! Segera kembali ke desa menemui Kakek Beryn."
+                    )
+                }
+            } else {
+                self.say("Arthur: Hawa dingin mencekam membuat kakiku kaku! Cepat ketuk layar berulang kali untuk kabur!", duration: 4.0)
+            }
+        }
+
+        qte.onDismiss = { [weak self] in
+            if self?.activeQTE === qte {
+                self?.activeQTE = nil
+            }
+        }
+
+        qte.start()
+    }
+
+
+    // MARK: - Hollow 2-Stage Dial QTE (Mencekam)
+
+    func startHollow2StageDialQTE() {
+        guard activeQTE == nil else { return }
+        arthur.route.removeAll()
+        stickVector = .zero
+        stickKnob.position = stickCenter
+
+        let qte = HollowQuickTimeEventNode()
+        qte.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        qte.zPosition = 870
+        hud.addChild(qte)
+        activeQTE = qte
+
+        qte.onComplete = { [weak self] isSuccess in
+            guard let self else { return }
+            if isSuccess {
+                self.progress.encounteredHollow = true
+                PrologueStore.shared.save()
+                self.objective.text = self.progress.currentObjective(for: self.entry.region)
+                if let h = self.hollowNode {
+                    h.run(.sequence([
+                        .group([.fadeOut(withDuration: 1.2), .moveBy(x: 50, y: 10, duration: 1.2)]),
+                        .removeFromParent()
+                    ]))
+                }
+                self.startDialogue([
+                    .init(speaker: "Arthur", text: "Hah... nyaris saja! Cakar bayangan The Hollow meleset beberapa jengkal dari tubuhku!"),
+                    .init(speaker: "The Hollow", text: "... ... ..."),
+                    .init(speaker: "Arthur", text: "Hawa dingin menusuk tulang... matanya memancarkan cahaya merah redup di balik kabut!"),
+                    .init(speaker: "Arthur", text: "Sosok itu memudar ke balik pohon. Aku harus segera kembali ke desa dan melaporkan ini ke Kakek Beryn!")
+                ]) { [weak self] in
+                    self?.showAnnouncementBanner(
+                        icon: "⚠️",
+                        title: "Lolos dari Sergapan Hollow!",
+                        subtitle: "Arthur berhasil meloloskan diri! Segera kembali ke desa menemui Kakek Beryn."
+                    )
+                }
+            } else {
+                self.say("Sergapan The Hollow mengenai Arthur! Ketuk tepat di zona kabut/mata merah saat jarum berputar!", duration: 4.0)
+            }
+        }
+
+        qte.onDismiss = { [weak self] in
+            if self?.activeQTE === qte {
+                self?.activeQTE = nil
+            }
+        }
+
+        qte.start()
+    }
+
+    // MARK: - Mud Escape Tap QTE (Lumpur)
+
+    func startMudEscapeTapQTE(onComplete: ((Bool) -> Void)? = nil) {
+        guard activeQTE == nil else { return }
+        arthur.route.removeAll()
+        stickVector = .zero
+        stickKnob.position = stickCenter
+
+        let qte = MudTapQuickTimeEventNode()
+        qte.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        qte.zPosition = 860
+        hud.addChild(qte)
+        activeQTE = qte
+
+        qte.onComplete = { isSuccess in
+            onComplete?(isSuccess)
+        }
+
+        qte.onDismiss = { [weak self] in
+            if self?.activeQTE === qte {
+                self?.activeQTE = nil
+            }
+        }
+
+        qte.start()
+    }
 }

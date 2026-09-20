@@ -48,6 +48,7 @@ final class ExplorationScene: SKScene {
     var echoesVillagePassed = false
     var sceneryNode: SKSpriteNode?
     var debugMenuNode: SKNode?
+    weak var activeQTE: SKNode?
 
     let houseStumpCushions: [CGPoint] = [
         CGPoint(x: 305, y: 335), // Atas karpet

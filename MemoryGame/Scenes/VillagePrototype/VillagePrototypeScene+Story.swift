@@ -109,8 +109,10 @@ extension VillagePrototypeScene {
         guard activeQTE == nil, let storyProgress,
               StoryProgression.currentStep(for: storyProgress)?.minigame == .maraShelfQTE else { return }
         route=[];stick = .zero;stickTouch=nil;knob.position=stickCenter
-        let event = QuickTimeEventNode(config: QuickTimeEventConfig(
-            requiredTaps: 15, buttonPrompt: "ANGKAT", allowTouchAnywhere: false
+        let event = TapQuickTimeEventNode(config: TapQuickTimeEventConfig(
+            requiredTaps: 15, buttonPrompt: "ANGKAT", heading: "ANGKAT RAK!",
+            instruction: "KETUK LAYAR BERULANG KALI UNTUK MENEGAKKAN RAK!",
+            style: .classic, allowTouchAnywhere: true
         ))
         event.position=CGPoint(x:size.width/2,y:size.height/2)
         event.zPosition=2000

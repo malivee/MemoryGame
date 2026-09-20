@@ -433,4 +433,38 @@ failStage2.currentProgress = 0.70 // outside stage 2 zone (0.2...0.4)
 let stage2Miss = failStage2.registerTap()
 expect(stage2Miss.result == .miss && stage2Miss.completed && !stage2Miss.isSuccess, "Miss in stage 2 triggers failure")
 
+// MARK: - TapQuickTimeEvent (Classic & Hollow Chase) Validation
+var classicTapLogic = TapQuickTimeEventLogic(config: TapQuickTimeEventConfig(
+    requiredTaps: 5,
+    buttonPrompt: "ANGKAT",
+    style: .classic
+))
+expect(!classicTapLogic.isCompleted && classicTapLogic.tapCount == 0, "Classic tap logic starts at 0 taps")
+for i in 1...4 {
+    let tap = classicTapLogic.registerTap()
+    expect(tap.result == .good && !tap.completed, "Tap \(i) under requiredTaps is .good and not completed")
+    expect(classicTapLogic.tapCount == i, "Tap count matches \(i)")
+}
+let finalClassicTap = classicTapLogic.registerTap()
+expect(finalClassicTap.result == .great && finalClassicTap.completed && finalClassicTap.isSuccess, "5th tap completes classic QTE with success")
+expect(classicTapLogic.isCompleted && classicTapLogic.isSuccess, "Classic tap state marked completed and successful")
+
+// Hollow Chase Tap Logic with Decay
+var hollowTapLogic = TapQuickTimeEventLogic(config: TapQuickTimeEventConfig(
+    requiredTaps: 10,
+    buttonPrompt: "LARI!",
+    style: .hollowChase,
+    decayPerSecond: 0.20
+))
+_ = hollowTapLogic.registerTap() // 1
+_ = hollowTapLogic.registerTap() // 2
+_ = hollowTapLogic.registerTap() // 3 (progress = 0.3)
+expect(hollowTapLogic.tapCount == 3, "Hollow tap count is 3 before decay")
+hollowTapLogic.update(deltaTime: 1.0) // decay 0.2 -> progress = 0.1 -> tapCount = 1
+// MARK: - Mud & Classic Tap Validation
+var mudTap = MudTapConfig(requiredTaps: 10, suctionDecay: 0.1)
+expect(mudTap.requiredTaps == 10, "Mud tap config stores required taps")
+var classicTap = ClassicTapConfig(requiredTaps: 12)
+expect(classicTap.requiredTaps == 12, "Classic tap config stores required taps")
+
 print("Passed \(checks) progression, connectivity, jigsaw and QTE checks")

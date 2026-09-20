@@ -30,7 +30,17 @@ extension VillagePrototypeScene {
             return
         }
 
-        guard activeQTE == nil else { return }
+        if let qte = activeQTE as? TapQuickTimeEventNode {
+            qte.handleTap()
+            return
+        }
+        if let qte = activeQTE as? ClassicTapQuickTimeEventNode {
+            qte.handleTap()
+            return
+        }
+        if activeQTE != nil {
+            return
+        }
 
         let point = touch.location(in: hud)
         let names = Set(

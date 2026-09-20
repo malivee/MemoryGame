@@ -9,6 +9,10 @@ Setiap minigame cerita harus dideklarasikan sebagai case `StoryMinigame`, kemudi
 ```swift
 enum StoryMinigame: String {
     case maraShelfQTE
+    case basketDeliveryQTE
+    case seedSorting
+    case fencePostQTE
+    case tuberSorting
 }
 
 step(
@@ -37,6 +41,18 @@ Minigame `.maraShelfQTE` berjalan di `VillagePrototypeScene`.
 6. Keberhasilan QTE memanggil `StoryProgression.complete`, menyimpan progres, dan membuka step berikutnya.
 
 Posisi visual rak berasal dari `VillageArtwork`. Node prompt dan adapter QTE berada di `VillagePrototypeScene`. Kepemilikan minigame tetap berasal dari `StoryProgressionStep.minigame`.
+
+## Minigame Step 1-5
+
+| Step | StoryMinigame | Implementasi reusable | Waktu dimulai |
+| --- | --- | --- | --- |
+| 1 | `maraShelfQTE` | `TapQuickTimeEventNode` | Setelah mengambil air, berbicara dengan Bu Mara, lalu mengetuk rak |
+| 2 | `basketDeliveryQTE` | `ClassicTapQuickTimeEventNode` | Setelah menyelesaikan dialog dengan Kakek |
+| 3 | `seedSorting` | `SeedSortingMinigameNode` | Setelah berbicara dengan Keneth di lumbung |
+| 4 | `fencePostQTE` | `ClassicTapQuickTimeEventNode` | Setelah berbicara dengan Roland di kandang |
+| 5 | `tuberSorting` | `ItemSortingMinigameNode` | Setelah berbicara dengan Anneth |
+
+Minigame harus berhasil sebelum `StoryProgression.complete` dipanggil. Dismissal minigame membangun ulang NPC, akses wilayah, objektif, dan kabut untuk step berikutnya.
 
 ## Batas Implementasi Saat Ini
 

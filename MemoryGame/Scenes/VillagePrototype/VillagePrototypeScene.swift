@@ -34,7 +34,7 @@ final class VillagePrototypeScene: SKScene {
     let rackInteraction = SKNode()
 
 
-    weak var activeQTE: TapQuickTimeEventNode?
+    weak var activeQTE: SKNode?
 
     // Navigasi memakai tahap yang sama dengan visual kabut.
     var navigation: VillageNavigation {

@@ -362,6 +362,11 @@ extension VillagePrototypeScene {
             return
         }
 
+        if step.minigame != nil {
+            startProgressionMinigame(for: step)
+            return
+        }
+
         if StoryProgression.complete(
             step,
             in: storyProgress
@@ -446,5 +451,130 @@ extension VillagePrototypeScene {
         activeQTE = event
         addChild(event)
         event.start()
+    }
+
+    func startProgressionMinigame(
+        for step: StoryProgressionStep
+    ) {
+        guard activeQTE == nil,
+              let minigame = step.minigame else { return }
+
+        route = []
+        stick = .zero
+        stickTouch = nil
+        knob.position = stickCenter
+
+        switch minigame {
+        case .maraShelfQTE:
+            startRackQTE()
+
+        case .basketDeliveryQTE:
+            let node = ClassicTapQuickTimeEventNode(
+                config: ClassicTapConfig(
+                    requiredTaps: 8,
+                    buttonPrompt: "ANTAR",
+                    heading: "BAWA KERANJANG",
+                    instruction: "KETUK UNTUK MEMBAWA KERANJANG KE LUMBUNG"
+                )
+            )
+            present(node, for: step)
+
+        case .seedSorting:
+            let node = SeedSortingMinigameNode(
+                config: SeedSortingConfig(
+                    goodSeedCount: 36,
+                    badSeedCount: 14,
+                    shakeThresholdTotal: 90
+                )
+            )
+            present(node, for: step)
+
+        case .fencePostQTE:
+            let node = ClassicTapQuickTimeEventNode(
+                config: ClassicTapConfig(
+                    requiredTaps: 12,
+                    buttonPrompt: "TAHAN",
+                    heading: "TAHAN TIANG!",
+                    instruction: "KETUK CEPAT AGAR TIANG TETAP TEGAK"
+                )
+            )
+            present(node, for: step)
+
+        case .tuberSorting:
+            let node = ItemSortingMinigameNode(
+                config: ItemSortingConfig(requiredItems: 3)
+            )
+            present(node, for: step)
+        }
+    }
+
+    private func prepareMinigame(_ node: SKNode) {
+        node.position = CGPoint(x: size.width/2, y: size.height/2)
+        node.zPosition = 2000
+        activeQTE = node
+        addChild(node)
+    }
+
+    private func completeMinigame(
+        _ step: StoryProgressionStep,
+        success: Bool
+    ) {
+        guard success, let progress = storyProgress,
+              StoryProgression.currentStep(for: progress)?.id == step.id else { return }
+        if StoryProgression.complete(step, in: progress) {
+            PrologueStore.shared.save()
+        }
+    }
+
+    private func dismissMinigame(_ node: SKNode) {
+        guard activeQTE === node else { return }
+        activeQTE = nil
+        refreshStory()
+        hint("Tugas selesai. Bagian kenangan berikutnya terbuka.")
+    }
+
+    private func present(
+        _ node: ClassicTapQuickTimeEventNode,
+        for step: StoryProgressionStep
+    ) {
+        prepareMinigame(node)
+        node.onComplete = { [weak self] success in
+            self?.completeMinigame(step, success: success)
+        }
+        node.onDismiss = { [weak self, weak node] in
+            guard let node else { return }
+            self?.dismissMinigame(node)
+        }
+        node.start()
+    }
+
+    private func present(
+        _ node: SeedSortingMinigameNode,
+        for step: StoryProgressionStep
+    ) {
+        prepareMinigame(node)
+        node.onComplete = { [weak self] in
+            self?.completeMinigame(step, success: true)
+        }
+        node.onDismiss = { [weak self, weak node] in
+            guard let node else { return }
+            self?.dismissMinigame(node)
+        }
+        node.start()
+    }
+
+    private func present(
+        _ node: ItemSortingMinigameNode,
+        for step: StoryProgressionStep
+    ) {
+        prepareMinigame(node)
+        node.onComplete = { [weak self] success in
+            self?.completeMinigame(step, success: success)
+        }
+        node.onDismiss = { [weak self, weak node] in
+            guard let node else { return }
+            self?.dismissMinigame(node)
+        }
+        node.start()
     }
 }

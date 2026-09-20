@@ -16,6 +16,10 @@ struct StoryProgressionStep: Identifiable {
 
 enum StoryMinigame: String {
     case maraShelfQTE
+    case basketDeliveryQTE
+    case seedSorting
+    case fencePostQTE
+    case tuberSorting
 }
 
 struct StoryNPC: Equatable, Identifiable {
@@ -138,7 +142,8 @@ enum StoryProgression {
                     "Arthur",
                     "Baik, Kek. Aku ke lumbung dulu."
                 )
-            ]
+            ],
+            .basketDeliveryQTE
         ),
 
         step(
@@ -157,7 +162,8 @@ enum StoryProgression {
                     "Arthur",
                     "I wonder if the soil past the hills is like our garden."
                 )
-            ]
+            ],
+            .seedSorting
         ),
 
         step(
@@ -173,7 +179,8 @@ enum StoryProgression {
                     "Arthur",
                     "Someday... I want to see the forest boundary up close."
                 )
-            ]
+            ],
+            .fencePostQTE
         ),
 
         step(
@@ -195,7 +202,8 @@ enum StoryProgression {
                     "Ibu Anneth",
                     "Could you fetch some rock salt for me?"
                 )
-            ]
+            ],
+            .tuberSorting
         ),
 
         step(

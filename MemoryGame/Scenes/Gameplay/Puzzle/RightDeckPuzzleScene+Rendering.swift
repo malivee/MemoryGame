@@ -84,6 +84,12 @@ extension RightDeckPuzzleScene {
         worldBadge.storyLabel(currentWorld.title, at: .zero, size: 14,
                               color: SKColor(red: 0.96, green: 0.92, blue: 0.81, alpha: 1))
         canvas.safeAddChild(worldBadge)
+        // Akses langsung ke desa untuk review; tidak memakai syarat portal puzzle.
+        let villageButton = canvas.storyButton("Area Desa", name: "villagePreview",
+            at: CGPoint(x: viewport.minX + 88, y: viewport.maxY - 28), width: 140)
+        villageButton.zPosition = 110
+        villageButton.fillColor = worldBadge.fillColor
+        villageButton.strokeColor = worldBadge.strokeColor
 
         let deck = SKShapeNode(rect: deckBounds)
         deck.zPosition = 65

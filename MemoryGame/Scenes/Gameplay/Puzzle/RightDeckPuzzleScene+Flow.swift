@@ -3,6 +3,23 @@ import UIKit
 
 // Flow adapter. Gameplay rules live in Models and Systems.
 extension RightDeckPuzzleScene {
+    // Membuka modul desa mandiri. Kembali membuat papan baru dari progres yang sama.
+    func openVillagePreview() {
+        guard !enteringMemory, let view else { return }
+        enteringMemory = true
+        trackedTouch = nil
+        dragPiece = nil
+        let village = VillagePrototypeScene(size: view.bounds.size)
+        village.scaleMode = .resizeFill
+        village.onExit = { [weak view] in
+            guard let view else { return }
+            let puzzle = RightDeckPuzzleScene(size: view.bounds.size)
+            puzzle.scaleMode = .resizeFill
+            view.presentScene(puzzle, transition: .fade(withDuration: 0.25))
+        }
+        view.presentScene(village, transition: .fade(withDuration: 0.25))
+    }
+
     func changed(focusInventory: Bool = false) {
         let wasComplete = progress.assembled
         session.synchronize()

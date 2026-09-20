@@ -1,104 +1,371 @@
+// Alur awal wajib: sumur, Bu Mara, Kakek, lalu lumbung.
+
 import SpriteKit
 
 extension VillagePrototypeScene {
     func refreshStory() {
         guard let storyProgress else { return }
-        setAccess(StoryProgression.villageAccess(for: storyProgress))
-        rackInteraction.isHidden = StoryProgression.currentStep(for: storyProgress)?.minigame != .maraShelfQTE
+
+        setAccess(
+            StoryProgression.villageAccess(for: storyProgress)
+        )
+
+        rackInteraction.isHidden =
+            !StoryProgression.canStartMaraQTE(storyProgress)
+
+        mapNode.childNode(
+            withName: "well-water-prompt"
+        )?.removeFromParent()
+
+        if StoryProgression.needsWellWater(storyProgress) {
+            let prompt = SKShapeNode(circleOfRadius: 17)
+            prompt.name = "well-water-prompt"
+            prompt.fillColor = .systemTeal
+            prompt.strokeColor = .white
+
+            prompt.position = CGPoint(
+                x: VillageMap.well.midX,
+                y: VillageMap.well.maxY + 18
+            )
+
+            prompt.zPosition = 28
+            prompt.storyLabel("!", at: .zero, size: 19)
+
+            mapNode.addChild(prompt)
+        }
+
         storyNPCs.removeAllChildren()
-        if StoryProgression.showsWellResidents(for: storyProgress) {
-            let positions = [CGPoint(x: 805, y: 720), CGPoint(x: 905, y: 700), CGPoint(x: 1005, y: 720)]
-            let colors: [SKColor] = [.brown, .systemGray, .systemTeal]
+
+        if StoryProgression.showsWellResidents(
+            for: storyProgress
+        ) {
+            let positions = [
+                CGPoint(x: 805, y: 720),
+                CGPoint(x: 905, y: 700),
+                CGPoint(x: 1005, y: 720)
+            ]
+
+            let colors: [SKColor] = [
+                .brown, .systemGray, .systemTeal
+            ]
+
             for (index, position) in positions.enumerated() {
-                let node = MemoryCharacter(title: "", color: colors[index])
+                let node = MemoryCharacter(
+                    title: "",
+                    color: colors[index]
+                )
+
                 node.name = "well-resident-\(index)"
                 node.position = position
                 node.zPosition = 22
+
                 storyNPCs.addChild(node)
             }
         }
-        activeStoryStep = StoryProgression.currentStep(for: storyProgress)
+
+        activeStoryStep = StoryProgression.currentStep(
+            for: storyProgress
+        )
+
         if activeStoryStep?.world != .villagePrototype {
             activeStoryStep = StoryProgression.steps.last {
-                $0.world == .villagePrototype && $0.id <= storyProgress.storyProgress
+                $0.world == .villagePrototype &&
+                $0.id <= storyProgress.storyProgress
             }
         }
-        guard let step = activeStoryStep, step.world == .villagePrototype else { return }
+
+        if StoryProgression.needsWellWater(storyProgress) {
+            // Tujuan tutorial untuk HUD saja.
+            // Tidak menambah reward atau mengubah ID cerita.
+            activeStoryStep = StoryProgression.step(
+                0,
+                "Ambil air di sumur: dekati dan ketuk sumur",
+                .villagePrototype,
+                "Sumur",
+                0,
+                [],
+                []
+            )
+
+            return
+        }
+
+        guard let step = activeStoryStep,
+              step.world == .villagePrototype else {
+            return
+        }
+
+        // Kakek sudah dibuat oleh buildMap.
+        // Gunakan tokoh yang sama agar tidak muncul dua Kakek.
+        if step.id == 2 {
+            return
+        }
+
         let positions: [Int: CGPoint] = [
-            1: CGPoint(x: 1400, y: 545), 2: CGPoint(x: 1275, y: 520),
-            3: CGPoint(x: 1220, y: 1005), 4: CGPoint(x: 1550, y: 320),
-            5: CGPoint(x: 565, y: 1280), 7: CGPoint(x: 565, y: 1280),
-            12: CGPoint(x: 1170, y: 850),
-            9: CGPoint(x: 1105, y: 270), 11: CGPoint(x: 1660, y: 935)
+            1: CGPoint(x: 1400, y: 545),
+            3: CGPoint(x: 1220, y: 1005),
+            4: CGPoint(x: 1550, y: 320),
+            5: CGPoint(x: 565, y: 1280),
+            7: CGPoint(x: 565, y: 1280),
+            9: CGPoint(x: 1105, y: 270),
+            11: CGPoint(x: 1660, y: 935),
+            12: CGPoint(x: 1170, y: 850)
         ]
-        guard let position = positions[step.id] else { return }
+
+        guard let position = positions[step.id] else {
+            return
+        }
+
         for (index, npc) in step.npcs.enumerated() {
             let visibleName = step.id == 12 ? "" : npc.name
-            let node = MemoryCharacter(title: visibleName, color: .systemTeal)
+
+            let node = MemoryCharacter(
+                title: visibleName,
+                color: .systemTeal
+            )
+
             node.name = npc.id
-            let offset: [(CGFloat, CGFloat)] = [(-90, 55), (0, -70), (90, 55)]
-            let delta: (CGFloat, CGFloat) = step.npcs.count == 1 ? (0, 0) : offset[min(index, offset.count - 1)]
-            node.position = CGPoint(x: position.x + delta.0, y: position.y + delta.1)
+
+            let offsets: [(CGFloat, CGFloat)] = [
+                (-90, 55),
+                (0, -70),
+                (90, 55)
+            ]
+
+            let delta: (CGFloat, CGFloat) =
+                step.npcs.count == 1
+                ? (0, 0)
+                : offsets[min(index, offsets.count - 1)]
+
+            node.position = CGPoint(
+                x: position.x + delta.0,
+                y: position.y + delta.1
+            )
+
             node.zPosition = 22
             storyNPCs.addChild(node)
         }
     }
 
+    // Mengembalikan true jika ketukan sudah ditangani tutorial.
+    func handleOpeningInteraction(
+        at destination: CGPoint
+    ) -> Bool {
+        guard let progress = storyProgress else {
+            return false
+        }
+
+        if StoryProgression.needsWellWater(progress),
+           VillageMap.well.insetBy(
+               dx: -25,
+               dy: -40
+           ).contains(destination) {
+
+            let approach = CGPoint(
+                x: VillageMap.well.midX,
+                y: VillageMap.well.minY - 35
+            )
+
+            let distance = hypot(
+                actor.position.x - approach.x,
+                actor.position.y - approach.y
+            )
+
+            guard distance <= 100 else {
+                route = navigation.route(
+                    from: actor.position,
+                    to: approach
+                )
+
+                hint(
+                    "Dekati sumur, lalu ketuk lagi untuk mengambil air."
+                )
+
+                return true
+            }
+
+            route = []
+            stick = .zero
+            stickTouch = nil
+            knob.position = stickCenter
+
+            if StoryProgression.collectWellWater(in: progress) {
+                PrologueStore.shared.save()
+                refreshStory()
+
+                hint(
+                    "Air sudah diambil. Temui Bu Mara di halaman rumahnya."
+                )
+            }
+
+            return true
+        }
+
+        let grandpa = CGPoint(x: 570, y: 560)
+
+        if progress.storyProgress == 1,
+           hypot(
+               destination.x - grandpa.x,
+               destination.y - grandpa.y
+           ) < 65 {
+
+            let distance = hypot(
+                actor.position.x - grandpa.x,
+                actor.position.y - grandpa.y
+            )
+
+            guard distance <= 145 else {
+                route = navigation.route(
+                    from: actor.position,
+                    to: CGPoint(x: 590, y: 535)
+                )
+
+                hint(
+                    "Dekati Kakek di depan rumah, lalu ketuk untuk berbicara."
+                )
+
+                return true
+            }
+
+            route = []
+            stick = .zero
+            stickTouch = nil
+            knob.position = stickCenter
+
+            isWellConversation = false
+            dialogueIndex = 0
+            renderStoryDialogue()
+
+            return true
+        }
+
+        return false
+    }
+
     var currentDialogueLines: [StoryLine] {
         if isWellConversation {
-            return [StoryProgression.wellConversation[min(wellResidentIndex,
-                                                          StoryProgression.wellConversation.count - 1)]]
+            return [
+                StoryProgression.wellConversation[
+                    min(
+                        wellResidentIndex,
+                        StoryProgression.wellConversation.count - 1
+                    )
+                ]
+            ]
         }
+
         return activeStoryStep?.dialogue ?? []
     }
 
     func renderStoryDialogue() {
         storyPanel.removeFromParent()
         storyPanel.removeAllChildren()
+
         guard let index = dialogueIndex,
-              currentDialogueLines.indices.contains(index) else { return }
+              currentDialogueLines.indices.contains(index) else {
+            return
+        }
+
         let line = currentDialogueLines[index]
-        let width = max(180, min(size.width-40, 620))
+        let width = max(180, min(size.width - 40, 620))
+
         let text = SKLabelNode(fontNamed: "AvenirNext-Regular")
         text.text = line.text
         text.fontSize = 16
         text.fontColor = .white
-        text.preferredMaxLayoutWidth = width-36
+        text.preferredMaxLayoutWidth = width - 36
         text.numberOfLines = 0
         text.verticalAlignmentMode = .top
-        let height = max(115, text.frame.height+66)
-        let background = SKShapeNode(rectOf: CGSize(width: width, height: height), cornerRadius: 8)
-        background.fillColor = SKColor(white: 0.10, alpha: 0.97)
-        background.strokeColor = SKColor(white: 0.8, alpha: 0.5)
+
+        let height = max(115, text.frame.height + 66)
+
+        let background = SKShapeNode(
+            rectOf: CGSize(width: width, height: height),
+            cornerRadius: 8
+        )
+
+        background.fillColor = SKColor(
+            white: 0.10,
+            alpha: 0.97
+        )
+
+        background.strokeColor = SKColor(
+            white: 0.8,
+            alpha: 0.5
+        )
+
         storyPanel.addChild(background)
-        let speaker = label(line.speaker, at: CGPoint(x: 0, y: height/2-28), size: 15, on: storyPanel)
+
+        let speaker = label(
+            line.speaker,
+            at: CGPoint(x: 0, y: height / 2 - 28),
+            size: 15,
+            on: storyPanel
+        )
+
         speaker.fontColor = .systemYellow
-        text.position = CGPoint(x: 0, y: height/2-45)
+
+        text.position = CGPoint(
+            x: 0,
+            y: height / 2 - 45
+        )
+
         storyPanel.addChild(text)
-        storyPanel.position = CGPoint(x: size.width/2, y: height/2+40)
+
+        storyPanel.position = CGPoint(
+            x: size.width / 2,
+            y: height / 2 + 40
+        )
+
         storyPanel.zPosition = 100
         hud.addChild(storyPanel)
     }
 
     func advanceStoryDialogue() {
         guard let index = dialogueIndex else { return }
-        if index+1 < currentDialogueLines.count {
-            dialogueIndex = index+1
+
+        if index + 1 < currentDialogueLines.count {
+            dialogueIndex = index + 1
             renderStoryDialogue()
             return
         }
+
         dialogueIndex = nil
         renderStoryDialogue()
+
+        // Percakapan warga sumur tidak menyelesaikan quest.
         if isWellConversation {
             isWellConversation = false
             return
         }
-        guard let step = activeStoryStep, let storyProgress else { return }
-        if step.minigame == .maraShelfQTE {
-            hint("Bu Mara menunggu Arthur mengangkat rak yang miring.")
+
+        guard let step = activeStoryStep,
+              let storyProgress else {
             return
         }
-        if StoryProgression.complete(step, in: storyProgress) {
+
+        if step.minigame == .maraShelfQTE {
+            guard StoryProgression.finishMaraIntroduction(
+                in: storyProgress
+            ) else {
+                hint("Ambil air di sumur terlebih dahulu.")
+                return
+            }
+
+            PrologueStore.shared.save()
+            refreshStory()
+
+            hint(
+                "Sekarang dekati dan ketuk rak miring untuk membantu Bu Mara."
+            )
+
+            return
+        }
+
+        if StoryProgression.complete(
+            step,
+            in: storyProgress
+        ) {
             PrologueStore.shared.save()
             refreshStory()
             hint("Bagian kenangan berikutnya terbuka.")
@@ -106,30 +373,75 @@ extension VillagePrototypeScene {
     }
 
     func startRackQTE() {
-        guard activeQTE == nil, let storyProgress,
-              StoryProgression.currentStep(for: storyProgress)?.minigame == .maraShelfQTE else { return }
-        route=[];stick = .zero;stickTouch=nil;knob.position=stickCenter
-        let event = QuickTimeEventNode(config: QuickTimeEventConfig(
-            requiredTaps: 15, buttonPrompt: "ANGKAT", allowTouchAnywhere: false
-        ))
-        event.position=CGPoint(x:size.width/2,y:size.height/2)
-        event.zPosition=2000
+        guard activeQTE == nil,
+              let storyProgress,
+              StoryProgression.canStartMaraQTE(
+                  storyProgress
+              ) else {
+            return
+        }
+
+        route = []
+        stick = .zero
+        stickTouch = nil
+        knob.position = stickCenter
+
+        let event = QuickTimeEventNode(
+            config: QuickTimeEventConfig(
+                requiredTaps: 15,
+                buttonPrompt: "ANGKAT",
+                allowTouchAnywhere: false
+            )
+        )
+
+        event.position = CGPoint(
+            x: size.width / 2,
+            y: size.height / 2
+        )
+
+        event.zPosition = 2000
+
         event.onComplete = { [weak self, weak event] success in
-            guard success, let self, let event, self.activeQTE === event,
-                  let progress=self.storyProgress,
-                  let step=StoryProgression.currentStep(for: progress),
-                  step.minigame == .maraShelfQTE else { return }
+            guard success,
+                  let self,
+                  let event,
+                  self.activeQTE === event,
+                  let progress = self.storyProgress,
+                  let step = StoryProgression.currentStep(
+                      for: progress
+                  ),
+                  step.minigame == .maraShelfQTE else {
+                return
+            }
+
             if StoryProgression.complete(step, in: progress) {
                 PrologueStore.shared.save()
             }
         }
+
         event.onDismiss = { [weak self, weak event] in
-            guard let self, self.activeQTE === event else { return }
-            self.activeQTE=nil
+            guard let self,
+                  self.activeQTE === event else {
+                return
+            }
+
+            self.activeQTE = nil
             self.refreshStory()
-            self.hint("Rak berhasil ditegakkan. Jalan kenangan berikutnya terbuka.")
+
+            if let progress = self.storyProgress,
+               progress.storyProgress >= 1 {
+                self.hint(
+                    "Rak berhasil ditegakkan. Kembali ke rumah dan bicara dengan Kakek."
+                )
+            } else {
+                self.hint(
+                    "Rak belum selesai. Ketuk rak untuk mencoba lagi."
+                )
+            }
         }
-        activeQTE=event
-        addChild(event);event.start()
+
+        activeQTE = event
+        addChild(event)
+        event.start()
     }
 }

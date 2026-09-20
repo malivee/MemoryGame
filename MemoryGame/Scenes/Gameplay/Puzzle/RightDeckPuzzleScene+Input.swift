@@ -17,6 +17,7 @@ extension RightDeckPuzzleScene {
             enterDebugWorld(world)
             return
         }
+        if names.contains("villagePreview") { openVillagePreview(); return }
         if names.contains("enter") || names.contains("entryPrompt") { enterSelected(); return }
         guard !progress.assembled else { return }
         // Transparent margins and sockets never steal a neighbouring piece's tap.

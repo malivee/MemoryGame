@@ -44,6 +44,7 @@ final class VillagePrototypeScene: SKScene {
     var route: [CGPoint] = []
     var overview = false
     var showBounds = false
+    var cameraTransitioning = false
     var lastTime: TimeInterval = 0
 
     var stickTouch: UITouch?
@@ -119,7 +120,7 @@ final class VillagePrototypeScene: SKScene {
 
     // Zoom tetap mengikuti ExplorationScene bawaan proyek.
     var worldScale: CGFloat {
-        max(1.45, min(1.85, size.height / 250))
+        max(2.25, min(2.95, size.height / 170))
     }
 
     override func didChangeSize(_ oldSize: CGSize) {
@@ -188,8 +189,34 @@ final class VillagePrototypeScene: SKScene {
         mapNode.position.x +=
             (target.x - mapNode.position.x) * blend
 
+        
         mapNode.position.y +=
             (target.y - mapNode.position.y) * blend
+    }
+
+    func animateCameraTransition(
+        fromScale: CGFloat,
+        fromPosition: CGPoint
+    ) {
+        let targetScale = mapNode.xScale
+        let targetPosition = mapNode.position
+        cameraTransitioning = true
+        mapNode.removeAction(forKey: "cameraTransition")
+        mapNode.setScale(fromScale)
+        mapNode.position = fromPosition
+
+        let scale = SKAction.scale(to: targetScale, duration: 0.42)
+        let move = SKAction.move(to: targetPosition, duration: 0.42)
+        scale.timingMode = .easeInEaseOut
+        move.timingMode = .easeInEaseOut
+
+        mapNode.run(.sequence([
+            .group([scale, move]),
+            .run { [weak self] in
+                self?.cameraTransitioning = false
+                self?.updateCamera(immediate: true)
+            }
+        ]), withKey: "cameraTransition")
     }
 
     override func update(_ currentTime: TimeInterval) {
@@ -202,6 +229,7 @@ final class VillagePrototypeScene: SKScene {
                         ? 0
                         : currentTime - lastTime
                 )
+                
             )
         )
 
@@ -260,7 +288,9 @@ final class VillagePrototypeScene: SKScene {
             actor.position = next
             actor.zPosition = 20
 
-            updateCamera(dt: dt)
+            if !cameraTransitioning {
+                updateCamera(dt: dt)
+            }
         }
 
         if currentTime > hintUntil {

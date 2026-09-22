@@ -271,6 +271,28 @@ struct VillageTileLayout {
         }
         return true
     }
+    mutating func solveAllPieces() {
+        let initialAnchor = VillageCartoMap.pieces[Self.initial.id][0]
+        let columnOffset = Self.initial.column - initialAnchor.x
+        let rowOffset = Self.initial.row - initialAnchor.y
+        let solved = (0..<Self.count).map { id in
+            let anchor = VillageCartoMap.pieces[id][0]
+            return Placement(
+                id: id,
+                column: anchor.x + columnOffset,
+                row: anchor.y + rowOffset,
+                turns: 0
+            )
+        }
+        placements = Self.valid(solved) ? solved : [Self.initial]
+        buildingPlacements = buildingPlacements.filter { building in
+            Self.validBuilding(
+                building,
+                pieces: placements,
+                otherBuildings: buildingPlacements.filter { $0.id != building.id }
+            )
+        }
+    }
     static func building(_ id: String) -> VillageCartoMap.Building? {
         VillageCartoMap.buildings.first { $0.id == id }
     }

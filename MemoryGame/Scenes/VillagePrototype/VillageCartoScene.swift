@@ -19,6 +19,7 @@ final class VillageCartoScene: SKScene {
     private var zoom: CGFloat = 1
     private var activeTouch: UITouch?, touchStart = CGPoint.zero, panStart = CGPoint.zero
     private var dragging = false, panning = false
+    private var cameraTransitioning = false
     private var ghost: SKNode?
     private var inventoryHits: [(id: Int, node: SKNode)] = []
     private var buildingInventoryHits: [(id: String, node: SKNode)] = []
@@ -31,6 +32,7 @@ final class VillageCartoScene: SKScene {
     private let status = SKLabelNode(fontNamed: "AvenirNext-Medium")
     private var board: CGRect { CGRect(x:20,y:80,width:max(150,rightEdge-208),height:max(110,size.height-148)) }
     private var stickCenter: CGPoint { CGPoint(x:85,y:105) }
+    private let actorExplorationZ: CGFloat = 80
     // Semua keping tersedia, termasuk keping tanpa jalan.
     private var available: [Int] { layout.inventory }
     private let pageSize = 4
@@ -58,11 +60,36 @@ final class VillageCartoScene: SKScene {
         node.children.first?.name = name; hud.addChild(node)
     }
 
-    // Both layers use the same clipped artwork and indivisible four-cell shape.
+    // Map editing shows the puzzle outline; exploration draws clean map cells without cutout seams.
     private func tile(_ id: Int, turns: Int, miniature: Bool) -> SKNode {
         let s = VillageTileLayout.side, h = s/2
         let origin = VillageTileLayout.sourceOrigin(id)
         let cells = VillageCartoMap.pieces[id]
+        let node = SKNode()
+        node.zRotation = CGFloat(turns) * .pi / 2
+
+        if !miniature {
+            for cell in cells {
+                let minX = CGFloat(cell.x) * s
+                let minY = CGFloat(cell.y) * s
+                let rect = CGRect(
+                    x: minX / VillageCartoMap.size.width,
+                    y: minY / VillageCartoMap.size.height,
+                    width: s / VillageCartoMap.size.width,
+                    height: s / VillageCartoMap.size.height
+                )
+                let texture = SKTexture(rect: rect, in: village)
+                texture.filteringMode = .linear
+                let image = SKSpriteNode(texture: texture, size: CGSize(width: s + 1, height: s + 1))
+                image.position = CGPoint(
+                    x: minX + h - origin.x - h,
+                    y: minY + h - origin.y - h
+                )
+                node.addChild(image)
+            }
+            return node
+        }
+
         let minX = CGFloat(cells.map(\.x).min()!) * s
         let minY = CGFloat(cells.map(\.y).min()!) * s
         let width = CGFloat(cells.map(\.x).max()! - cells.map(\.x).min()! + 1) * s
@@ -78,8 +105,6 @@ final class VillageCartoScene: SKScene {
         let mask = SKShapeNode(path:path)
         mask.fillColor = .white; mask.strokeColor = .clear
         crop.maskNode = mask; crop.addChild(image)
-        let node = SKNode()
-        node.zRotation = CGFloat(turns) * .pi / 2
         node.addChild(crop)
         if miniature {
             let border = SKShapeNode(path:path)
@@ -212,7 +237,7 @@ final class VillageCartoScene: SKScene {
                 actor.position = p; sourcePosition = layout.source(p) ?? sourcePosition
             }
             if !isMap {
-                actor.zPosition = 20; world.addChild(actor)
+                keepActorAboveMap(); world.addChild(actor)
             } else {
                 let marker = SKShapeNode(circleOfRadius:10); marker.fillColor = .systemOrange
                 marker.strokeColor = .white; marker.lineWidth = 2; marker.position = actor.position; marker.zPosition = 20; world.addChild(marker)
@@ -221,6 +246,9 @@ final class VillageCartoScene: SKScene {
 
         button("Kembali",name:"exit",at:CGPoint(x:80,y:size.height-32))
         button(isMap ? "Jelajahi" : "Susun peta",name:"toggle",at:CGPoint(x:rightEdge-90,y:size.height-32),width:135)
+        if isMap {
+            button("Debug selesai",name:"debugSolveCarto",at:CGPoint(x:210,y:size.height-32),width:145)
+        }
         text(isMap ? "KEPING DESA" : "DESA ARTHUR",at:CGPoint(x:size.width/2,y:size.height-30),size:18,parent:hud,color:cream)
         if isMap {
             let panel = SKShapeNode(rect:inventoryArea,cornerRadius:8)
@@ -312,9 +340,33 @@ final class VillageCartoScene: SKScene {
             let scale = min(board.width/(VillageTileLayout.side*10),board.height/(VillageTileLayout.side*6))*zoom
             world.setScale(scale); world.position = CGPoint(x:board.midX-mapCenter.x*scale,y:board.midY-mapCenter.y*scale)
         } else {
-            let scale = min(1.1,max(0.8,size.height/440)); world.setScale(scale)
+            let scale = min(2.8,max(2.1,size.height/190)); world.setScale(scale)
             world.position = CGPoint(x:size.width/2-actor.position.x*scale,y:size.height/2-actor.position.y*scale)
         }
+    }
+    private func keepActorAboveMap() {
+        actor.zPosition = actorExplorationZ
+    }
+    private func animateWorldCamera(fromScale: CGFloat, fromPosition: CGPoint) {
+        let targetScale = world.xScale
+        let targetPosition = world.position
+        cameraTransitioning = true
+        world.removeAction(forKey: "cameraTransition")
+        world.setScale(fromScale)
+        world.position = fromPosition
+
+        let scale = SKAction.scale(to: targetScale, duration: 0.42)
+        let move = SKAction.move(to: targetPosition, duration: 0.42)
+        scale.timingMode = .easeInEaseOut
+        move.timingMode = .easeInEaseOut
+
+        world.run(.sequence([
+            .group([scale, move]),
+            .run { [weak self] in
+                self?.cameraTransitioning = false
+                self?.updateCamera()
+            }
+        ]), withKey: "cameraTransition")
     }
     override func didChangeSize(_ oldSize: CGSize) {
         guard world.parent != nil else { return }; stopInput(); rebuild()
@@ -363,6 +415,18 @@ final class VillageCartoScene: SKScene {
         guard activeTouch == nil, stickTouch == nil, let touch = touches.first else { return }
         let p = touch.location(in:hud), actions = names(at:p)
         if actions.contains("exit") { stopInput(); onExit?(); return }
+        if actions.contains("debugSolveCarto") {
+            stopInput()
+            layout.solveAllPieces()
+            selected = nil
+            selectedBuilding = nil
+            draftTurns = 0
+            page = 0
+            mapCenter = layout.world(sourcePosition) ?? VillageTileLayout.initial.center
+            save()
+            rebuild("Debug: semua keping Carto sudah dipasang.")
+            return
+        }
         if actions.contains("toggle") {
             if isMap && (layout.world(sourcePosition) == nil || !layout.walkable(layout.world(sourcePosition)!)) {
                 status.text = "Pasang keping dengan tempat berjalan dahulu sebelum menjelajah."; return
@@ -371,7 +435,12 @@ final class VillageCartoScene: SKScene {
                 status.text = "Rotasi belum diterapkan. Taruh di slot kosong atau pilih keping lain untuk batal."
                 return
             }
-            stopInput(); isMap.toggle(); selected = nil; rebuild(); return
+            let enteringExploration = isMap
+            let oldScale = world.xScale
+            let oldPosition = world.position
+            stopInput(); isMap.toggle(); selected = nil; rebuild()
+            if enteringExploration { animateWorldCamera(fromScale: oldScale, fromPosition: oldPosition) }
+            return
         }
         if isMap {
             if actions.contains("rotate") {
@@ -512,6 +581,9 @@ final class VillageCartoScene: SKScene {
         }
         let next = layout.moved(from:actor.position,by:delta)
         actor.applyMovement(dx:next.x-actor.position.x,dy:next.y-actor.position.y,dt:dt)
-        actor.position = next; sourcePosition = layout.source(next) ?? sourcePosition; updateCamera()
+        actor.position = next
+        keepActorAboveMap()
+        sourcePosition = layout.source(next) ?? sourcePosition
+        if !cameraTransitioning { updateCamera() }
     }
 }

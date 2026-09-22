@@ -64,6 +64,9 @@ extension VillagePrototypeScene {
         }
 
         if names.contains("overview") {
+            let enteringExploration = overview
+            let oldScale = mapNode.xScale
+            let oldPosition = mapNode.position
             overview.toggle()
             route = []
             stick = .zero
@@ -72,6 +75,12 @@ extension VillagePrototypeScene {
 
             buildHUD()
             updateCamera(immediate: true)
+            if enteringExploration {
+                animateCameraTransition(
+                    fromScale: oldScale,
+                    fromPosition: oldPosition
+                )
+            }
             return
         }
 

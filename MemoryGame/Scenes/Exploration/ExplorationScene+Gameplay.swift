@@ -1,5 +1,6 @@
 import SpriteKit
 import UIKit
+import SwiftUI
 
 // Gameplay adapter. Gameplay rules live in Models and Systems.
 extension ExplorationScene {
@@ -251,25 +252,7 @@ extension ExplorationScene {
                 ])
                 return
             }
-            HapticsService.shared.playNotification(.success)
-            progress.hasEliasBook = true
-            progress.hasBook = true
-            progress.foundMarker = true
-            PrologueStore.shared.save()
-            eliasBookNode?.removeFromParent()
-            eliasBookNode = nil
-            objective.text = progress.currentObjective(for: entry.region)
-            startDialogue([
-                .init(speaker: "Arthur", text: "Tanah longsor mengikis lereng dan menyingkapkan jalinan akar pohon tua..."),
-                .init(speaker: "Arthur", text: "Ada sesuatu yang terlindung di rongga akar... Sebuah buku bersampul kulit tua!"),
-                .init(speaker: "Arthur", text: "Ini... Buku Catatan Elias! Peta kuno dan catatan jalur perbatasan tersimpan di dalamnya!"),
-                .init(speaker: "Arthur", text: "Dengan buku ini, misteri di balik The Boundary bisa kita ungkap! Aku harus membicarakan ekspedisi ini dengan teman-teman.")
-            ]) { [weak self] in
-                self?.showUnlockCard(
-                    title: "📖 BUKU ELIAS DITEMUKAN!",
-                    body: "Buku Catatan Elias berhasil diselamatkan dari sela akar pohon tua! Peta perbatasan kini lengkap. Bicarakan rencana ekspedisi ke The Boundary bersama para sahabat."
-                )
-            }
+            presentEliasJournalDiscoveryMinigame()
 
         case .boundaryTreeMarker:
             clearNearbyInteraction()
@@ -766,5 +749,64 @@ extension ExplorationScene {
         }
 
         qte.start()
+    }
+
+    // MARK: - Elias Journal Discovery Minigame
+
+    func presentEliasJournalDiscoveryMinigame() {
+        guard let rootVC = view?.window?.rootViewController else {
+            finishEliasBookDiscovery(openBookDirectly: false)
+            return
+        }
+        
+        var hostingController: UIHostingController<EliasJournalDiscoveryView>?
+        let discoveryView = EliasJournalDiscoveryView(
+            onComplete: { [weak self] in
+                hostingController?.dismiss(animated: true) {
+                    self?.finishEliasBookDiscovery(openBookDirectly: false)
+                }
+            },
+            onDismiss: {
+                hostingController?.dismiss(animated: true)
+            },
+            onOpenBook: { [weak self] in
+                hostingController?.dismiss(animated: true) {
+                    self?.finishEliasBookDiscovery(openBookDirectly: true)
+                }
+            }
+        )
+        
+        let hc = UIHostingController(rootView: discoveryView)
+        hc.modalPresentationStyle = .fullScreen
+        hc.modalTransitionStyle = .crossDissolve
+        hostingController = hc
+        rootVC.present(hc, animated: true)
+    }
+
+    func finishEliasBookDiscovery(openBookDirectly: Bool) {
+        HapticsService.shared.playNotification(.success)
+        progress.hasEliasBook = true
+        progress.hasBook = true
+        progress.foundMarker = true
+        PrologueStore.shared.save()
+        eliasBookNode?.removeFromParent()
+        eliasBookNode = nil
+        objective.text = progress.currentObjective(for: entry.region)
+        
+        if openBookDirectly {
+            openBook()
+        } else {
+            startDialogue([
+                .init(speaker: "Arthur", text: "Tanah longsor mengikis lereng dan menyingkapkan jalinan akar pohon tua..."),
+                .init(speaker: "Arthur", text: "Ada sesuatu yang terlindung di rongga akar... Sebuah buku bersampul kulit tua!"),
+                .init(speaker: "Arthur", text: "Ini... Buku Catatan Elias! Peta kuno dan catatan jalur perbatasan tersimpan di dalamnya!"),
+                .init(speaker: "Arthur", text: "Dengan buku ini, misteri di balik The Boundary bisa kita ungkap! Aku harus membicarakan ekspedisi ini dengan teman-teman.")
+            ]) { [weak self] in
+                self?.showUnlockCard(
+                    title: "📖 BUKU ELIAS DITEMUKAN!",
+                    body: "Buku Catatan Elias berhasil diselamatkan dari sela akar pohon tua! Peta perbatasan kini lengkap. Bicarakan rencana ekspedisi ke The Boundary bersama para sahabat."
+                )
+            }
+        }
     }
 }

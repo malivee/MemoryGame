@@ -6,6 +6,7 @@ trap 'rm -rf "$build_dir"' EXIT
 swiftc -module-cache-path "$build_dir/modules" \
   MemoryGame/Models/PrologueDialogue.swift \
   MemoryGame/Models/Village/VillageMap.swift \
+  MemoryGame/Models/Village/VillageOpeningState.swift \
   MemoryGame/Models/PrologueProgress.swift \
   MemoryGame/Models/JigsawProgress.swift \
   MemoryGame/Models/PuzzleWorld.swift \

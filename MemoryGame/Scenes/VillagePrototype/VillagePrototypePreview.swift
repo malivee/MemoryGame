@@ -6,8 +6,9 @@ import SpriteKit
 struct VillagePrototypePreview: UIViewRepresentable {
     var access: VillageAccess = .opening
     func makeUIView(context: Context) -> SKView {
-        let view = SKView()
-        let scene = VillagePrototypeScene(size: view.bounds.size)
+        let defaultSize = CGSize(width: 844, height: 390)
+        let view = SKView(frame: CGRect(origin: .zero, size: defaultSize))
+        let scene = VillagePrototypeScene(size: defaultSize)
         scene.access = access
         scene.scaleMode = .resizeFill
         view.presentScene(scene)

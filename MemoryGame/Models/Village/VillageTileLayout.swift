@@ -1,14 +1,14 @@
-// Peta desa modular: 28 keping persegi, rotasi 90°, dan sambungan jalan.
-// Semua transformasi visual, collision, serta posisi Arthur memakai data ini.
+// Four source cells move, rotate, and collide as one Carto piece.
 import Foundation
 import CoreGraphics
 
 struct VillageTileLayout {
-    static let side: CGFloat = 235.25
-    static let sourceColumns = 7, sourceRows = 4
-    static let columns = 10, rows = 7
-    static let count = sourceColumns * sourceRows
+    static let side = VillageCartoMap.side
+    static let sourceColumns = VillageCartoMap.columns, sourceRows = VillageCartoMap.rows
+    static let columns = 28, rows = 20
+    static let count = VillageCartoMap.pieces.count
     static let bounds = CGRect(x: 0, y: 0, width: CGFloat(columns)*side, height: CGFloat(rows)*side)
+
     struct Placement: Codable, Equatable {
         let id: Int
         var column: Int
@@ -17,30 +17,77 @@ struct VillageTileLayout {
         var origin: CGPoint { CGPoint(x: CGFloat(column)*VillageTileLayout.side, y: CGFloat(row)*VillageTileLayout.side) }
         var center: CGPoint { CGPoint(x: origin.x+VillageTileLayout.side/2, y: origin.y+VillageTileLayout.side/2) }
     }
+    struct BuildingPlacement: Codable, Equatable {
+        let id: String
+        var subColumn: Int
+        var subRow: Int
+    }
+    private struct Save: Codable {
+        let version: Int
+        let placements: [Placement]
+        let buildingPlacements: [BuildingPlacement]?
+    }
     private(set) var placements: [Placement]
-    static var initial: Placement { Placement(id: tileID(VillageMap.spawn)!, column: 4, row: 3, turns: 0) }
-    init() { placements = [Self.initial] }
-    // Save versi baru tidak membaca array empat keping versi lama.
+    private(set) var buildingPlacements: [BuildingPlacement]
+    static var initial: Placement {
+        Placement(id: tileID(VillageCartoMap.spawn)!, column: 12, row: 10, turns: 0)
+    }
+    init() {
+        placements = [Self.initial]
+        buildingPlacements = []
+    }
     init(data: Data?) {
         placements = [Self.initial]
-        if let data, let saved = try? JSONDecoder().decode([Placement].self, from: data), Self.valid(saved) {
-            placements = saved
+        buildingPlacements = []
+        if let data, let saved = try? JSONDecoder().decode(Save.self, from: data),
+           (3...4).contains(saved.version), Self.valid(saved.placements) {
+            placements = saved.placements
+            let savedBuildings = saved.buildingPlacements ?? []
+            if Self.validBuildings(savedBuildings, pieces: placements) {
+                buildingPlacements = savedBuildings
+            }
         }
     }
-    var encoded: Data? { try? JSONEncoder().encode(placements) }
+    var encoded: Data? {
+        try? JSONEncoder().encode(Save(version: 4, placements: placements, buildingPlacements: buildingPlacements))
+    }
     var inventory: [Int] { (0..<Self.count).filter { id in !placements.contains { $0.id == id } } }
+    var buildingInventory: [VillageCartoMap.Building] {
+        VillageCartoMap.buildings.filter { building in
+            !buildingPlacements.contains { $0.id == building.id }
+        }
+    }
+
     static func tileID(_ p: CGPoint) -> Int? {
         guard p.x >= 0, p.y >= 0, p.x < CGFloat(sourceColumns)*side, p.y < CGFloat(sourceRows)*side else { return nil }
-        return Int(p.x/side) + Int(p.y/side)*sourceColumns
+        let cell = VillageCartoMap.Cell(x: Int(p.x/side), y: Int(p.y/side))
+        return VillageCartoMap.pieces.firstIndex { $0.contains(cell) }
     }
-    static func sourceOrigin(_ id: Int) -> CGPoint { CGPoint(x: CGFloat(id%sourceColumns)*side, y: CGFloat(id/sourceColumns)*side) }
+    static func sourceOrigin(_ id: Int) -> CGPoint {
+        let anchor = VillageCartoMap.pieces[id][0]
+        return CGPoint(x: CGFloat(anchor.x)*side, y: CGFloat(anchor.y)*side)
+    }
+    private static func cellOrigin(_ id: Int) -> CGPoint {
+        CGPoint(x: CGFloat(id%sourceColumns)*side, y: CGFloat(id/sourceColumns)*side)
+    }
     static func cell(_ p: CGPoint) -> (Int, Int)? {
-        guard bounds.contains(p) else { return nil }
+        guard p.x >= 0, p.y >= 0, p.x < bounds.width, p.y < bounds.height else { return nil }
         return (Int(p.x/side), Int(p.y/side))
+    }
+
+    /// Expanded cells are transient geometry, never independently movable pieces.
+    static func cells(of piece: Placement) -> [Placement] {
+        guard (0..<count).contains(piece.id) else { return [] }
+        let shape = VillageCartoMap.pieces[piece.id], anchor = shape[0]
+        return shape.map { cell in
+            let offset = rotated(CGPoint(x: cell.x-anchor.x, y: cell.y-anchor.y), turns: piece.turns)
+            return Placement(id: cell.x+cell.y*sourceColumns,
+                             column: piece.column+Int(offset.x), row: piece.row+Int(offset.y), turns: piece.turns)
+        }
     }
     func placement(at p: CGPoint) -> Placement? {
         guard let (col,row) = Self.cell(p) else { return nil }
-        return placements.first { $0.column == col && $0.row == row }
+        return placements.first { Self.cells(of: $0).contains { $0.column == col && $0.row == row } }
     }
     static func rotated(_ p: CGPoint, turns: Int) -> CGPoint {
         switch (turns%4+4)%4 {
@@ -63,12 +110,41 @@ struct VillageTileLayout {
         return CGPoint(x: a.x+Self.side/2+p.x, y: a.y+Self.side/2+p.y)
     }
 
-    // Urutan sisi: timur, utara, barat, selatan. Posisi port dihitung dari
-    // persilangan garis jalan asli, bukan dari kedekatan dua keping saja.
-    static let roadPorts: [[[CGFloat]]] = (0..<count).map { id in
-        let origin = sourceOrigin(id), s = side
+    /// One closed perimeter, with no internal cell seams.
+    static func outline(_ id: Int) -> CGPath {
+        let path = CGMutablePath()
+        guard (0..<count).contains(id) else { return path }
+        typealias Cell = VillageCartoMap.Cell
+        let shape = VillageCartoMap.pieces[id], cells = Set(shape), anchor = shape[0]
+        var edges: [Cell: Cell] = [:]
+        let offsets = [(0,-1),(1,0),(0,1),(-1,0)]
+        for c in shape {
+            let corners = [c, Cell(x:c.x+1,y:c.y), Cell(x:c.x+1,y:c.y+1), Cell(x:c.x,y:c.y+1)]
+            for edge in 0..<4 {
+                let d = offsets[edge]
+                if !cells.contains(Cell(x:c.x+d.0,y:c.y+d.1)) { edges[corners[edge]] = corners[(edge+1)%4] }
+            }
+        }
+        func point(_ c: Cell) -> CGPoint {
+            CGPoint(x:(CGFloat(c.x-anchor.x)-0.5)*side,y:(CGFloat(c.y-anchor.y)-0.5)*side)
+        }
+        while let start = edges.keys.first {
+            path.move(to:point(start))
+            var current = start
+            while let next = edges.removeValue(forKey:current) {
+                path.addLine(to:point(next)); current = next
+                if current == start { break }
+            }
+            path.closeSubpath()
+        }
+        return path
+    }
+
+    // Cell edges: east, north, west, south. Only exposed edges constrain joins.
+    static let roadPorts: [[[CGFloat]]] = (0..<(sourceColumns * sourceRows)).map { id in
+        let origin = cellOrigin(id), s = side
         var sides = [[CGFloat]](repeating: [], count: 4)
-        for road in VillageMap.roads {
+        for road in VillageCartoMap.roads {
             for (a,b) in zip(road,road.dropFirst()) {
                 let dx = b.x-a.x, dy = b.y-a.y
                 for edge in 0..<4 {
@@ -85,7 +161,32 @@ struct VillageTileLayout {
         }
         return sides.map { $0.sorted() }
     }
-    static func ports(_ piece: Placement, edge: Int) -> [CGFloat] {
+    static func boundaryPorts(_ id: Int) -> [(edge: Int, point: CGPoint)] {
+        guard (0..<count).contains(id) else { return [] }
+        let shape = Set(VillageCartoMap.pieces[id]), anchor = sourceOrigin(id)
+        let offsets = [(1,0),(0,1),(-1,0),(0,-1)]
+        var result: [(edge: Int, point: CGPoint)] = []
+        for cell in shape {
+            for edge in 0..<4 {
+                let d = offsets[edge]
+                guard !shape.contains(.init(x:cell.x+d.0,y:cell.y+d.1)) else { continue }
+                let origin = cellOrigin(cell.x+cell.y*sourceColumns)
+                for value in roadPorts[cell.x+cell.y*sourceColumns][edge] {
+                    let local: CGPoint
+                    switch edge {
+                    case 0: local = CGPoint(x:side,y:value)
+                    case 1: local = CGPoint(x:value,y:side)
+                    case 2: local = CGPoint(x:0,y:value)
+                    default: local = CGPoint(x:value,y:0)
+                    }
+                    result.append((edge,CGPoint(x:origin.x+local.x-anchor.x-side/2,
+                                               y:origin.y+local.y-anchor.y-side/2)))
+                }
+            }
+        }
+        return result
+    }
+    private static func ports(_ piece: Placement, edge: Int) -> [CGFloat] {
         var result: [CGFloat] = []
         let h = side/2
         for old in 0..<4 {
@@ -104,7 +205,8 @@ struct VillageTileLayout {
         }
         return result.sorted()
     }
-    static func edge(from a: Placement, to b: Placement) -> Int? {
+
+    private static func edge(from a: Placement, to b: Placement) -> Int? {
         switch (b.column-a.column, b.row-a.row) {
         case (1,0): return 0
         case (0,1): return 1
@@ -113,67 +215,161 @@ struct VillageTileLayout {
         default: return nil
         }
     }
-    static func matching(_ a: Placement, _ b: Placement) -> Bool {
-        guard let edge = edge(from: a, to: b) else { return false }
+    private static func cellMatching(_ a: Placement, _ b: Placement, edge: Int) -> Bool {
         let aa = ports(a, edge: edge), bb = ports(b, edge: (edge+2)%4)
         return aa.count == bb.count && zip(aa,bb).allSatisfy { abs($0-$1) <= 12 }
     }
+    static func matching(_ a: Placement, _ b: Placement) -> Bool {
+        cells(of:a).allSatisfy { first in
+            cells(of:b).allSatisfy { second in
+                guard let edge = edge(from:first,to:second) else { return true }
+                return cellMatching(first,second,edge:edge)
+            }
+        }
+    }
     static func linked(_ a: Placement, _ b: Placement) -> Bool {
-        guard let edge = edge(from: a, to: b) else { return false }
-        return !ports(a, edge: edge).isEmpty && matching(a,b)
+        cells(of:a).contains { first in
+            cells(of:b).contains { second in
+                guard let edge = edge(from:first,to:second) else { return false }
+                return !ports(first,edge:edge).isEmpty && cellMatching(first,second,edge:edge)
+            }
+        }
     }
     static func valid(_ pieces: [Placement]) -> Bool {
-        guard pieces.count <= count,
-              Set(pieces.map(\.id)).count == pieces.count else { return false }
-        var cells = Set<Int>()
+        guard pieces.count <= count, Set(pieces.map(\.id)).count == pieces.count else { return false }
+        var occupied = Set<Int>()
         for p in pieces {
-            guard (0..<count).contains(p.id), (0..<columns).contains(p.column), (0..<rows).contains(p.row),
-                  (0..<4).contains(p.turns), cells.insert(p.column+p.row*columns).inserted else { return false }
+            guard (0..<count).contains(p.id), (0..<4).contains(p.turns) else { return false }
+            for cell in cells(of:p) {
+                guard (0..<columns).contains(cell.column), (0..<rows).contains(cell.row),
+                      occupied.insert(cell.column+cell.row*columns).inserted else { return false }
+            }
         }
-        // Penempatan bebas: tidak ada target gambar, syarat jalan, atau syarat rangkaian.
         return true
     }
-
     func canPlace(id: Int, column: Int, row: Int, turns: Int) -> Bool {
         let candidate = Placement(id:id,column:column,row:row,turns:turns)
         let others = placements.filter { $0.id != id }
-        guard Self.valid(others + [candidate]) else { return false }
-        // Lokasi dan bentuk rangkaian bebas; hanya sisi yang saling menempel diuji.
-        return others.allSatisfy { Self.edge(from:candidate,to:$0) == nil || Self.matching(candidate,$0) }
+        return Self.valid(others + [candidate]) && others.allSatisfy { Self.matching(candidate,$0) }
     }
     @discardableResult mutating func place(id: Int, column: Int, row: Int, turns: Int) -> Bool {
         guard canPlace(id:id,column:column,row:row,turns:turns) else { return false }
         placements.removeAll { $0.id == id }
-        placements.append(Placement(id:id,column:column,row:row,turns:turns)); return true
+        placements.append(Placement(id:id,column:column,row:row,turns:turns))
+        return true
     }
     @discardableResult mutating func remove(id: Int) -> Bool {
         guard placements.contains(where: { $0.id == id }) else { return false }
-        let result = placements.filter { $0.id != id }
-        guard Self.valid(result) else { return false }
-        placements = result; return true
+        placements.removeAll { $0.id == id }
+        let currentBuildings = buildingPlacements
+        buildingPlacements = currentBuildings.filter { building in
+            Self.validBuilding(
+                building,
+                pieces: placements,
+                otherBuildings: currentBuildings.filter { $0.id != building.id }
+            )
+        }
+        return true
     }
-    // Rumah sudah hilang dari tekstur. Bekas tapaknya menjadi halaman yang bisa dilalui.
-    static let houseClearings: [CGRect] = VillageMap.landmarks.filter { $0.id != "pen" }.map(\.rect)
-        + [VillageMap.rect(911,319,72,65)]
-    static let terrainObstacles: [CGRect] = [VillageMap.well, VillageMap.meetingStone]
-        + VillageMap.landmarks.filter { $0.id == "pen" }.map(\.rect)
-    // Kebebasan menyusun dipisahkan dari navigasi. Satu pasang ujung jalan
-    // yang bertemu cukup untuk menyeberang, walaupun sisi lain tidak cocok.
+    static func building(_ id: String) -> VillageCartoMap.Building? {
+        VillageCartoMap.buildings.first { $0.id == id }
+    }
+    static func buildingRect(_ placement: BuildingPlacement) -> CGRect? {
+        guard let building = building(placement.id) else { return nil }
+        let unit = side / 3
+        return CGRect(
+            x: CGFloat(placement.subColumn) * unit,
+            y: CGFloat(placement.subRow) * unit,
+            width: CGFloat(building.width) * unit,
+            height: CGFloat(building.height) * unit
+        )
+    }
+    func buildingPlacement(at point: CGPoint) -> BuildingPlacement? {
+        buildingPlacements.first { placement in
+            Self.buildingRect(placement)?.contains(point) == true
+        }
+    }
+    static func validBuildings(_ buildings: [BuildingPlacement], pieces: [Placement]) -> Bool {
+        var accepted: [BuildingPlacement] = []
+        for building in buildings {
+            guard validBuilding(building, pieces: pieces, otherBuildings: accepted) else { return false }
+            accepted.append(building)
+        }
+        return true
+    }
+    static func validBuilding(
+        _ placement: BuildingPlacement,
+        pieces: [Placement],
+        otherBuildings: [BuildingPlacement]
+    ) -> Bool {
+        guard let building = building(placement.id),
+              placement.subColumn >= 0,
+              placement.subRow >= 0,
+              placement.subColumn + building.width <= columns * 3,
+              placement.subRow + building.height <= rows * 3,
+              let rect = buildingRect(placement) else {
+            return false
+        }
+
+        for subColumn in placement.subColumn..<(placement.subColumn + building.width) {
+            for subRow in placement.subRow..<(placement.subRow + building.height) {
+                let column = subColumn / 3
+                let row = subRow / 3
+                guard pieces.contains(where: { piece in
+                    cells(of: piece).contains { $0.column == column && $0.row == row }
+                }) else {
+                    return false
+                }
+            }
+        }
+
+        return otherBuildings.allSatisfy { other in
+            guard let otherRect = buildingRect(other) else { return false }
+            return !rect.intersects(otherRect.insetBy(dx: -2, dy: -2))
+        }
+    }
+    func canPlaceBuilding(id: String, subColumn: Int, subRow: Int) -> Bool {
+        let candidate = BuildingPlacement(id: id, subColumn: subColumn, subRow: subRow)
+        let others = buildingPlacements.filter { $0.id != id }
+        return Self.validBuilding(candidate, pieces: placements, otherBuildings: others)
+    }
+    @discardableResult mutating func placeBuilding(id: String, subColumn: Int, subRow: Int) -> Bool {
+        guard canPlaceBuilding(id: id, subColumn: subColumn, subRow: subRow) else { return false }
+        buildingPlacements.removeAll { $0.id == id }
+        buildingPlacements.append(BuildingPlacement(id: id, subColumn: subColumn, subRow: subRow))
+        return true
+    }
+    @discardableResult mutating func removeBuilding(id: String) -> Bool {
+        guard buildingPlacements.contains(where: { $0.id == id }) else { return false }
+        buildingPlacements.removeAll { $0.id == id }
+        return true
+    }
     static func canCross(_ a: Placement, _ b: Placement, at point: CGPoint) -> Bool {
-        guard let edge = edge(from:a,to:b) else { return false }
-        let t = edge % 2 == 0 ? point.y-a.origin.y : point.x-a.origin.x
-        return ports(a,edge:edge).contains { abs($0-t) <= 28 }
-            && ports(b,edge:(edge+2)%4).contains { abs($0-t) <= 28 }
+        cells(of:a).contains { first in
+            cells(of:b).contains { second in
+                guard let edge = edge(from:first,to:second) else { return false }
+                let boundary: CGFloat
+                switch edge {
+                case 0: boundary = first.origin.x + side
+                case 1: boundary = first.origin.y + side
+                case 2: boundary = first.origin.x
+                default: boundary = first.origin.y
+                }
+                guard abs((edge%2 == 0 ? point.x : point.y)-boundary) <= 9 else { return false }
+                let t = edge%2 == 0 ? point.y-first.origin.y : point.x-first.origin.x
+                return ports(first,edge:edge).contains { abs($0-t) <= 23 }
+                    && ports(second,edge:(edge+2)%4).contains { abs($0-t) <= 23 }
+            }
+        }
     }
     func walkable(_ point: CGPoint) -> Bool {
         let offsets: [CGPoint] = [.zero, CGPoint(x:-8,y:0),CGPoint(x:8,y:0),CGPoint(x:0,y:-8),CGPoint(x:0,y:8)]
-        guard let center = placement(at: point) else { return false }
+        guard let center = placement(at:point) else { return false }
         return offsets.allSatisfy { delta in
             let q = CGPoint(x:point.x+delta.x,y:point.y+delta.y)
-            guard let p = source(q), let neighbor = placement(at:q) else { return false }
-            if center.id != neighbor.id && !Self.canCross(center, neighbor, at: point) { return false }
-            let ground = VillageMap.onWalkableGround(p) || Self.houseClearings.contains { $0.contains(p) }
-            return ground && !Self.terrainObstacles.contains { $0.contains(p) }
+            guard let neighbor = placement(at:q) else { return false }
+            if center.id != neighbor.id && !Self.matching(center, neighbor) { return false }
+            return true
         }
     }
     func moved(from start: CGPoint, by delta: CGVector) -> CGPoint {

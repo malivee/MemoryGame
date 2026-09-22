@@ -1,35 +1,112 @@
 import Foundation
 import CoreGraphics
-func check(_ condition: @autoclosure () -> Bool,_ message:String) { if !condition() { fatalError(message) } }
+
+func check(_ condition: @autoclosure () -> Bool, _ message: String) {
+    if !condition() { fatalError(message) }
+}
+let allCells = VillageCartoMap.pieces.flatMap { $0 }
+check(allCells.count == VillageCartoMap.columns * VillageCartoMap.rows, "Full source coverage")
+check(Set(allCells).count == allCells.count, "No overlapping source cells")
+
 var layout = VillageTileLayout()
 let start = VillageTileLayout.initial
-var good = 0, bad = 0
-for id in 0..<28 where id != start.id {
- for turn in 0..<4 {
-  for (dx,dy) in [(1,0),(-1,0),(0,1),(0,-1)] {
-   let p = VillageTileLayout.Placement(id:id,column:start.column+dx,row:start.row+dy,turns:turn)
-   let matches = VillageTileLayout.matching(start,p)
-   check(layout.canPlace(id:id,column:p.column,row:p.row,turns:turn) == matches,"Placement must obey every touching road edge")
-   if matches { good += 1 } else { bad += 1 }
-  }
- }
+let player = layout.world(VillageCartoMap.spawn)!
+check(layout.walkable(player), "Starter has a safe spawn")
+for id in 0..<VillageTileLayout.count {
+    let shape = VillageCartoMap.pieces[id]
+    check(shape.count == 4 && Set(shape).count == 4, "Exactly four cells per piece")
+    var connected: Set<VillageCartoMap.Cell> = [shape[0]]
+    for _ in 0..<4 {
+        for cell in connected {
+            for (dx,dy) in [(1,0),(-1,0),(0,1),(0,-1)] {
+                let neighbor = VillageCartoMap.Cell(x:cell.x+dx,y:cell.y+dy)
+                if shape.contains(neighbor) { connected.insert(neighbor) }
+            }
+        }
+    }
+    check(connected.count == 4, "Cells form one connected piece")
+    let path = VillageTileLayout.outline(id)
+    let anchor = shape[0]
+    for x in -4...4 {
+        for y in -4...4 {
+            let sourceCell = VillageCartoMap.Cell(x:anchor.x+x,y:anchor.y+y)
+            check(path.contains(CGPoint(x:CGFloat(x)*VillageTileLayout.side,y:CGFloat(y)*VillageTileLayout.side))
+                == shape.contains(sourceCell), "Concave shape clipping and touch path")
+        }
+    }
+    for turns in 0..<4 {
+        var single = VillageTileLayout()
+        check(single.remove(id:start.id), "Remove complete starter group")
+        check(single.place(id:id,column:10,row:10,turns:turns), "Rotate complete group")
+        let piece = single.placements[0]
+        check(VillageTileLayout.cells(of:piece).count == 4, "Four occupied board cells")
+        for cell in shape {
+            let source = CGPoint(x:(CGFloat(cell.x)+0.5)*VillageTileLayout.side,
+                                 y:(CGFloat(cell.y)+0.5)*VillageTileLayout.side)
+            let world = single.world(source)!
+            check(single.placement(at:world)?.id == id, "Every cell selects the same piece")
+            let restored = single.source(world)!
+            check(hypot(source.x-restored.x,source.y-restored.y) < 0.001, "Rotated source/world roundtrip")
+        }
+        for occupied in VillageTileLayout.cells(of:piece) {
+            let other = (id+1)%VillageTileLayout.count
+            let before = single.placements
+            check(!single.place(id:other,column:occupied.column,row:occupied.row,turns:0), "Overlap rejected on every cell")
+            check(single.placements == before, "Rejected placement is atomic")
+        }
+    }
 }
-check(good > 0 && bad > 0,"Both accepted and rejected edge cases")
-check(layout.place(id:0,column:0,row:0,turns:2),"Detached placements still free")
-check(layout.remove(id:start.id),"Starter/Arthur tile can return to inventory")
-check(layout.inventory.contains(start.id),"Returned tile in inventory")
-check(layout.remove(id:0),"Last tile can be returned")
-check(layout.placements.isEmpty,"Empty board")
-check(VillageTileLayout(data:layout.encoded).placements.isEmpty,"Empty board save roundtrip")
-check(!layout.remove(id:0),"Double return rejected")
-check(layout.place(id:start.id,column:8,row:5,turns:3),"Re-place after empty board")
-let world = layout.world(VillageMap.spawn)!
-let restored = layout.source(world)!
-check(hypot(restored.x-VillageMap.spawn.x,restored.y-VillageMap.spawn.y)<0.0001,"Rotated player coordinate preserved")
-check(layout.walkable(world),"Replaced player still walkable")
+
+// Correct original arrangement remains legal, including shared road boundaries.
+var assembled = VillageTileLayout()
+assembled.remove(id:start.id)
+for id in 0..<VillageTileLayout.count {
+    let anchor = VillageCartoMap.pieces[id][0]
+    check(assembled.place(id:id,column:anchor.x+4,row:anchor.y+4,turns:0), "Source arrangement joins correctly")
+}
+check(assembled.inventory.isEmpty, "All pieces assembled")
+check(VillageTileLayout(data:assembled.encoded).placements == assembled.placements, "Save roundtrip")
+let roads = VillageCartoMap.roads
+var traversable = 0
+for road in roads {
+    for (a,b) in zip(road,road.dropFirst()) {
+        for i in 1..<20 {
+            let t = CGFloat(i)/20
+            let source = CGPoint(x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t)
+            if let point = assembled.world(source), assembled.walkable(point) { traversable += 1 }
+        }
+    }
+}
+check(traversable > 150, "Aligned trails support exploration")
+
+// Matching must examine every exposed subcell edge, not only the anchor.
+var good = 0, bad = 0
+for id in 0..<VillageTileLayout.count where id != start.id {
+    for turn in 0..<4 {
+        for dx in -4...4 {
+            for dy in -4...4 {
+                let candidate = VillageTileLayout.Placement(id:id,column:start.column+dx,row:start.row+dy,turns:turn)
+                let expected = VillageTileLayout.valid([start,candidate]) && VillageTileLayout.matching(start,candidate)
+                check(layout.canPlace(id:id,column:candidate.column,row:candidate.row,turns:turn) == expected,
+                      "Full footprint and every touching road edge validated")
+                if expected { good += 1 } else { bad += 1 }
+            }
+        }
+    }
+}
+check(good > 0 && bad > 0, "Both accepted and rejected placements")
 let before = layout.placements
-check(!layout.place(id:2,column:8,row:5,turns:0),"Overlap rejected")
-check(layout.placements == before,"Failed placement atomic")
-check(VillageTileLayout(data:Data("bad".utf8)).placements == [start],"Corrupt save fallback")
-check(VillageTileLayout(data:layout.encoded).placements == layout.placements,"Save roundtrip")
-print("PASS: \(good) matching and \(bad) mismatched neighbors, rotations, free isolated placement, return all pieces, empty board/save, overlap and player transform")
+check(!layout.place(id:14,column:VillageTileLayout.columns-1,row:8,turns:0), "Whole shape must stay in board")
+check(!layout.place(id:-1,column:0,row:0,turns:0), "Invalid ID rejected")
+check(layout.placements == before, "Invalid placements preserve state")
+check(layout.remove(id:start.id), "Starter returned to inventory as one unit")
+check(layout.inventory.contains(start.id), "Returned group available")
+check(layout.placements.isEmpty, "Empty board allowed")
+check(VillageTileLayout(data:layout.encoded).placements.isEmpty, "Empty board persistence")
+check(!layout.remove(id:start.id), "Double return rejected")
+check(layout.place(id:start.id,column:8,row:5,turns:3), "Place after empty board")
+check(layout.walkable(layout.world(VillageCartoMap.spawn)!), "Arthur stays walkable after rotating his group")
+check(VillageTileLayout(data:Data("bad".utf8)).placements == [start], "Corrupt save fallback")
+let legacy = try JSONEncoder().encode([start])
+check(VillageTileLayout(data:legacy).placements == [start], "Old square schema cannot be interpreted as groups")
+print("PASS: 45 tetrominoes, all rotations/hit paths, player transforms, \(good) valid and \(bad) invalid placements, \(traversable) road samples, saves and boundaries")

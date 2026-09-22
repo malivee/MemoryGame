@@ -1,15 +1,69 @@
-# Border, sambungan jalan, dan pengembalian keping
+# Carto Desa: Keping Gabungan
 
-Peta tetap dapat disusun bebas atau membentuk kelompok terpisah. Jika dua sisi saling menempel, seluruh ujung jalan di sisi itu harus bertemu dengan ujung jalan tetangga. Jalan–tanah atau ujung jalan yang tidak sejajar ditolak. Tanah–tanah diperbolehkan. Tidak ada target urutan gambar atau syarat seluruh keping menjadi satu kelompok.
+Modul yang dimaksud adalah `VillageCartoScene`, dibuka lewat **Area Desa**.
+Ini terpisah dari `RightDeckPuzzleScene` dan dari progres cerita desa utama.
 
-Border krem berlapis garis gelap membatasi setiap keping. Keping terpilih ber-outline oranye dan memiliki nomor. Tanda oranye kecil pada border menunjukkan ujung jalan dan ikut diputar 90°. Preview drop berwarna hijau bila sah, merah bila ditolak. Rotasi pada keping yang sudah menempel hanya diterapkan jika sah; jika belum sah, pilih posisi lain untuk meletakkannya.
+## Sumber Kebenaran
 
-Area sentuh inventori sekarang berasal dari CGRect thumbnail yang terlihat, bukan children SKCropNode. Path jalan panjang yang terpotong secara visual tidak dapat memilih thumbnail lain. Pemilihan pada papan tetap berdasarkan sel persegi yang terlihat, termasuk setelah pan/zoom.
+- `VillageCartoMap`: aset `VillageCartoMap.imageset`, grid sumber 18 x 10,
+  45 bentuk tetromino, jalur jalan, bangunan, dan posisi awal Arthur.
+- `VillageTileLayout`: penempatan, rotasi, footprint, outline, sambungan
+  jalan, navigasi, serta transformasi posisi sumber/dunia.
+- `VillageCartoScene`: rendering dan input. Tidak mendefinisikan ulang
+  bentuk keping atau aturan collision.
 
-Pilih keping terpasang lalu tekan **Balikkan keping**, atau drag keping ke panel inventori. Semua keping, termasuk awal/Arthur, bisa dikembalikan. Jika Arthur kehilangan kepingnya, pilih tempat aman pada keping tersisa. Jika tidak ada tempat aman atau papan kosong, **Jelajahi** meminta pemain memasang keping yang dapat dilalui. Papan kosong dapat disimpan dan dimuat kembali.
+Satu keping terdiri dari **empat sel yang menyatu**: T, Z, S, L, J, I, atau O.
+Empat sel itu tidak bisa dipindahkan, diputar, atau dikembalikan secara terpisah.
+Satu grup awal terpasang; seluruh grup lainnya tersedia di inventori.
 
-Rumah tetap tidak ditampilkan di mode ini. Save v2 dan cerita utama dipertahankan. Save lama dimuat tanpa dihapus, sementara penempatan/rotasi baru memeriksa sisi yang disentuh.
+Gambar terbaru digunakan pada mode susun dan jelajah, termasuk bangunan
+yang ada di gambar. Jalan dan penghalang memakai koordinat gambar baru,
+bukan koordinat `VillageMap` untuk cerita desa.
 
-File: VillageTileLayout.swift, VillageCartoScene.swift, Validation/Carto/main.swift, CARTO.md.
+## Penempatan dan Navigasi
 
-Validasi: typecheck seluruh source iOS (tanpa macro preview di salinan validasi); model menguji semua kombinasi tetangga dan rotasi terhadap keping awal, penolakan overlap, penempatan terpisah, pengembalian semua keping, save papan kosong, dan transformasi posisi pemain. Interaksi sentuh belum diuji langsung pada perangkat.
+Peta dapat disusun bebas atau membentuk kelompok terpisah. Tidak ada target
+urutan gambar. Seluruh footprint harus berada dalam papan dan tidak boleh
+bertumpuk, termasuk sel yang jauh dari anchor keping.
+
+Semua pasangan sisi sel yang saling bersentuhan diperiksa. Ujung jalan
+harus sejajar; jalan-tanah ditolak, tanah-tanah diperbolehkan. Sisi internal
+empat sel tidak dianggap sambungan antar-keping.
+
+Border mengikuti perimeter luar tanpa garis pemisah internal. Preview
+drop menampilkan seluruh bentuk, hijau jika sah dan merah jika ditolak.
+Penanda oranye hanya menunjukkan port jalan di perimeter luar.
+
+Area sentuh inventori mengikuti bentuk yang terlihat setelah rotasi.
+Pada papan, menyentuh sel mana pun memilih satu grup yang sama; ruang
+kosong di lekukan T/Z/L bukan bagian keping. Drag mempertahankan sel
+yang dipegang sebagai offset terhadap anchor.
+
+Arthur tetap memakai analog dan tap-to-move. Posisi sumber Arthur mengikuti
+pemindahan/rotasi seluruh grup. Ruang kosong dan ujung jalan yang tidak
+tersambung tidak bisa dilalui. Semua keping boleh dikembalikan ke inventori;
+jika tidak ada tempat berjalan, mode jelajah tidak dapat dimulai.
+
+## Save
+
+Layout baru disimpan pada `village.carto.layout.v3` dengan versi schema 3.
+Save v2 berisi kotak tunggal dan tetap dibiarkan, tidak ditimpa atau
+diinterpretasikan sebagai tetromino. Layout baru dimulai dari satu grup.
+Save cerita utama dan portal puzzle tidak diubah.
+
+## Validasi
+
+Jalankan dari root proyek:
+
+```sh
+swiftc -module-cache-path /tmp/memorygame-carto-cache \
+  MemoryGame/Models/Village/VillageCartoMap.swift \
+  MemoryGame/Models/Village/VillageTileLayout.swift \
+  Validation/Carto/main.swift -o /tmp/memorygame-carto-check
+/tmp/memorygame-carto-check
+```
+
+Validasi mencakup tiling tanpa celah/overlap, empat sel terhubung per keping,
+outline cekung, semua rotasi, hit test dan transformasi tiap sel, overlap
+pada sel non-anchor, semua kombinasi tetangga dekat keping awal, susunan
+gambar utuh, jalan, pengembalian grup, papan kosong, dan save round-trip.

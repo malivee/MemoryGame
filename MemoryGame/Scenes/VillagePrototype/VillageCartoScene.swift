@@ -14,6 +14,7 @@ final class VillageCartoScene: SKScene {
     private var isMap = true
     private var selected: Int?, draftTurns = 0, page = 0
     private var selectedBuilding: String?
+    private var buildingPage = 0
     private var sourcePosition = VillageCartoMap.spawn
     private var mapCenter = VillageTileLayout.initial.center
     private var zoom: CGFloat = 1
@@ -37,8 +38,11 @@ final class VillageCartoScene: SKScene {
     // Semua keping tersedia, termasuk keping tanpa jalan.
     private var available: [Int] { layout.inventory }
     private let pageSize = 4
+    private let buildingPageSize = 2
     private var pages: Int { max(1,Int(ceil(Double(available.count)/Double(pageSize)))) }
     private let cream = SKColor(red:0.94,green:0.90,blue:0.65,alpha:1)
+    // Exploration camera is intentionally close; keep placed structures modest.
+    private let explorationBuildingScale: CGFloat = 0.48
 
     override func didMove(to view: SKView) {
         guard world.parent == nil else { return }
@@ -278,6 +282,7 @@ final class VillageCartoScene: SKScene {
             guard let rect = VillageTileLayout.buildingRect(placement) else { continue }
             let node = buildingNode(placement.id, miniature: isMap)
             node.position = CGPoint(x: rect.midX, y: rect.midY)
+            if !isMap { node.setScale(explorationBuildingScale) }
             node.zPosition = 22
             world.addChild(node)
         }
@@ -293,6 +298,7 @@ final class VillageCartoScene: SKScene {
                 actor.position = p; sourcePosition = layout.source(p) ?? sourcePosition
             }
             if !isMap {
+                actor.setScale(0.3)
                 keepActorAboveMap(); world.addChild(actor)
             } else {
                 let marker = SKShapeNode(circleOfRadius:10); marker.fillColor = .systemOrange
@@ -340,7 +346,13 @@ final class VillageCartoScene: SKScene {
             divider.strokeColor = .clear
             hud.addChild(divider)
             text("BANGUNAN",at:CGPoint(x:rightEdge-94,y:buildingHeaderY),size:11,parent:hud,color:cream)
-            for (index, building) in layout.buildingInventory.enumerated() {
+            let buildingInventory = layout.buildingInventory
+            let buildingPages = max(1, Int(ceil(Double(buildingInventory.count) / Double(buildingPageSize))))
+            buildingPage = min(buildingPage, buildingPages - 1)
+            for (index, building) in buildingInventory
+                .dropFirst(buildingPage * buildingPageSize)
+                .prefix(buildingPageSize)
+                .enumerated() {
                 let node = buildingNode(building.id, miniature: true)
                 let unit = VillageTileLayout.side / 3
                 let maxSide = max(CGFloat(building.width) * unit, CGFloat(building.height) * unit)
@@ -348,11 +360,14 @@ final class VillageCartoScene: SKScene {
                 node.name = "building-\(building.id)"
                 node.position = CGPoint(
                     x: rightEdge - 94,
-                    y: buildingHeaderY - 50 - CGFloat(index) * 58
+                    y: buildingHeaderY - 42 - CGFloat(index) * 54
                 )
                 hud.addChild(node)
                 buildingInventoryHits.append((building.id,node))
             }
+            text("\(buildingPage + 1)/\(buildingPages)",at:CGPoint(x:rightEdge-94,y:buildingHeaderY-130),size:10,parent:hud,color:cream)
+            button("‹",name:"building-prev",at:CGPoint(x:rightEdge-134,y:buildingHeaderY-130),width:28)
+            button("›",name:"building-next",at:CGPoint(x:rightEdge-54,y:buildingHeaderY-130),width:28)
             button("‹",name:"prev",at:CGPoint(x:rightEdge-147,y:82),width:35)
             button("›",name:"next",at:CGPoint(x:rightEdge-39,y:82),width:35)
             text("\(page+1)/\(pages)",at:CGPoint(x:rightEdge-94,y:82),size:12,parent:hud,color:cream)
@@ -396,7 +411,8 @@ final class VillageCartoScene: SKScene {
             let scale = min(board.width/(VillageTileLayout.side*10),board.height/(VillageTileLayout.side*6))*zoom
             world.setScale(scale); world.position = CGPoint(x:board.midX-mapCenter.x*scale,y:board.midY-mapCenter.y*scale)
         } else {
-            let scale = min(2.8,max(2.1,size.height/190)); world.setScale(scale)
+            let scale = min(2.8,max(2.1,size.height/190)) * 2.8
+            world.setScale(scale)
             world.position = CGPoint(x:size.width/2-actor.position.x*scale,y:size.height/2-actor.position.y*scale)
         }
     }
@@ -510,6 +526,12 @@ final class VillageCartoScene: SKScene {
             }
             if actions.contains("remove") { returnSelected(); return }
             if actions.contains("prev") || actions.contains("next") { page = (page+(actions.contains("next") ? 1 : pages-1))%pages; rebuild(); return }
+            if actions.contains("building-prev") || actions.contains("building-next") {
+                let count = max(1, Int(ceil(Double(layout.buildingInventory.count) / Double(buildingPageSize))))
+                buildingPage = (buildingPage + (actions.contains("building-next") ? 1 : count - 1)) % count
+                rebuild()
+                return
+            }
             if actions.contains("plus") || actions.contains("minus") { zoom = max(0.5,min(2,zoom*(actions.contains("plus") ? 1.2 : 1/1.2))); updateCamera(); return }
             if actions.contains("center") { mapCenter = layout.world(sourcePosition) ?? VillageTileLayout.initial.center; updateCamera(); return }
             if let hit = inventoryHits.first(where: {

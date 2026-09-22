@@ -153,23 +153,25 @@ for id in 0..<VillageTileLayout.count {
 }
 check(allowedCount > 0 && rejectedCount > allowedCount, "Not every subcell is buildable")
 check(!VillageTileLayout.buildableSubcell(column:0,row:0,pieces:[]), "Empty space cannot support a building")
-var validBuildings = 0
-var firstBuildingSite: (Int, Int)?
-for row in 0..<(VillageTileLayout.rows*3) {
-    for column in 0..<(VillageTileLayout.columns*3) {
-        if assembled.canPlaceBuilding(id:"housePlaceholder",subColumn:column,subRow:row) {
-            validBuildings += 1
-            if firstBuildingSite == nil { firstBuildingSite = (column, row) }
+var validSitesByBuilding: [String: [(Int, Int)]] = [:]
+for building in VillageCartoMap.buildings {
+    var sites: [(Int, Int)] = []
+    for row in 0..<(VillageTileLayout.rows*3) {
+        for column in 0..<(VillageTileLayout.columns*3) {
+            if assembled.canPlaceBuilding(id:building.id,subColumn:column,subRow:row) {
+                sites.append((column, row))
+            }
         }
     }
+    validSitesByBuilding[building.id] = sites
+    check(!sites.isEmpty, "\(building.title) has a valid outlined-zone site")
 }
 let originalBuildings = assembled.buildingPlacements
-check(!assembled.placeBuilding(id:"housePlaceholder",subColumn:0,subRow:0), "Invalid footprint rejected")
+check(!assembled.placeBuilding(id:"building-3x2",subColumn:0,subRow:0), "Invalid footprint rejected")
 check(assembled.buildingPlacements == originalBuildings, "Building failure is atomic")
-check(validBuildings > 0, "Existing 6x4 house fits inside the outlined zone")
-if let (column, row) = firstBuildingSite {
-    check(assembled.placeBuilding(id:"housePlaceholder",subColumn:column,subRow:row), "Place full house inside outline")
+if let (column, row) = validSitesByBuilding["building-3x2"]?.first {
+    check(assembled.placeBuilding(id:"building-3x2",subColumn:column,subRow:row), "Place building inside outline")
     check(VillageTileLayout(data:assembled.encoded).buildingPlacements == assembled.buildingPlacements,
           "Valid outlined-zone building survives save roundtrip")
 }
-print("PASS: \(mask.count) outlined-zone subcells; \(allowedCount) rotated valid and \(rejectedCount) invalid checks; \(validBuildings) house sites in original arrangement")
+print("PASS: \(mask.count) outlined-zone subcells; \(allowedCount) rotated valid and \(rejectedCount) invalid checks; seven building sizes have valid sites")

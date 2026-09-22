@@ -39,10 +39,14 @@ enum VillageCartoMap {
     }
 
     // Building dimensions are measured in the 3 x 3 subgrid inside each map cell.
-    // Example: width 6 and height 4 spans two full cells horizontally and more
-    // than one cell vertically, so every covered subcell must belong to placed pieces.
     static let buildings: [Building] = [
-        .init(id: "housePlaceholder", title: "Rumah 1", width: 6, height: 4, kind: .house)
+        .init(id: "building-3x2", title: "Bangunan 1", width: 3, height: 2, kind: .house),
+        .init(id: "building-4x3-a", title: "Bangunan 2", width: 4, height: 3, kind: .house),
+        .init(id: "building-7x5", title: "Bangunan 3", width: 7, height: 5, kind: .barn),
+        .init(id: "building-5x5", title: "Bangunan 4", width: 5, height: 5, kind: .house),
+        .init(id: "building-10x2", title: "Bangunan 5", width: 10, height: 2, kind: .barn),
+        .init(id: "building-3x3", title: "Bangunan 6", width: 3, height: 3, kind: .well),
+        .init(id: "building-4x3-b", title: "Bangunan 7", width: 4, height: 3, kind: .pen)
     ]
 
     // Four edge-connected source cells form one indivisible piece.

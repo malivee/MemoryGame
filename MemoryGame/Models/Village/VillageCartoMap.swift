@@ -29,24 +29,44 @@ enum VillageCartoMap {
         let width: Int
         let height: Int
         let kind: Kind
+        let subtitle: String
+        let stage: Int
+
+        init(id: String, title: String, width: Int, height: Int, kind: Kind, subtitle: String = "", stage: Int = 1) {
+            self.id = id
+            self.title = title
+            self.width = width
+            self.height = height
+            self.kind = kind
+            self.subtitle = subtitle
+            self.stage = stage
+        }
 
         enum Kind: String, Codable {
             case house
             case barn
             case well
             case pen
+            case arthurHouse
+            case maraPottery
+            case kenethGranary
+            case annethKitchen
+            case rolandPen
+            case villageWell
+            case berynLodge
+            case gudangKosong
         }
     }
 
     // Building dimensions are measured in the 3 x 3 subgrid inside each map cell.
     static let buildings: [Building] = [
-        .init(id: "building-3x2", title: "Bangunan 1", width: 3, height: 2, kind: .house),
-        .init(id: "building-4x3-a", title: "Bangunan 2", width: 4, height: 3, kind: .house),
-        .init(id: "building-7x5", title: "Bangunan 3", width: 7, height: 5, kind: .barn),
-        .init(id: "building-5x5", title: "Bangunan 4", width: 5, height: 5, kind: .house),
-        .init(id: "building-10x2", title: "Bangunan 5", width: 10, height: 2, kind: .barn),
-        .init(id: "building-3x3", title: "Bangunan 6", width: 3, height: 3, kind: .well),
-        .init(id: "building-4x3-b", title: "Bangunan 7", width: 4, height: 3, kind: .pen)
+        .init(id: "building-3x2", title: "Rumah Arthur & Kakek", width: 3, height: 2, kind: .arthurHouse, subtitle: "Pondok Kayu, Cerobong & Kayu Bakar", stage: 1),
+        .init(id: "building-4x3-a", title: "Pondok Tembikar Bu Mara", width: 4, height: 3, kind: .maraPottery, subtitle: "Bengkel Keramik, Rak Pot & Tungku", stage: 1),
+        .init(id: "building-7x5", title: "Lumbung Gandum Keneth", width: 7, height: 5, kind: .kenethGranary, subtitle: "Lumbung Besar, Jerami & Karung Panen", stage: 2),
+        .init(id: "building-5x5", title: "Rumah & Dapur Anneth", width: 5, height: 5, kind: .annethKitchen, subtitle: "Homestead Asri & Kebun Sayur Umbi", stage: 3),
+        .init(id: "building-10x2", title: "Peternakan Roland", width: 10, height: 2, kind: .rolandPen, subtitle: "Kandang Memanjang, Palungan & Pagar", stage: 2),
+        .init(id: "building-3x3", title: "Gudang Kosong (Markas)", width: 3, height: 3, kind: .gudangKosong, subtitle: "Markas Rahasia Tepi Sungai 4 Sahabat", stage: 3),
+        .init(id: "building-4x3-b", title: "Rumah Sesepuh Beryn", width: 3, height: 4, kind: .berynLodge, subtitle: "Rumah Panggung Sesepuh Menegak (Lebar > Panjang)", stage: 3)
     ]
 
     // Four edge-connected source cells form one indivisible piece.

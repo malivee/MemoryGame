@@ -21,6 +21,36 @@ struct VillageTileLayout {
         let id: String
         var subColumn: Int
         var subRow: Int
+        var isRotated: Bool
+
+        init(id: String, subColumn: Int, subRow: Int, isRotated: Bool = false) {
+            self.id = id
+            self.subColumn = subColumn
+            self.subRow = subRow
+            self.isRotated = isRotated
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case id, subColumn, subRow, isRotated
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(String.self, forKey: .id)
+            subColumn = try container.decode(Int.self, forKey: .subColumn)
+            subRow = try container.decode(Int.self, forKey: .subRow)
+            isRotated = try container.decodeIfPresent(Bool.self, forKey: .isRotated) ?? false
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(id, forKey: .id)
+            try container.encode(subColumn, forKey: .subColumn)
+            try container.encode(subRow, forKey: .subRow)
+            if isRotated {
+                try container.encode(isRotated, forKey: .isRotated)
+            }
+        }
     }
     private struct Save: Codable {
         let version: Int
@@ -298,14 +328,19 @@ struct VillageTileLayout {
     static func building(_ id: String) -> VillageCartoMap.Building? {
         VillageCartoMap.buildings.first { $0.id == id }
     }
+    static func buildingDimensions(_ id: String, isRotated: Bool = false) -> (width: Int, height: Int)? {
+        guard let b = building(id) else { return nil }
+        return isRotated ? (b.height, b.width) : (b.width, b.height)
+    }
+
     static func buildingRect(_ placement: BuildingPlacement) -> CGRect? {
-        guard let building = building(placement.id) else { return nil }
+        guard let dims = buildingDimensions(placement.id, isRotated: placement.isRotated) else { return nil }
         let unit = side / 3
         return CGRect(
             x: CGFloat(placement.subColumn) * unit,
             y: CGFloat(placement.subRow) * unit,
-            width: CGFloat(building.width) * unit,
-            height: CGFloat(building.height) * unit
+            width: CGFloat(dims.width) * unit,
+            height: CGFloat(dims.height) * unit
         )
     }
     func buildingPlacement(at point: CGPoint) -> BuildingPlacement? {
@@ -326,17 +361,17 @@ struct VillageTileLayout {
         pieces: [Placement],
         otherBuildings: [BuildingPlacement]
     ) -> Bool {
-        guard let building = building(placement.id),
+        guard let dims = buildingDimensions(placement.id, isRotated: placement.isRotated),
               placement.subColumn >= 0,
               placement.subRow >= 0,
-              placement.subColumn + building.width <= columns * 3,
-              placement.subRow + building.height <= rows * 3,
+              placement.subColumn + dims.width <= columns * 3,
+              placement.subRow + dims.height <= rows * 3,
               let rect = buildingRect(placement) else {
             return false
         }
 
-        for subColumn in placement.subColumn..<(placement.subColumn + building.width) {
-            for subRow in placement.subRow..<(placement.subRow + building.height) {
+        for subColumn in placement.subColumn..<(placement.subColumn + dims.width) {
+            for subRow in placement.subRow..<(placement.subRow + dims.height) {
                 guard buildableSubcell(column: subColumn, row: subRow, pieces: pieces) else {
                     return false
                 }
@@ -362,15 +397,15 @@ struct VillageTileLayout {
                                          y:Int(floor((origin.y+side/2+local.y)/unit)))
         return VillageCartoMap.buildableSourceSubcells.contains(source)
     }
-    func canPlaceBuilding(id: String, subColumn: Int, subRow: Int) -> Bool {
-        let candidate = BuildingPlacement(id: id, subColumn: subColumn, subRow: subRow)
+    func canPlaceBuilding(id: String, subColumn: Int, subRow: Int, isRotated: Bool = false) -> Bool {
+        let candidate = BuildingPlacement(id: id, subColumn: subColumn, subRow: subRow, isRotated: isRotated)
         let others = buildingPlacements.filter { $0.id != id }
         return Self.validBuilding(candidate, pieces: placements, otherBuildings: others)
     }
-    @discardableResult mutating func placeBuilding(id: String, subColumn: Int, subRow: Int) -> Bool {
-        guard canPlaceBuilding(id: id, subColumn: subColumn, subRow: subRow) else { return false }
+    @discardableResult mutating func placeBuilding(id: String, subColumn: Int, subRow: Int, isRotated: Bool = false) -> Bool {
+        guard canPlaceBuilding(id: id, subColumn: subColumn, subRow: subRow, isRotated: isRotated) else { return false }
         buildingPlacements.removeAll { $0.id == id }
-        buildingPlacements.append(BuildingPlacement(id: id, subColumn: subColumn, subRow: subRow))
+        buildingPlacements.append(BuildingPlacement(id: id, subColumn: subColumn, subRow: subRow, isRotated: isRotated))
         return true
     }
     @discardableResult mutating func removeBuilding(id: String) -> Bool {

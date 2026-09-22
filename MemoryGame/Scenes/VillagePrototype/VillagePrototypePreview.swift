@@ -16,9 +16,31 @@ struct VillagePrototypePreview: UIViewRepresentable {
     }
     func updateUIView(_ view: SKView, context: Context) {}
 }
+struct VillageCartoPreview: UIViewRepresentable {
+    func makeUIView(context: Context) -> SKView {
+        let defaultSize = CGSize(width: 844, height: 390)
+        let view = SKView(frame: CGRect(origin: .zero, size: defaultSize))
+        let scene = VillageCartoScene(size: defaultSize)
+        scene.scaleMode = .resizeFill
+        view.presentScene(scene)
+        return view
+    }
+    func updateUIView(_ view: SKView, context: Context) {}
+}
+
 struct VillagePrototypePreviewProvider: PreviewProvider {
     static var previews: some View {
-        VillagePrototypePreview().ignoresSafeArea().previewInterfaceOrientation(.landscapeLeft)
+        Group {
+            VillageCartoPreview()
+                .previewDisplayName("Carto Map & Buildings")
+                .ignoresSafeArea()
+                .previewInterfaceOrientation(.landscapeLeft)
+
+            VillagePrototypePreview()
+                .previewDisplayName("Village Story Scene")
+                .ignoresSafeArea()
+                .previewInterfaceOrientation(.landscapeLeft)
+        }
     }
 }
 #endif

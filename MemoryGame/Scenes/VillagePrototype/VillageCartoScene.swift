@@ -21,6 +21,7 @@ final class VillageCartoScene: SKScene {
     private var dragging = false, panning = false
     private var cameraTransitioning = false
     private var ghost: SKNode?
+    private var buildingGrid: SKShapeNode?
     private var inventoryHits: [(id: Int, node: SKNode)] = []
     private var buildingInventoryHits: [(id: String, node: SKNode)] = []
     private var dragOffset = CGPoint.zero
@@ -199,10 +200,47 @@ final class VillageCartoScene: SKScene {
         return (Int(round(rect.minX / unit)), Int(round(rect.minY / unit)))
     }
 
+    private func showBuildingGrid() {
+        guard buildingGrid == nil else { return }
+        let side = VillageTileLayout.side
+        let unit = side / 3
+        let path = CGMutablePath()
+
+        for piece in layout.placements {
+            for cell in VillageTileLayout.cells(of: piece) {
+                let origin = cell.origin
+                path.addRect(CGRect(origin: origin, size: CGSize(width: side, height: side)))
+
+                for index in 1...2 {
+                    let offset = CGFloat(index) * unit
+                    path.move(to: CGPoint(x: origin.x + offset, y: origin.y))
+                    path.addLine(to: CGPoint(x: origin.x + offset, y: origin.y + side))
+                    path.move(to: CGPoint(x: origin.x, y: origin.y + offset))
+                    path.addLine(to: CGPoint(x: origin.x + side, y: origin.y + offset))
+                }
+            }
+        }
+
+        let grid = SKShapeNode(path: path)
+        grid.name = "buildingGrid"
+        grid.strokeColor = SKColor.systemCyan.withAlphaComponent(0.48)
+        grid.fillColor = .clear
+        grid.lineWidth = 1.2
+        grid.zPosition = 34
+        world.addChild(grid)
+        buildingGrid = grid
+    }
+
+    private func hideBuildingGrid() {
+        buildingGrid?.removeFromParent()
+        buildingGrid = nil
+        world.childNode(withName: "buildingGrid")?.removeFromParent()
+    }
+
     private func rebuild(_ message: String? = nil) {
         let mask = SKShapeNode(rect:isMap ? board : CGRect(origin:.zero,size:size))
         mask.fillColor = .white; mask.strokeColor = .clear; viewport.maskNode = mask
-        ghost?.removeFromParent(); ghost = nil; inventoryHits = []; buildingInventoryHits = []
+        ghost?.removeFromParent(); ghost = nil; hideBuildingGrid(); inventoryHits = []; buildingInventoryHits = []
         actor.removeFromParent(); world.removeAllChildren(); hud.removeAllChildren(); backdrop.removeAllChildren()
         // Motif garis air di ruang kosong, tetap ringan karena hanya node vektor.
         if isMap {
@@ -371,7 +409,7 @@ final class VillageCartoScene: SKScene {
     override func didChangeSize(_ oldSize: CGSize) {
         guard world.parent != nil else { return }; stopInput(); rebuild()
     }
-    private func stopInput() { activeTouch = nil; stickTouch = nil; stick = .zero; route = []; dragging = false; panning = false; ghost?.removeFromParent(); ghost = nil }
+    private func stopInput() { activeTouch = nil; stickTouch = nil; stick = .zero; route = []; dragging = false; panning = false; ghost?.removeFromParent(); ghost = nil; hideBuildingGrid(); world.childNode(withName:"dropSlot")?.removeFromParent() }
     private func save() { if let data = layout.encoded { UserDefaults.standard.set(data,forKey:Self.saveKey) } }
     private func returnSelected() {
         if let buildingID = selectedBuilding {
@@ -435,11 +473,10 @@ final class VillageCartoScene: SKScene {
                 status.text = "Rotasi belum diterapkan. Taruh di slot kosong atau pilih keping lain untuk batal."
                 return
             }
-            let enteringExploration = isMap
             let oldScale = world.xScale
             let oldPosition = world.position
             stopInput(); isMap.toggle(); selected = nil; rebuild()
-            if enteringExploration { animateWorldCamera(fromScale: oldScale, fromPosition: oldPosition) }
+            animateWorldCamera(fromScale: oldScale, fromPosition: oldPosition)
             return
         }
         if isMap {
@@ -506,6 +543,7 @@ final class VillageCartoScene: SKScene {
             mapCenter = CGPoint(x:max(0,min(VillageTileLayout.bounds.width,panStart.x-(p.x-touchStart.x)/world.xScale)),y:max(0,min(VillageTileLayout.bounds.height,panStart.y-(p.y-touchStart.y)/world.yScale)))
             updateCamera()
         } else if let buildingID = selectedBuilding {
+            showBuildingGrid()
             if ghost == nil {
                 let node = buildingNode(buildingID, miniature: true)
                 node.alpha = 0.82; node.zPosition = 40; world.addChild(node); ghost = node

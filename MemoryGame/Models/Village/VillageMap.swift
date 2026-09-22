@@ -30,79 +30,95 @@ struct VillageLandmark {
     let rect: CGRect
     let stage: VillageAccess
     let detail: String
-    var approach: CGPoint {
-        if id == "beryn" { return CGPoint(x: rect.maxX + 45, y: rect.minY + 40) }
-        if id == "pen" { return CGPoint(x: rect.midX, y: rect.maxY + 45) }
-        return CGPoint(x: rect.midX, y: rect.minY - 40)
-    }
+    var approach: CGPoint { VillageMap.approach(for: id) }
 }
+
+// Koordinat dipetakan ke gambar Desa Arthur.png (1672 × 941), tanpa distorsi.
+// point/rect menerima koordinat dari sudut kiri atas gambar referensi.
 enum VillageMap {
-    static let bounds = CGRect(x: 0, y: 0, width: 1920, height: 1440)
-    static let spawn = CGPoint(x: 640, y: 650)
-    static let landmarks: [VillageLandmark] = [
-        .init(id: "arthur", name: "Rumah Arthur & Kakek", rect: CGRect(x: 280, y: 570, width: 260, height: 195), stage: .opening,
-              detail: "Teras kayu, meja, tungku, dan ambang pintu tempat Kakek memantau jalan."),
-        .init(id: "mara", name: "Rumah Bu Mara", rect: CGRect(x: 1160, y: 570, width: 230, height: 185), stage: .opening,
-              detail: "Halaman dekat sumur: pot tanah liat, rak miring, genangan cucian, dan pecahan bata."),
-        .init(id: "barn", name: "Lumbung Desa", rect: CGRect(x: 1020, y: 1060, width: 300, height: 205), stage: .barnRoute,
-              detail: "Lumbung Keneth: karung panen, dinding lembap, papan lapuk, dan engsel pintu miring."),
-        .init(id: "anneth", name: "Rumah Anneth", rect: CGRect(x: 290, y: 1050, width: 260, height: 205), stage: .annethRoute,
-              detail: "Dapur belakang yang rapi: stok umbi, papan inventori, panci, dan lumpang."),
-        .init(id: "beryn", name: "Rumah Kakek Beryn", rect: CGRect(x: 800, y: 230, width: 260, height: 185), stage: .berynRoute,
-              detail: "Batu pipih besar di depan rumah menjadi tempat pertemuan warga."),
-        .init(id: "base", name: "Gudang Kosong", rect: CGRect(x: 1580, y: 980, width: 220, height: 170), stage: .storehouseRoute,
-              detail: "Gudang dekat sungai kecil; lokasi secret base Arthur dan teman-teman."),
-        .init(id: "pen", name: "Kandang & pagar Roland", rect: CGRect(x: 1340, y: 130, width: 245, height: 140), stage: .rolandRoute,
-              detail: "Kandang di ujung permukiman dengan tiang dan pagar kayu yang perlu diperbaiki.")
-    ]
-    static let well = CGRect(x: 865, y: 765, width: 80, height: 85)
-    static let meetingStone = CGRect(x: 865, y: 135, width: 130, height: 55)
-    static let kitchen = CGRect(x: 320, y: 1280, width: 200, height: 55)
-    // Jaringan jalan utuh: simpang sumur, cabang rumah, lumbung, dan batas hutan.
-    static let roads: [[CGPoint]] = [
-        [CGPoint(x: 0, y: 480), CGPoint(x: 580, y: 480), CGPoint(x: 775, y: 600), CGPoint(x: 790, y: 850), CGPoint(x: 700, y: 1020), CGPoint(x: 740, y: 1440)],
-        [CGPoint(x: 0, y: 900), CGPoint(x: 710, y: 900), CGPoint(x: 1000, y: 900), CGPoint(x: 1500, y: 880), CGPoint(x: 1710, y: 920)],
-        [CGPoint(x: 775, y: 600), CGPoint(x: 1090, y: 490), CGPoint(x: 1510, y: 380), CGPoint(x: 1920, y: 290)],
-        [CGPoint(x: 410, y: 535), CGPoint(x: 440, y: 480)],
-        [CGPoint(x: 1275, y: 535), CGPoint(x: 1240, y: 490)],
-        [CGPoint(x: 1170, y: 1020), CGPoint(x: 1120, y: 900)],
-        [CGPoint(x: 420, y: 1010), CGPoint(x: 470, y: 900)],
-        [CGPoint(x: 930, y: 420), CGPoint(x: 1030, y: 490)],
-        [CGPoint(x: 1600, y: 880), CGPoint(x: 1690, y: 940)],
-        [CGPoint(x: 1460, y: 305), CGPoint(x: 1510, y: 380)]
-    ]
-    static let river: [CGPoint] = [CGPoint(x: 1470, y: 1440), CGPoint(x: 1500, y: 1330), CGPoint(x: 1620, y: 1270), CGPoint(x: 1750, y: 1240), CGPoint(x: 1920, y: 1180)]
-    // Collision sesuai bangunan dan properti besar; dekorasi tanah tidak menghalangi.
-    static var solids: [CGRect] {
-        landmarks.map(\.rect) + [well, meetingStone, kitchen,
-            CGRect(x: 1420, y: 1320, width: 150, height: 120),
-            CGRect(x: 1500, y: 1250, width: 190, height: 90),
-            CGRect(x: 1650, y: 1200, width: 270, height: 100),
-            CGRect(x: 1720, y: 0, width: 22, height: 265),
-            CGRect(x: 1720, y: 390, width: 22, height: 380),
-            CGRect(x: 1450, y: 600, width: 70, height: 85)]
+    static let bounds = CGRect(x: 0, y: 0, width: 1672, height: 941)
+    static func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x:x,y:bounds.height-y) }
+    static func rect(_ x: CGFloat,_ y: CGFloat,_ w: CGFloat,_ h: CGFloat) -> CGRect {
+        CGRect(x:x,y:bounds.height-y-h,width:w,height:h)
     }
-    // Gabungan area akses bertahap mencegah pemain memutari ujung sebuah invisible wall.
-    static func accessible(_ point: CGPoint, stage: VillageAccess) -> Bool {
-        accessibleAreas(stage: stage).contains { $0.contains(point) }
+    static let spawn = point(575,460)
+    static let grandpa = point(558,445)
+    static let mara = point(775,478)
+    static let rack = point(794,459)
+    static let rackApproach = point(795,490)
+    static let wellApproach = point(846,550)
+    static let wellResidents = [point(792,547),point(895,545),point(907,500)]
+    static let storyPositions: [Int:CGPoint] = [
+        1:mara, 2:grandpa, 3:point(1200,334), 4:point(1215,565),
+        5:point(646,603), 7:point(646,603), 9:point(1160,806),
+        11:point(600,716), 12:point(902,550)
+    ]
+    static func approach(for id: String) -> CGPoint {
+        switch id {
+        case "arthur": return grandpa
+        case "mara": return mara
+        case "barn": return storyPositions[3]!
+        case "anneth": return storyPositions[5]!
+        case "beryn": return storyPositions[9]!
+        case "base": return storyPositions[11]!
+        case "pen": return storyPositions[4]!
+        default: return spawn
+        }
+    }
+    static let landmarks: [VillageLandmark] = [
+        .init(id:"arthur",name:"Rumah Arthur & Kakek",rect:rect(430,325,128,102),stage:.opening,detail:"Rumah beratap merah di barat sumur."),
+        .init(id:"mara",name:"Rumah Bu Mara",rect:rect(674,355,121,105),stage:.opening,detail:"Rumah di sebelah barat sumur; tempat membantu Bu Mara."),
+        .init(id:"barn",name:"Lumbung Desa",rect:rect(1182,194,156,125),stage:.barnRoute,detail:"Lumbung Keneth di ujung jalan utara."),
+        .init(id:"anneth",name:"Rumah Anneth",rect:rect(494,483,132,98),stage:.annethRoute,detail:"Rumah beratap biru dengan kebun sayur."),
+        .init(id:"beryn",name:"Rumah Kakek Beryn",rect:rect(1145,639,138,116),stage:.berynRoute,detail:"Rumah di tenggara dengan batu pertemuan di halaman."),
+        .init(id:"base",name:"Gudang Kosong",rect:rect(465,637,91,78),stage:.storehouseRoute,detail:"Gudang kecil di samping sungai dan jembatan."),
+        .init(id:"pen",name:"Kandang Roland",rect:rect(1148,443,185,99),stage:.rolandRoute,detail:"Kandang ternak di timur sumur.")
+    ]
+    static let well = rect(821,478,51,49)
+    static let meetingStone = rect(1124,754,63,29)
+    static let kitchen = rect(530,576,75,35)
+    static let roads: [[CGPoint]] = [
+        [point(530,437),point(650,477),point(766,505),point(799,535),point(750,590),point(705,659),point(620,732),point(577,762),point(459,814)],
+        [point(766,505),point(861,462),point(963,419),point(1062,375),point(1136,331),point(1210,341),point(1340,347),point(1440,296),point(1485,204),point(1517,119)],
+        [point(799,535),point(869,552),point(956,582),point(1043,596),point(1158,588),point(1240,603),point(1372,554),point(1431,488),point(1477,411)],
+        [point(646,603),point(750,590)],
+        [point(775,478),point(795,490),point(799,535),point(846,550),point(907,500)],
+        [point(1210,341),point(1200,334)],
+        [point(1215,565),point(1240,603)],
+        [point(1240,603),point(1301,658),point(1303,765),point(1213,806),point(1160,806)],
+        [point(620,732),point(600,716)],
+        [point(530,437),point(558,445),point(575,460)]
+    ]
+    static let river = [point(169,413),point(273,660),point(430,717),point(633,777),point(980,914)]
+    static var solids: [CGRect] {
+        landmarks.map(\.rect) + [well,meetingStone,kitchen,rect(911,319,72,65)]
+    }
+    // Jalan mengikuti gambar. Daerah di luar koridor/halaman adalah lereng atau sungai.
+    static func onWalkableGround(_ p: CGPoint) -> Bool {
+        for road in roads {
+            for (a,b) in zip(road,road.dropFirst()) {
+                let dx=b.x-a.x,dy=b.y-a.y
+                let t=max(0,min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/max(1,dx*dx+dy*dy)))
+                if hypot(p.x-a.x-t*dx,p.y-a.y-t*dy) < 40 { return true }
+            }
+        }
+        return (Array(storyPositions.values)+wellResidents+[spawn,wellApproach]).contains {
+            hypot(p.x-$0.x,p.y-$0.y) < 48
+        }
+    }
+    static func accessible(_ p: CGPoint,stage: VillageAccess) -> Bool {
+        accessibleAreas(stage:stage).contains { $0.contains(p) }
     }
     static func accessibleAreas(stage: VillageAccess) -> [CGRect] {
-        if stage == .wholeVillage { return [bounds.insetBy(dx: 36, dy: 36)] }
-        // Termasuk Rumah Arthur, Kakek, sumur, dan Rumah Bu Mara pada progresi awal.
-        let opening = CGRect(x: 250, y: 445, width: 1300, height: 495)
-        let barn = CGRect(x: 690, y: 820, width: 770, height: 570)
-        let roland = CGRect(x: 1050, y: 285, width: 580, height: 270)
-        let anneth = CGRect(x: 250, y: 880, width: 520, height: 520)
-        let beryn = CGRect(x: 760, y: 180, width: 390, height: 380)
-        let storehouse = CGRect(x: 1450, y: 850, width: 430, height: 430)
-        switch stage {
-        case .opening: return [opening]
-        case .barnRoute: return [opening, barn]
-        case .rolandRoute: return [opening, barn, roland]
-        case .annethRoute: return [opening, barn, roland, anneth]
-        case .berynRoute: return [opening, barn, roland, anneth, beryn]
-        case .storehouseRoute: return [opening, barn, roland, anneth, beryn, storehouse]
-        case .wholeVillage: return [bounds.insetBy(dx: 36, dy: 36)]
+        if stage == .wholeVillage { return [bounds.insetBy(dx:24,dy:24)] }
+        var areas = [rect(365,290,585,295)]
+        if stage.rawValue >= VillageAccess.barnRoute.rawValue {
+            areas += [rect(855,360,270,200),rect(1025,175,475,240)]
         }
+        if stage.rawValue >= VillageAccess.rolandRoute.rawValue { areas += [rect(882,408,550,235)] }
+        if stage.rawValue >= VillageAccess.annethRoute.rawValue { areas += [rect(440,475,345,207)] }
+        if stage.rawValue >= VillageAccess.berynRoute.rawValue { areas += [rect(1060,570,307,285)] }
+        if stage.rawValue >= VillageAccess.storehouseRoute.rawValue { areas += [rect(418,635,365,175)] }
+        return areas
     }
 }

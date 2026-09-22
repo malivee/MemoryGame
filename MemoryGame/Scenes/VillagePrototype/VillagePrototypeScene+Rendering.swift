@@ -50,17 +50,12 @@ extension VillagePrototypeScene {
     }
 
     func buildMap() {
-        if let image = VillageArtwork().image() {
-            let terrain = SKSpriteNode(
-                texture: SKTexture(cgImage: image)
-            )
-
-            terrain.anchorPoint = .zero
-            terrain.size = VillageMap.bounds.size
-            terrain.zPosition = -10
-
-            mapNode.addChild(terrain)
-        }
+        // Aset asli digunakan utuh; ukuran dunia mengikuti rasio gambar.
+        let terrain = SKSpriteNode(texture: SKTexture(imageNamed: "DesaArthur"))
+        terrain.anchorPoint = .zero
+        terrain.size = VillageMap.bounds.size
+        terrain.zPosition = -10
+        mapNode.addChild(terrain)
 
         for place in VillageMap.landmarks {
             label(
@@ -77,21 +72,21 @@ extension VillagePrototypeScene {
 
         label(
             "SUMUR",
-            at: CGPoint(x: 905, y: 869),
+            at: CGPoint(x: VillageMap.well.midX, y: VillageMap.well.maxY + 18),
             size: 14,
             on: mapNode
         )
 
         label(
             "Sungai kecil",
-            at: CGPoint(x: 1730, y: 1330),
+            at: VillageMap.point(390, 718),
             size: 16,
             on: mapNode
         )
 
         label(
             "Ke pinggiran hutan →",
-            at: CGPoint(x: 1780, y: 335),
+            at: VillageMap.point(1490, 135),
             size: 14,
             on: mapNode
         )
@@ -100,12 +95,12 @@ extension VillagePrototypeScene {
         for (name, position, color) in [
             (
                 "Kakek",
-                CGPoint(x: 570, y: 560),
+                VillageMap.grandpa,
                 SKColor.brown
             ),
             (
                 "Bu Mara",
-                CGPoint(x: 1400, y: 545),
+                VillageMap.mara,
                 SKColor(
                     red: 0.67,
                     green: 0.42,
@@ -115,17 +110,17 @@ extension VillagePrototypeScene {
             ),
             (
                 "Keneth",
-                CGPoint(x: 1220, y: 1005),
+                VillageMap.approach(for: "barn"),
                 SKColor.orange
             ),
             (
                 "Anneth",
-                CGPoint(x: 565, y: 1280),
+                VillageMap.approach(for: "anneth"),
                 SKColor.systemTeal
             ),
             (
                 "Roland",
-                CGPoint(x: 1550, y: 320),
+                VillageMap.approach(for: "pen"),
                 SKColor.systemYellow
             )
         ] {
@@ -168,7 +163,7 @@ extension VillagePrototypeScene {
         )
 
         rackInteraction.addChild(rackPrompt)
-        rackInteraction.position = CGPoint(x: 1455, y: 640)
+        rackInteraction.position = VillageMap.rack
         rackInteraction.zPosition = 28
 
         mapNode.addChild(rackInteraction)
@@ -306,12 +301,12 @@ extension VillagePrototypeScene {
         if access != .wholeVillage {
             for x in stride(
                 from: CGFloat(36),
-                to: 1884,
+                to: VillageMap.bounds.maxX - 24,
                 by: 48
             ) {
                 for y in stride(
                     from: CGFloat(36),
-                    to: 1404,
+                    to: VillageMap.bounds.maxY - 24,
                     by: 48
                 ) where !VillageMap.accessible(
                     CGPoint(x: x, y: y),

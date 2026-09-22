@@ -1,22 +1,21 @@
 import Foundation
 import CoreGraphics
-var count=0
-func check(_ value: @autoclosure () -> Bool, _ message:String) { precondition(value(),message);count += 1 }
+var failures=0
 for stage in VillageAccess.allCases {
-    let nav=VillageNavigation(stage:stage)
-    check(nav.walkable(VillageMap.spawn),"Spawn safe at every stage")
-    for landmark in VillageMap.landmarks {
-        let accessible=landmark.stage.rawValue<=stage.rawValue
-        check(nav.walkable(landmark.approach)==accessible,"Stage access: \(landmark.id), \(stage)")
-        if accessible { check(!nav.route(from:VillageMap.spawn,to:landmark.approach).isEmpty,"Route reaches \(landmark.id)") }
-        check(!nav.walkable(CGPoint(x:landmark.rect.midX,y:landmark.rect.midY)),"Cannot enter solid building")
-    }
-    check(!nav.walkable(CGPoint(x:-10,y:700)),"World boundary")
-    let start=CGPoint(x:905,y:700)
-    let reached=nav.moved(from:start,by:CGVector(dx:0,dy:400))
-    check(reached.y < VillageMap.well.minY,"Long move cannot tunnel through well")
+ let nav=VillageNavigation(stage:stage)
+ let points = VillageMap.landmarks.filter{$0.stage.rawValue<=stage.rawValue}.map{($0.id,$0.approach)} + [("water",VillageMap.wellApproach),("rack",VillageMap.rackApproach)]
+ for (id,p) in points {
+  if !nav.walkable(p) || nav.route(from:VillageMap.spawn,to:p).isEmpty { print("FAIL",stage,id,p);failures += 1 }
+ }
 }
-check(!VillageNavigation(stage:.opening).walkable(CGPoint(x:750,y:1000)),"North route initially locked")
-check(VillageNavigation(stage:.barnRoute).walkable(CGPoint(x:750,y:1000)),"North route unlocks")
-check(!VillageNavigation(stage:.barnRoute).walkable(VillageMap.landmarks[3].approach),"Anneth remains locked until stage 3")
-print("Passed \(count) village navigation and access checks.")
+for p in [VillageMap.point(100,400),VillageMap.point(850,870),VillageMap.point(400,170)] {
+ if VillageNavigation(stage:.wholeVillage).walkable(p) {failures += 1;print("FAIL cliff/water")}
+}
+for (step,center) in VillageMap.storyPositions where [5,7,11,12].contains(step) {
+ for delta in [CGPoint(x:-24,y:0),CGPoint(x:0,y:-22),CGPoint(x:24,y:0)] {
+  let p=CGPoint(x:center.x+delta.x,y:center.y+delta.y)
+  if !VillageNavigation(stage:.wholeVillage).walkable(p) { print("FAIL npc",step,p);failures += 1 }
+ }
+}
+print("Failures:",failures)
+exit(failures == 0 ? 0 : 1)

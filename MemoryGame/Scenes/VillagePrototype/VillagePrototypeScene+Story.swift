@@ -39,12 +39,7 @@ extension VillagePrototypeScene {
         if StoryProgression.showsWellResidents(
             for: storyProgress
         ) {
-            let positions = [
-                CGPoint(x: 805, y: 720),
-                CGPoint(x: 905, y: 700),
-                CGPoint(x: 1005, y: 720)
-            ]
-
+            let positions = VillageMap.wellResidents
             let colors: [SKColor] = [
                 .brown, .systemGray, .systemTeal
             ]
@@ -101,17 +96,7 @@ extension VillagePrototypeScene {
             return
         }
 
-        let positions: [Int: CGPoint] = [
-            1: CGPoint(x: 1400, y: 545),
-            3: CGPoint(x: 1220, y: 1005),
-            4: CGPoint(x: 1550, y: 320),
-            5: CGPoint(x: 565, y: 1280),
-            7: CGPoint(x: 565, y: 1280),
-            9: CGPoint(x: 1105, y: 270),
-            11: CGPoint(x: 1660, y: 935),
-            12: CGPoint(x: 1170, y: 850)
-        ]
-
+        let positions = VillageMap.storyPositions
         guard let position = positions[step.id] else {
             return
         }
@@ -127,9 +112,9 @@ extension VillagePrototypeScene {
             node.name = npc.id
 
             let offsets: [(CGFloat, CGFloat)] = [
-                (-90, 55),
-                (0, -70),
-                (90, 55)
+                (-24, 0),
+                (0, -22),
+                (24, 0)
             ]
 
             let delta: (CGFloat, CGFloat) =
@@ -161,10 +146,7 @@ extension VillagePrototypeScene {
                dy: -40
            ).contains(destination) {
 
-            let approach = CGPoint(
-                x: VillageMap.well.midX,
-                y: VillageMap.well.minY - 35
-            )
+            let approach = VillageMap.wellApproach
 
             let distance = hypot(
                 actor.position.x - approach.x,
@@ -201,7 +183,7 @@ extension VillagePrototypeScene {
             return true
         }
 
-        let grandpa = CGPoint(x: 570, y: 560)
+        let grandpa = VillageMap.grandpa
 
         if progress.storyProgress == 1,
            hypot(
@@ -217,7 +199,7 @@ extension VillagePrototypeScene {
             guard distance <= 145 else {
                 route = navigation.route(
                     from: actor.position,
-                    to: CGPoint(x: 590, y: 535)
+                    to: VillageMap.grandpa
                 )
 
                 hint(

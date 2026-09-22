@@ -121,7 +121,7 @@ extension VillagePrototypeScene {
             } else {
                 route = navigation.route(
                     from: actor.position,
-                    to: CGPoint(x: 1415, y: 545)
+                    to: VillageMap.rackApproach
                 )
 
                 hint("Dekati rak miring di halaman Bu Mara.")

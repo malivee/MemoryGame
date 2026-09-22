@@ -8,7 +8,8 @@ struct VillageNavigation {
     let radius: CGFloat = 13
     let step: CGFloat = 24
     func walkable(_ p: CGPoint) -> Bool {
-        guard VillageMap.bounds.insetBy(dx: 36, dy: 36).contains(p),
+        guard VillageMap.bounds.insetBy(dx: 24, dy: 24).contains(p),
+              VillageMap.onWalkableGround(p),
               !VillageMap.solids.contains(where: { $0.insetBy(dx: -radius, dy: -radius).contains(p) }) else { return false }
         return [CGPoint(x: p.x-radius, y: p.y), CGPoint(x: p.x+radius, y: p.y),
                 CGPoint(x: p.x, y: p.y-radius), CGPoint(x: p.x, y: p.y+radius)].allSatisfy { VillageMap.accessible($0, stage: stage) }

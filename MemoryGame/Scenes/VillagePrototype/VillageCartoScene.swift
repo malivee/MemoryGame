@@ -205,36 +205,54 @@ final class VillageCartoScene: SKScene {
         let side = VillageTileLayout.side
         let unit = side / 3
         let path = CGMutablePath()
+        let borderPath = CGMutablePath()
 
         for piece in layout.placements {
             for cell in VillageTileLayout.cells(of: piece) {
                 let origin = cell.origin
-                path.addRect(CGRect(origin: origin, size: CGSize(width: side, height: side)))
+                let cellRect = CGRect(origin: origin, size: CGSize(width: side, height: side))
 
-                for index in 1...2 {
-                    let offset = CGFloat(index) * unit
-                    path.move(to: CGPoint(x: origin.x + offset, y: origin.y))
-                    path.addLine(to: CGPoint(x: origin.x + offset, y: origin.y + side))
-                    path.move(to: CGPoint(x: origin.x, y: origin.y + offset))
-                    path.addLine(to: CGPoint(x: origin.x + side, y: origin.y + offset))
+                borderPath.addRect(cellRect)
+                for row in 0..<VillageCartoMap.subdivisions {
+                    for column in 0..<VillageCartoMap.subdivisions {
+                        let x = cell.column*VillageCartoMap.subdivisions+column
+                        let y = cell.row*VillageCartoMap.subdivisions+row
+                        guard VillageTileLayout.buildableSubcell(column:x,row:y,pieces:layout.placements) else { continue }
+                        path.addRect(CGRect(x:CGFloat(x)*unit,y:CGFloat(y)*unit,width:unit,height:unit))
+                    }
                 }
             }
         }
 
+        let gridFeather = SKShapeNode(path: path)
+        gridFeather.name = "buildingGrid"
+        gridFeather.zPosition = 33.5
+        world.addChild(gridFeather)
+
         let grid = SKShapeNode(path: path)
         grid.name = "buildingGrid"
-        grid.strokeColor = SKColor.systemCyan.withAlphaComponent(0.48)
-        grid.fillColor = .clear
+        grid.strokeColor = SKColor.systemRed.withAlphaComponent(0.88)
+        grid.fillColor = SKColor.systemRed.withAlphaComponent(0.16)
         grid.lineWidth = 1.2
         grid.zPosition = 34
         world.addChild(grid)
         buildingGrid = grid
+
+        let border = SKShapeNode(path: borderPath)
+        border.name = "buildingGrid"
+        border.strokeColor = SKColor.white.withAlphaComponent(0.2)
+        border.fillColor = .clear
+        border.lineWidth = 1
+        border.zPosition = 33
+        world.addChild(border)
     }
 
     private func hideBuildingGrid() {
         buildingGrid?.removeFromParent()
         buildingGrid = nil
-        world.childNode(withName: "buildingGrid")?.removeFromParent()
+        world.enumerateChildNodes(withName: "buildingGrid") { node, _ in
+            node.removeFromParent()
+        }
     }
 
     private func rebuild(_ message: String? = nil) {
@@ -600,7 +618,7 @@ final class VillageCartoScene: SKScene {
                 save()
                 rebuild("Bangunan ditempatkan di gabungan keping.")
             } else {
-                rebuild("Bangunan harus berada di subgrid keping yang sudah terpasang dan tidak boleh bertumpuk.")
+                rebuild("Seluruh tapak bangunan harus berada di dalam zona bangunan dan tidak bertumpuk.")
             }
         } else if let id = selected, board.contains(p), ((!wasPan && (wasDrag || changedRotation)) || (wasPan && !wasDrag)), let (col,row) = VillageTileLayout.cell(q) {
             if layout.place(id:id,column:col,row:row,turns:draftTurns) { save(); rebuild("Keping diletakkan. Posisi dan rotasinya diterapkan ke dunia.") }

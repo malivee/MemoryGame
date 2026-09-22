@@ -43,8 +43,10 @@ struct VillageTileLayout {
            (3...4).contains(saved.version), Self.valid(saved.placements) {
             placements = saved.placements
             let savedBuildings = saved.buildingPlacements ?? []
-            if Self.validBuildings(savedBuildings, pieces: placements) {
-                buildingPlacements = savedBuildings
+            for building in savedBuildings {
+                if Self.validBuilding(building, pieces: placements, otherBuildings: buildingPlacements) {
+                    buildingPlacements.append(building)
+                }
             }
         }
     }
@@ -335,11 +337,7 @@ struct VillageTileLayout {
 
         for subColumn in placement.subColumn..<(placement.subColumn + building.width) {
             for subRow in placement.subRow..<(placement.subRow + building.height) {
-                let column = subColumn / 3
-                let row = subRow / 3
-                guard pieces.contains(where: { piece in
-                    cells(of: piece).contains { $0.column == column && $0.row == row }
-                }) else {
+                guard buildableSubcell(column: subColumn, row: subRow, pieces: pieces) else {
                     return false
                 }
             }
@@ -349,6 +347,20 @@ struct VillageTileLayout {
             guard let otherRect = buildingRect(other) else { return false }
             return !rect.intersects(otherRect.insetBy(dx: -2, dy: -2))
         }
+    }
+    static func buildableSubcell(column: Int, row: Int, pieces: [Placement]) -> Bool {
+        let divisions = VillageCartoMap.subdivisions
+        guard column >= 0, row >= 0, column < columns*divisions, row < rows*divisions,
+              let piece = pieces.first(where: {
+                  cells(of: $0).contains { $0.column == column/divisions && $0.row == row/divisions }
+              }) else { return false }
+        let unit = VillageCartoMap.subcellSide
+        let world = CGPoint(x:(CGFloat(column)+0.5)*unit,y:(CGFloat(row)+0.5)*unit)
+        let local = rotated(CGPoint(x:world.x-piece.center.x,y:world.y-piece.center.y),turns:-piece.turns)
+        let origin = sourceOrigin(piece.id)
+        let source = VillageCartoMap.Cell(x:Int(floor((origin.x+side/2+local.x)/unit)),
+                                         y:Int(floor((origin.y+side/2+local.y)/unit)))
+        return VillageCartoMap.buildableSourceSubcells.contains(source)
     }
     func canPlaceBuilding(id: String, subColumn: Int, subRow: Int) -> Bool {
         let candidate = BuildingPlacement(id: id, subColumn: subColumn, subRow: subRow)

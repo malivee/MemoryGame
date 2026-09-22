@@ -110,3 +110,66 @@ check(VillageTileLayout(data:Data("bad".utf8)).placements == [start], "Corrupt s
 let legacy = try JSONEncoder().encode([start])
 check(VillageTileLayout(data:legacy).placements == [start], "Old square schema cannot be interpreted as groups")
 print("PASS: 45 tetrominoes, all rotations/hit paths, player transforms, \(good) valid and \(bad) invalid placements, \(traversable) road samples, saves and boundaries")
+
+let mask = VillageCartoMap.buildableSourceSubcells
+check(!mask.isEmpty, "Outlined zone has usable land")
+for index in VillageCartoMap.waterSubcellIndices {
+    let columns = VillageCartoMap.columns * VillageCartoMap.subdivisions
+    check(!mask.contains(.init(x:index%columns,y:index/columns)),
+          "Every subcell touching blue water is excluded, including feathered edges")
+}
+func terrainSubcell(_ x: CGFloat, _ y: CGFloat) -> VillageCartoMap.Cell {
+    .init(x:Int(x/1818*CGFloat(VillageCartoMap.columns*3)),
+          y:Int((1-y/1344)*CGFloat(VillageCartoMap.rows*3)))
+}
+check(mask.contains(terrainSubcell(1000,350)), "Northern plateau is not clipped by old piece IDs")
+check(mask.contains(terrainSubcell(650,880)), "Southwestern plateau is covered")
+check(!mask.contains(terrainSubcell(900,770)), "River between contours is excluded")
+check(!mask.contains(terrainSubcell(100,100)), "Land outside contours is excluded")
+let unit = VillageCartoMap.subcellSide
+var allowedCount = 0, rejectedCount = 0
+for id in 0..<VillageTileLayout.count {
+    for turns in 0..<4 {
+        var sample = VillageTileLayout()
+        sample.remove(id:start.id)
+        check(sample.place(id:id,column:12,row:10,turns:turns), "Isolated rotated building test")
+        for cell in VillageCartoMap.pieces[id] {
+            for row in 0..<3 {
+                for column in 0..<3 {
+                    let sub = VillageCartoMap.Cell(x:cell.x*3+column,y:cell.y*3+row)
+                    let source = CGPoint(x:(CGFloat(sub.x)+0.5)*unit,y:(CGFloat(sub.y)+0.5)*unit)
+                    let world = sample.world(source)!
+                    let actual = VillageTileLayout.buildableSubcell(
+                        column:Int(world.x/unit),row:Int(world.y/unit),pieces:sample.placements)
+                    check(actual == mask.contains(sub), "Build mask follows every rotation and translation")
+                    if actual {
+                        check(VillageCartoMap.grassBuildPieceIDs.contains(id), "Whitelist remains mandatory")
+                        allowedCount += 1
+                    } else { rejectedCount += 1 }
+                }
+            }
+        }
+    }
+}
+check(allowedCount > 0 && rejectedCount > allowedCount, "Not every subcell is buildable")
+check(!VillageTileLayout.buildableSubcell(column:0,row:0,pieces:[]), "Empty space cannot support a building")
+var validBuildings = 0
+var firstBuildingSite: (Int, Int)?
+for row in 0..<(VillageTileLayout.rows*3) {
+    for column in 0..<(VillageTileLayout.columns*3) {
+        if assembled.canPlaceBuilding(id:"housePlaceholder",subColumn:column,subRow:row) {
+            validBuildings += 1
+            if firstBuildingSite == nil { firstBuildingSite = (column, row) }
+        }
+    }
+}
+let originalBuildings = assembled.buildingPlacements
+check(!assembled.placeBuilding(id:"housePlaceholder",subColumn:0,subRow:0), "Invalid footprint rejected")
+check(assembled.buildingPlacements == originalBuildings, "Building failure is atomic")
+check(validBuildings > 0, "Existing 6x4 house fits inside the outlined zone")
+if let (column, row) = firstBuildingSite {
+    check(assembled.placeBuilding(id:"housePlaceholder",subColumn:column,subRow:row), "Place full house inside outline")
+    check(VillageTileLayout(data:assembled.encoded).buildingPlacements == assembled.buildingPlacements,
+          "Valid outlined-zone building survives save roundtrip")
+}
+print("PASS: \(mask.count) outlined-zone subcells; \(allowedCount) rotated valid and \(rejectedCount) invalid checks; \(validBuildings) house sites in original arrangement")

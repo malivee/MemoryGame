@@ -2,8 +2,7 @@
 // Layer dunia memakai susunan serta rotasi yang sama, tanpa mengubah save cerita.
 import SpriteKit
 import UIKit
-
-final class VillageCartoScene: SKScene {
+final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
     var onExit: (() -> Void)?
     private static let saveKey = "village.carto.layout.v3"
     private var layout = VillageTileLayout(data: UserDefaults.standard.data(forKey: saveKey))
@@ -18,6 +17,17 @@ final class VillageCartoScene: SKScene {
     private var sourcePosition = VillageCartoMap.spawn
     private var mapCenter = VillageTileLayout.initial.center
     private var zoom: CGFloat = 1
+    private weak var pinchGesture: UIPinchGestureRecognizer?
+    private var pinchActive = false
+    private weak var rotationGesture: UIRotationGestureRecognizer?
+    private var rotationActive = false
+    private var rotationStartTurns = 0
+    private weak var twoFingerPanGesture: UIPanGestureRecognizer?
+    private var twoFingerPanActive = false
+    private var twoFingerPanStart = CGPoint.zero
+    private enum TwoFingerMode { case none, zoom, rotate, pan }
+    private var twoFingerMode: TwoFingerMode = .none
+    private var lastPinchScale: CGFloat = 1
     private var activeTouch: UITouch?, touchStart = CGPoint.zero, panStart = CGPoint.zero
     private var dragging = false, panning = false
     private var cameraTransitioning = false
@@ -142,12 +152,28 @@ final class VillageCartoScene: SKScene {
     private var pages: Int { max(1,Int(ceil(Double(available.count)/Double(pageSize)))) }
     private let cream = SKColor(red:0.94,green:0.90,blue:0.65,alpha:1)
     private let explorationBuildingScale: CGFloat = 0.48
-
     override func didMove(to view: SKView) {
         guard world.parent == nil else { return }
         backgroundColor = SKColor(red:0.045,green:0.20,blue:0.24,alpha:1)
         addChild(backdrop); addChild(viewport); viewport.addChild(world); addChild(hud); hud.zPosition = 1000
         village.filteringMode = .linear
+        let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        pinch.cancelsTouchesInView = false
+        pinch.delegate = self
+        view.addGestureRecognizer(pinch)
+        pinchGesture = pinch
+        let rotation = UIRotationGestureRecognizer(target: self, action: #selector(handleRotation(_:)))
+        rotation.cancelsTouchesInView = false
+        rotation.delegate = self
+        view.addGestureRecognizer(rotation)
+        rotationGesture = rotation
+        let twoFingerPan = UIPanGestureRecognizer(target: self, action: #selector(handleTwoFingerPan(_:)))
+        twoFingerPan.minimumNumberOfTouches = 2
+        twoFingerPan.maximumNumberOfTouches = 2
+        twoFingerPan.cancelsTouchesInView = false
+        twoFingerPan.delegate = self
+        view.addGestureRecognizer(twoFingerPan)
+        twoFingerPanGesture = twoFingerPan
         rebuild()
     }
     private func text(_ value: String, at p: CGPoint, size: CGFloat = 14, parent: SKNode, color: SKColor = .white) {
@@ -163,7 +189,6 @@ final class VillageCartoScene: SKScene {
         text(title,at:.zero,size:13,parent:node,color:cream)
         node.children.first?.name = name; hud.addChild(node)
     }
-
     // Map editing shows the puzzle outline; exploration draws clean map cells without cutout seams.
     private func tile(_ id: Int, turns: Int, miniature: Bool) -> SKNode {
         let s = VillageTileLayout.side, h = s/2
@@ -171,7 +196,6 @@ final class VillageCartoScene: SKScene {
         let cells = VillageCartoMap.pieces[id]
         let node = SKNode()
         node.zRotation = CGFloat(turns) * .pi / 2
-
         if !miniature {
             for cell in cells {
                 let minX = CGFloat(cell.x) * s
@@ -193,7 +217,6 @@ final class VillageCartoScene: SKScene {
             }
             return node
         }
-
         let minX = CGFloat(cells.map(\.x).min()!) * s
         let minY = CGFloat(cells.map(\.y).min()!) * s
         let width = CGFloat(cells.map(\.x).max()! - cells.map(\.x).min()! + 1) * s
@@ -233,7 +256,6 @@ final class VillageCartoScene: SKScene {
         }
         return node
     }
-
     private func buildingNode(_ id: String, isRotated: Bool = false, miniature: Bool) -> SKNode {
         guard let building = VillageTileLayout.building(id) else { return SKNode() }
         let dims = VillageTileLayout.buildingDimensions(id, isRotated: isRotated) ?? (building.width, building.height)
@@ -247,7 +269,6 @@ final class VillageCartoScene: SKScene {
         footprint.strokeColor = selectedBuilding == id ? .systemOrange : cream.withAlphaComponent(0.65)
         footprint.lineWidth = selectedBuilding == id ? 4 : 1.8
         node.addChild(footprint)
-
         // 2. Konten Spesifik Bangunan & Hiasan Pekarangan
         let contentNode = createBuildingArt(id: id, building: building, size: size, miniature: miniature)
         node.addChild(contentNode)
@@ -257,7 +278,6 @@ final class VillageCartoScene: SKScene {
         grid.strokeColor = SKColor(white: 0.05, alpha: 0.20)
         grid.lineWidth = miniature ? 0.6 : 0.9
         node.addChild(grid)
-
         // 4. Label Nama Bangunan & Dimensi Subgrid
         let orientText = dims.width < dims.height ? " (Tegak)" : (dims.width > dims.height ? " (Datar)" : "")
         let labelText = miniature ? "\(building.title)\(orientText)" : "\(building.title) (\(dims.width)x\(dims.height))\(orientText)"
@@ -1001,25 +1021,21 @@ final class VillageCartoScene: SKScene {
             height: CGFloat(dims.height) * unit
         )
     }
-
     private func buildingSubcell(id: String, centeredAt center: CGPoint, isRotated: Bool = false) -> (Int, Int)? {
         guard let rect = buildingRect(id: id, centeredAt: center, isRotated: isRotated) else { return nil }
         let unit = VillageTileLayout.side / 3
         return (Int(round(rect.minX / unit)), Int(round(rect.minY / unit)))
     }
-
     private func showBuildingGrid() {
         guard buildingGrid == nil else { return }
         let side = VillageTileLayout.side
         let unit = side / 3
         let path = CGMutablePath()
         let borderPath = CGMutablePath()
-
         for piece in layout.placements {
             for cell in VillageTileLayout.cells(of: piece) {
                 let origin = cell.origin
                 let cellRect = CGRect(origin: origin, size: CGSize(width: side, height: side))
-
                 borderPath.addRect(cellRect)
                 for row in 0..<VillageCartoMap.subdivisions {
                     for column in 0..<VillageCartoMap.subdivisions {
@@ -1031,12 +1047,10 @@ final class VillageCartoScene: SKScene {
                 }
             }
         }
-
         let gridFeather = SKShapeNode(path: path)
         gridFeather.name = "buildingGrid"
         gridFeather.zPosition = 33.5
         world.addChild(gridFeather)
-
         let grid = SKShapeNode(path: path)
         grid.name = "buildingGrid"
         grid.strokeColor = SKColor.systemRed.withAlphaComponent(0.88)
@@ -1045,7 +1059,6 @@ final class VillageCartoScene: SKScene {
         grid.zPosition = 34
         world.addChild(grid)
         buildingGrid = grid
-
         let border = SKShapeNode(path: borderPath)
         border.name = "buildingGrid"
         border.strokeColor = SKColor.white.withAlphaComponent(0.2)
@@ -1054,7 +1067,6 @@ final class VillageCartoScene: SKScene {
         border.zPosition = 33
         world.addChild(border)
     }
-
     private func hideBuildingGrid() {
         buildingGrid?.removeFromParent()
         buildingGrid = nil
@@ -1062,7 +1074,6 @@ final class VillageCartoScene: SKScene {
             node.removeFromParent()
         }
     }
-
     private func rebuild(_ message: String? = nil) {
         let mask = SKShapeNode(rect:isMap ? board : CGRect(origin:.zero,size:size))
         mask.fillColor = .white; mask.strokeColor = .clear; viewport.maskNode = mask
@@ -1109,7 +1120,6 @@ final class VillageCartoScene: SKScene {
                 marker.strokeColor = .white; marker.lineWidth = 2; marker.position = actor.position; marker.zPosition = 20; world.addChild(marker)
             }
         }
-
         button("Kembali",name:"exit",at:CGPoint(x:42,y:size.height-32),width:68)
         button(isMap ? "Jelajahi" : "Susun peta",name:"toggle",at:CGPoint(x:rightEdge-70,y:size.height-32),width:105)
         if isMap {
@@ -1234,6 +1244,158 @@ final class VillageCartoScene: SKScene {
         }
         return result
     }
+    override func willMove(from view: SKView) {
+        if let pinchGesture { view.removeGestureRecognizer(pinchGesture) }
+        if let rotationGesture { view.removeGestureRecognizer(rotationGesture) }
+        if let twoFingerPanGesture { view.removeGestureRecognizer(twoFingerPanGesture) }
+        pinchGesture = nil
+        rotationGesture = nil
+        twoFingerPanGesture = nil
+        pinchActive = false
+        rotationActive = false
+        twoFingerPanActive = false
+        twoFingerMode = .none
+    }
+    private func dominantTwoFingerMode() -> TwoFingerMode? {
+        let zoomScore = abs(log(max(0.001, pinchGesture?.scale ?? 1))) / 0.08
+        let rotationScore = abs(rotationGesture?.rotation ?? 0) / 0.10
+        let translation = twoFingerPanGesture?.translation(in: twoFingerPanGesture?.view) ?? .zero
+        let panScore = hypot(translation.x,translation.y) / 14
+        let best = max(zoomScore,rotationScore,panScore)
+        guard best >= 1 else { return nil }
+        if panScore >= zoomScore && panScore >= rotationScore { return .pan }
+        if rotationScore > zoomScore { return .rotate }
+        return .zoom
+    }
+    @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        guard isMap, let skView = gesture.view as? SKView else { pinchActive = false; return }
+        let p = convertPoint(fromView: gesture.location(in: skView))
+        switch gesture.state {
+        case .began:
+            guard board.contains(p) else { pinchActive = false; return }
+            stopInput()
+            pinchActive = true
+            lastPinchScale = 1
+            if selected == nil { twoFingerMode = .zoom }
+        case .changed:
+            guard pinchActive else { return }
+            if twoFingerMode == .none {
+                guard let mode = dominantTwoFingerMode() else { return }
+                twoFingerMode = mode
+            }
+            guard twoFingerMode == .zoom else { return }
+            let oldScale = world.xScale
+            guard oldScale > 0 else { return }
+            let anchor = CGPoint(x: mapCenter.x + (p.x-board.midX)/oldScale, y: mapCenter.y + (p.y-board.midY)/oldScale)
+            let factor = gesture.scale / max(0.001, lastPinchScale)
+            zoom = max(0.5,min(2,zoom*factor))
+            lastPinchScale = gesture.scale
+            let newScale = min(board.width/(VillageTileLayout.side*10),board.height/(VillageTileLayout.side*6))*zoom
+            mapCenter = CGPoint(
+                x: max(0,min(VillageTileLayout.bounds.width,anchor.x-(p.x-board.midX)/newScale)),
+                y: max(0,min(VillageTileLayout.bounds.height,anchor.y-(p.y-board.midY)/newScale))
+            )
+            updateCamera()
+        case .ended, .cancelled, .failed:
+            pinchActive = false
+            lastPinchScale = 1
+            if !rotationActive { twoFingerMode = .none }
+        default:
+            break
+        }
+    }
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if gestureRecognizer === pinchGesture { return isMap }
+        if gestureRecognizer === rotationGesture { return isMap && selected != nil && selectedBuilding == nil }
+        if gestureRecognizer === twoFingerPanGesture { return isMap }
+        return true
+    }
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        let first = gestureRecognizer === pinchGesture || gestureRecognizer === rotationGesture || gestureRecognizer === twoFingerPanGesture
+        let second = otherGestureRecognizer === pinchGesture || otherGestureRecognizer === rotationGesture || otherGestureRecognizer === twoFingerPanGesture
+        return first && second
+    }
+    @objc private func handleRotation(_ gesture: UIRotationGestureRecognizer) {
+        guard isMap, selectedBuilding == nil, let id = selected, let skView = gesture.view as? SKView else {
+            rotationActive = false
+            return
+        }
+        let p = convertPoint(fromView: gesture.location(in: skView))
+        switch gesture.state {
+        case .began:
+            guard board.contains(p) else { rotationActive = false; return }
+            stopInput()
+            rotationStartTurns = draftTurns
+            rotationActive = true
+        case .changed:
+            guard rotationActive else { return }
+            if twoFingerMode == .none {
+                guard let mode = dominantTwoFingerMode() else { return }
+                twoFingerMode = mode
+            }
+            guard twoFingerMode == .rotate else { return }
+            let step = Int(round(-gesture.rotation / (.pi / 2)))
+            let turns = ((rotationStartTurns + step) % 4 + 4) % 4
+            if turns != draftTurns {
+                draftTurns = turns
+                rebuild()
+            }
+        case .ended:
+            guard rotationActive else { return }
+            rotationActive = false
+            if twoFingerMode == .rotate {
+                if let piece = layout.placements.first(where: { $0.id == id }) {
+                    if layout.place(id:id,column:piece.column,row:piece.row,turns:draftTurns) {
+                        save(); rebuild("Keping diputar \(draftTurns * 90)°.")
+                    } else {
+                        draftTurns = piece.turns
+                        rebuild("Rotasi terhalang keping lain, batas peta, atau sambungan jalan.")
+                    }
+                } else {
+                    rebuild("Rotasi siap. Letakkan keping di slot kosong untuk menerapkan.")
+                }
+            }
+            if !pinchActive { twoFingerMode = .none }
+        case .cancelled, .failed:
+            if twoFingerMode == .rotate { draftTurns = rotationStartTurns; rebuild() }
+            rotationActive = false
+            if !pinchActive { twoFingerMode = .none }
+        default:
+            break
+        }
+    }
+    @objc private func handleTwoFingerPan(_ gesture: UIPanGestureRecognizer) {
+        guard isMap, let skView = gesture.view as? SKView else {
+            twoFingerPanActive = false
+            return
+        }
+        let p = convertPoint(fromView: gesture.location(in: skView))
+        switch gesture.state {
+        case .began:
+            guard board.contains(p) else { twoFingerPanActive = false; return }
+            stopInput()
+            twoFingerPanStart = mapCenter
+            twoFingerPanActive = true
+        case .changed:
+            guard twoFingerPanActive else { return }
+            if twoFingerMode == .none {
+                guard let mode = dominantTwoFingerMode() else { return }
+                twoFingerMode = mode
+            }
+            guard twoFingerMode == .pan else { return }
+            let translation = gesture.translation(in: skView)
+            mapCenter = CGPoint(
+                x: max(0,min(VillageTileLayout.bounds.width,twoFingerPanStart.x-translation.x/world.xScale)),
+                y: max(0,min(VillageTileLayout.bounds.height,twoFingerPanStart.y+translation.y/world.yScale))
+            )
+            updateCamera()
+        case .ended, .cancelled, .failed:
+            twoFingerPanActive = false
+            if !pinchActive && !rotationActive { twoFingerMode = .none }
+        default:
+            break
+        }
+    }
     private func updateCamera() {
         if isMap {
             let scale = min(board.width/(VillageTileLayout.side*10),board.height/(VillageTileLayout.side*6))*zoom
@@ -1254,12 +1416,10 @@ final class VillageCartoScene: SKScene {
         world.removeAction(forKey: "cameraTransition")
         world.setScale(fromScale)
         world.position = fromPosition
-
         let scale = SKAction.scale(to: targetScale, duration: 0.42)
         let move = SKAction.move(to: targetPosition, duration: 0.42)
         scale.timingMode = .easeInEaseOut
         move.timingMode = .easeInEaseOut
-
         world.run(.sequence([
             .group([scale, move]),
             .run { [weak self] in
@@ -1296,6 +1456,11 @@ final class VillageCartoScene: SKScene {
     }
     private func selectBuilding(_ id: String) {
         selected = nil; selectedBuilding = id; rebuild()
+    }
+    private func clearSelection() {
+        selected = nil
+        selectedBuilding = nil
+        draftTurns = 0
     }
     private func updateStick(_ touch: UITouch) {
         let p = touch.location(in:hud), dx = p.x-stickCenter.x, dy = p.y-stickCenter.y
@@ -1434,7 +1599,13 @@ final class VillageCartoScene: SKScene {
                 dragOffset = .zero
                 activeTouch = touch; touchStart = p; return
             }
-            guard board.contains(p) else { return }
+            guard board.contains(p) else {
+                if selected != nil || selectedBuilding != nil {
+                    clearSelection()
+                    rebuild()
+                }
+                return
+            }
             let q = touch.location(in:world)
             if let building = layout.buildingPlacement(at: q),
                let rect = VillageTileLayout.buildingRect(building) {
@@ -1445,6 +1616,10 @@ final class VillageCartoScene: SKScene {
             } else if let piece = layout.placement(at:q) {
                 select(piece.id); dragOffset = CGPoint(x:piece.center.x-q.x,y:piece.center.y-q.y)
                 activeTouch = touch; touchStart = p
+            } else if selected != nil || selectedBuilding != nil {
+                clearSelection()
+                rebuild()
+                return
             } else {
                 activeTouch = touch; touchStart = p; panStart = mapCenter; panning = true; dragOffset = .zero
             }

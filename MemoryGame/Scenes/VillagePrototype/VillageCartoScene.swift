@@ -3,7 +3,7 @@
 import SpriteKit
 import UIKit
 
-final class VillageCartoScene: SKScene {
+final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
     var onExit: (() -> Void)?
     private static let saveKey = "village.carto.layout.v3"
     private var layout = VillageTileLayout(data: UserDefaults.standard.data(forKey: saveKey))
@@ -17,6 +17,17 @@ final class VillageCartoScene: SKScene {
     private var sourcePosition = VillageCartoMap.spawn
     private var mapCenter = VillageTileLayout.initial.center
     private var zoom: CGFloat = 1
+    private weak var pinchGesture: UIPinchGestureRecognizer?
+    private var pinchActive = false
+    private weak var rotationGesture: UIRotationGestureRecognizer?
+    private var rotationActive = false
+    private var rotationStartTurns = 0
+    private weak var twoFingerPanGesture: UIPanGestureRecognizer?
+    private var twoFingerPanActive = false
+    private var twoFingerPanStart = CGPoint.zero
+    private enum TwoFingerMode { case none, zoom, rotate, pan }
+    private var twoFingerMode: TwoFingerMode = .none
+    private var lastPinchScale: CGFloat = 1
     private var activeTouch: UITouch?, touchStart = CGPoint.zero, panStart = CGPoint.zero
     private var dragging = false, panning = false
     private var cameraTransitioning = false
@@ -47,6 +58,27 @@ final class VillageCartoScene: SKScene {
         guard world.parent == nil else { return }
         backgroundColor = SKColor(red:0.045,green:0.20,blue:0.24,alpha:1)
         addChild(backdrop); addChild(viewport); viewport.addChild(world); addChild(hud); hud.zPosition = 1000
+
+        let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        pinch.cancelsTouchesInView = false
+        pinch.delegate = self
+        view.addGestureRecognizer(pinch)
+        pinchGesture = pinch
+
+        let rotation = UIRotationGestureRecognizer(target: self, action: #selector(handleRotation(_:)))
+        rotation.cancelsTouchesInView = false
+        rotation.delegate = self
+        view.addGestureRecognizer(rotation)
+        rotationGesture = rotation
+
+        let twoFingerPan = UIPanGestureRecognizer(target: self, action: #selector(handleTwoFingerPan(_:)))
+        twoFingerPan.minimumNumberOfTouches = 2
+        twoFingerPan.maximumNumberOfTouches = 2
+        twoFingerPan.cancelsTouchesInView = false
+        twoFingerPan.delegate = self
+        view.addGestureRecognizer(twoFingerPan)
+        twoFingerPanGesture = twoFingerPan
+
         rebuild()
     }
     private func text(_ value: String, at p: CGPoint, size: CGFloat = 14, parent: SKNode, color: SKColor = .white) {
@@ -420,6 +452,158 @@ final class VillageCartoScene: SKScene {
             }
         }
         return result
+    }
+    override func willMove(from view: SKView) {
+        if let pinchGesture { view.removeGestureRecognizer(pinchGesture) }
+        if let rotationGesture { view.removeGestureRecognizer(rotationGesture) }
+        if let twoFingerPanGesture { view.removeGestureRecognizer(twoFingerPanGesture) }
+        pinchGesture = nil
+        rotationGesture = nil
+        twoFingerPanGesture = nil
+        pinchActive = false
+        rotationActive = false
+        twoFingerPanActive = false
+        twoFingerMode = .none
+    }
+    private func dominantTwoFingerMode() -> TwoFingerMode? {
+        let zoomScore = abs(log(max(0.001, pinchGesture?.scale ?? 1))) / 0.08
+        let rotationScore = abs(rotationGesture?.rotation ?? 0) / 0.10
+        let translation = twoFingerPanGesture?.translation(in: twoFingerPanGesture?.view) ?? .zero
+        let panScore = hypot(translation.x,translation.y) / 14
+        let best = max(zoomScore,rotationScore,panScore)
+        guard best >= 1 else { return nil }
+        if panScore >= zoomScore && panScore >= rotationScore { return .pan }
+        if rotationScore > zoomScore { return .rotate }
+        return .zoom
+    }
+    @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        guard isMap, let skView = gesture.view as? SKView else { pinchActive = false; return }
+        let p = convertPoint(fromView: gesture.location(in: skView))
+        switch gesture.state {
+        case .began:
+            guard board.contains(p) else { pinchActive = false; return }
+            stopInput()
+            pinchActive = true
+            lastPinchScale = 1
+            if selected == nil { twoFingerMode = .zoom }
+        case .changed:
+            guard pinchActive else { return }
+            if twoFingerMode == .none {
+                guard let mode = dominantTwoFingerMode() else { return }
+                twoFingerMode = mode
+            }
+            guard twoFingerMode == .zoom else { return }
+            let oldScale = world.xScale
+            guard oldScale > 0 else { return }
+            let anchor = CGPoint(x: mapCenter.x + (p.x-board.midX)/oldScale, y: mapCenter.y + (p.y-board.midY)/oldScale)
+            let factor = gesture.scale / max(0.001, lastPinchScale)
+            zoom = max(0.5,min(2,zoom*factor))
+            lastPinchScale = gesture.scale
+            let newScale = min(board.width/(VillageTileLayout.side*10),board.height/(VillageTileLayout.side*6))*zoom
+            mapCenter = CGPoint(
+                x: max(0,min(VillageTileLayout.bounds.width,anchor.x-(p.x-board.midX)/newScale)),
+                y: max(0,min(VillageTileLayout.bounds.height,anchor.y-(p.y-board.midY)/newScale))
+            )
+            updateCamera()
+        case .ended, .cancelled, .failed:
+            pinchActive = false
+            lastPinchScale = 1
+            if !rotationActive { twoFingerMode = .none }
+        default:
+            break
+        }
+    }
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if gestureRecognizer === pinchGesture { return isMap }
+        if gestureRecognizer === rotationGesture { return isMap && selected != nil && selectedBuilding == nil }
+        if gestureRecognizer === twoFingerPanGesture { return isMap }
+        return true
+    }
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        let first = gestureRecognizer === pinchGesture || gestureRecognizer === rotationGesture || gestureRecognizer === twoFingerPanGesture
+        let second = otherGestureRecognizer === pinchGesture || otherGestureRecognizer === rotationGesture || otherGestureRecognizer === twoFingerPanGesture
+        return first && second
+    }
+    @objc private func handleRotation(_ gesture: UIRotationGestureRecognizer) {
+        guard isMap, selectedBuilding == nil, let id = selected, let skView = gesture.view as? SKView else {
+            rotationActive = false
+            return
+        }
+        let p = convertPoint(fromView: gesture.location(in: skView))
+        switch gesture.state {
+        case .began:
+            guard board.contains(p) else { rotationActive = false; return }
+            stopInput()
+            rotationStartTurns = draftTurns
+            rotationActive = true
+        case .changed:
+            guard rotationActive else { return }
+            if twoFingerMode == .none {
+                guard let mode = dominantTwoFingerMode() else { return }
+                twoFingerMode = mode
+            }
+            guard twoFingerMode == .rotate else { return }
+            let step = Int(round(-gesture.rotation / (.pi / 2)))
+            let turns = ((rotationStartTurns + step) % 4 + 4) % 4
+            if turns != draftTurns {
+                draftTurns = turns
+                rebuild()
+            }
+        case .ended:
+            guard rotationActive else { return }
+            rotationActive = false
+            if twoFingerMode == .rotate {
+                if let piece = layout.placements.first(where: { $0.id == id }) {
+                    if layout.place(id:id,column:piece.column,row:piece.row,turns:draftTurns) {
+                        save(); rebuild("Keping diputar \(draftTurns * 90)°.")
+                    } else {
+                        draftTurns = piece.turns
+                        rebuild("Rotasi terhalang keping lain, batas peta, atau sambungan biome.")
+                    }
+                } else {
+                    rebuild("Rotasi siap. Letakkan keping di slot kosong untuk menerapkan.")
+                }
+            }
+            if !pinchActive { twoFingerMode = .none }
+        case .cancelled, .failed:
+            if twoFingerMode == .rotate { draftTurns = rotationStartTurns; rebuild() }
+            rotationActive = false
+            if !pinchActive { twoFingerMode = .none }
+        default:
+            break
+        }
+    }
+    @objc private func handleTwoFingerPan(_ gesture: UIPanGestureRecognizer) {
+        guard isMap, let skView = gesture.view as? SKView else {
+            twoFingerPanActive = false
+            return
+        }
+        let p = convertPoint(fromView: gesture.location(in: skView))
+        switch gesture.state {
+        case .began:
+            guard board.contains(p) else { twoFingerPanActive = false; return }
+            stopInput()
+            twoFingerPanStart = mapCenter
+            twoFingerPanActive = true
+        case .changed:
+            guard twoFingerPanActive else { return }
+            if twoFingerMode == .none {
+                guard let mode = dominantTwoFingerMode() else { return }
+                twoFingerMode = mode
+            }
+            guard twoFingerMode == .pan else { return }
+            let translation = gesture.translation(in: skView)
+            mapCenter = CGPoint(
+                x: max(0,min(VillageTileLayout.bounds.width,twoFingerPanStart.x-translation.x/world.xScale)),
+                y: max(0,min(VillageTileLayout.bounds.height,twoFingerPanStart.y+translation.y/world.yScale))
+            )
+            updateCamera()
+        case .ended, .cancelled, .failed:
+            twoFingerPanActive = false
+            if !pinchActive && !rotationActive { twoFingerMode = .none }
+        default:
+            break
+        }
     }
     private func updateCamera() {
         if isMap {

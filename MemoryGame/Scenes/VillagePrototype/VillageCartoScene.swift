@@ -135,9 +135,37 @@ final class VillageCartoScene: SKScene {
         return node
     }
 
+    private func exportPuzzlePieceNode(_ id: Int, turns: Int) -> SKNode {
+        let node = SKNode()
+        node.zRotation = CGFloat(turns) * .pi / 2
+
+        let path = VillageTileLayout.outline(id)
+        let ink = SKShapeNode(path: path)
+        ink.strokeColor = SKColor(white: 0.05, alpha: 0.72)
+        ink.fillColor = .clear
+        ink.lineWidth = 5
+        node.addChild(ink)
+
+        let border = SKShapeNode(path: path)
+        border.strokeColor = SKColor(white: 0.92, alpha: 0.95)
+        border.fillColor = .clear
+        border.lineWidth = 2.4
+        node.addChild(border)
+
+        let badge = SKShapeNode(circleOfRadius: 13)
+        badge.fillColor = SKColor(white: 0.04, alpha: 0.82)
+        badge.strokeColor = SKColor.white.withAlphaComponent(0.35)
+        badge.lineWidth = 1
+        badge.zRotation = -node.zRotation
+        text("\(id+1)", at: .zero, size: 15, parent: badge)
+        node.addChild(badge)
+
+        return node
+    }
+
     private func buildingNode(_ id: String, miniature: Bool) -> SKNode {
         guard let building = VillageTileLayout.building(id) else { return SKNode() }
-        let unit = VillageTileLayout.side / 3
+        let unit = VillageCartoMap.subcellSide
         let size = CGSize(width: CGFloat(building.width) * unit, height: CGFloat(building.height) * unit)
         let node = SKNode()
         let footprint = SKShapeNode(rectOf: size, cornerRadius: miniature ? 5 : 8)
@@ -189,7 +217,7 @@ final class VillageCartoScene: SKScene {
 
     private func buildingRect(id: String, centeredAt center: CGPoint) -> CGRect? {
         guard let building = VillageTileLayout.building(id) else { return nil }
-        let unit = VillageTileLayout.side / 3
+        let unit = VillageCartoMap.subcellSide
         return CGRect(
             x: center.x - CGFloat(building.width) * unit / 2,
             y: center.y - CGFloat(building.height) * unit / 2,
@@ -200,16 +228,28 @@ final class VillageCartoScene: SKScene {
 
     private func buildingSubcell(id: String, centeredAt center: CGPoint) -> (Int, Int)? {
         guard let rect = buildingRect(id: id, centeredAt: center) else { return nil }
-        let unit = VillageTileLayout.side / 3
+        let unit = VillageCartoMap.subcellSide
         return (Int(round(rect.minX / unit)), Int(round(rect.minY / unit)))
     }
 
     private func showBuildingGrid() {
         guard buildingGrid == nil else { return }
         let side = VillageTileLayout.side
-        let unit = side / 3
+        let unit = VillageCartoMap.subcellSide
+        let fullGridPath = CGMutablePath()
         let path = CGMutablePath()
         let borderPath = CGMutablePath()
+
+        for column in 0...VillageTileLayout.columns * VillageCartoMap.subdivisions {
+            let x = CGFloat(column) * unit
+            fullGridPath.move(to: CGPoint(x: x, y: 0))
+            fullGridPath.addLine(to: CGPoint(x: x, y: VillageTileLayout.bounds.height))
+        }
+        for row in 0...VillageTileLayout.rows * VillageCartoMap.subdivisions {
+            let y = CGFloat(row) * unit
+            fullGridPath.move(to: CGPoint(x: 0, y: y))
+            fullGridPath.addLine(to: CGPoint(x: VillageTileLayout.bounds.width, y: y))
+        }
 
         for piece in layout.placements {
             for cell in VillageTileLayout.cells(of: piece) {
@@ -221,33 +261,43 @@ final class VillageCartoScene: SKScene {
                     for column in 0..<VillageCartoMap.subdivisions {
                         let x = cell.column*VillageCartoMap.subdivisions+column
                         let y = cell.row*VillageCartoMap.subdivisions+row
-                        guard VillageTileLayout.buildableSubcell(column:x,row:y,pieces:layout.placements) else { continue }
                         path.addRect(CGRect(x:CGFloat(x)*unit,y:CGFloat(y)*unit,width:unit,height:unit))
                     }
                 }
             }
         }
 
+        let fullGrid = SKShapeNode(path: fullGridPath)
+        fullGrid.name = "buildingGrid"
+        fullGrid.strokeColor = SKColor.systemBlue.withAlphaComponent(0.34)
+        fullGrid.fillColor = .clear
+        fullGrid.lineWidth = 0.7
+        fullGrid.zPosition = 18
+        world.addChild(fullGrid)
+
         let gridFeather = SKShapeNode(path: path)
         gridFeather.name = "buildingGrid"
-        gridFeather.zPosition = 33.5
+        gridFeather.strokeColor = SKColor.systemBlue.withAlphaComponent(0.22)
+        gridFeather.fillColor = SKColor.systemBlue.withAlphaComponent(0.04)
+        gridFeather.lineWidth = 5
+        gridFeather.zPosition = 18.5
         world.addChild(gridFeather)
 
         let grid = SKShapeNode(path: path)
         grid.name = "buildingGrid"
-        grid.strokeColor = SKColor.systemRed.withAlphaComponent(0.88)
-        grid.fillColor = SKColor.systemRed.withAlphaComponent(0.16)
+        grid.strokeColor = SKColor.systemBlue.withAlphaComponent(0.82)
+        grid.fillColor = SKColor.systemBlue.withAlphaComponent(0.08)
         grid.lineWidth = 1.2
-        grid.zPosition = 34
+        grid.zPosition = 19
         world.addChild(grid)
         buildingGrid = grid
 
         let border = SKShapeNode(path: borderPath)
         border.name = "buildingGrid"
-        border.strokeColor = SKColor.white.withAlphaComponent(0.2)
+        border.strokeColor = SKColor.systemBlue.withAlphaComponent(0.28)
         border.fillColor = .clear
         border.lineWidth = 1
-        border.zPosition = 33
+        border.zPosition = 18.8
         world.addChild(border)
     }
 
@@ -277,6 +327,9 @@ final class VillageCartoScene: SKScene {
             let node = tile(piece.id,turns:displayedTurns,miniature:isMap)
             if displayedTurns != piece.turns { node.alpha = 0.65 }
             node.position = piece.center; world.addChild(node)
+        }
+        if isMap {
+            showBuildingGrid()
         }
         for placement in layout.buildingPlacements {
             guard let rect = VillageTileLayout.buildingRect(placement) else { continue }
@@ -310,6 +363,7 @@ final class VillageCartoScene: SKScene {
         button(isMap ? "Jelajahi" : "Susun peta",name:"toggle",at:CGPoint(x:rightEdge-90,y:size.height-32),width:135)
         if isMap {
             button("Debug selesai",name:"debugSolveCarto",at:CGPoint(x:210,y:size.height-32),width:145)
+            button("Export PNG",name:"exportPNG",at:CGPoint(x:350,y:size.height-32),width:120)
         }
         text(isMap ? "KEPING DESA" : "DESA ARTHUR",at:CGPoint(x:size.width/2,y:size.height-30),size:18,parent:hud,color:cream)
         if isMap {
@@ -354,7 +408,7 @@ final class VillageCartoScene: SKScene {
                 .prefix(buildingPageSize)
                 .enumerated() {
                 let node = buildingNode(building.id, miniature: true)
-                let unit = VillageTileLayout.side / 3
+                let unit = VillageCartoMap.subcellSide
                 let maxSide = max(CGFloat(building.width) * unit, CGFloat(building.height) * unit)
                 node.setScale(min(0.9, 76 / maxSide))
                 node.name = "building-\(building.id)"
@@ -445,6 +499,75 @@ final class VillageCartoScene: SKScene {
     }
     private func stopInput() { activeTouch = nil; stickTouch = nil; stick = .zero; route = []; dragging = false; panning = false; ghost?.removeFromParent(); ghost = nil; hideBuildingGrid(); world.childNode(withName:"dropSlot")?.removeFromParent() }
     private func save() { if let data = layout.encoded { UserDefaults.standard.set(data,forKey:Self.saveKey) } }
+    private func fullMapGridNode() -> SKShapeNode {
+        let unit = VillageCartoMap.subcellSide
+        let path = CGMutablePath()
+        for column in 0...VillageTileLayout.columns * VillageCartoMap.subdivisions {
+            let x = CGFloat(column) * unit
+            path.move(to: CGPoint(x: x, y: 0))
+            path.addLine(to: CGPoint(x: x, y: VillageTileLayout.bounds.height))
+        }
+        for row in 0...VillageTileLayout.rows * VillageCartoMap.subdivisions {
+            let y = CGFloat(row) * unit
+            path.move(to: CGPoint(x: 0, y: y))
+            path.addLine(to: CGPoint(x: VillageTileLayout.bounds.width, y: y))
+        }
+
+        let grid = SKShapeNode(path: path)
+        grid.strokeColor = SKColor.systemBlue.withAlphaComponent(0.55)
+        grid.fillColor = .clear
+        grid.lineWidth = 1
+        grid.zPosition = 200
+        return grid
+    }
+    private func exportVisibleMapPNG() {
+        guard let view else {
+            status.text = "View belum siap untuk export."
+            return
+        }
+
+        let exportRoot = SKNode()
+        for piece in layout.placements {
+            let node = exportPuzzlePieceNode(piece.id, turns: piece.turns)
+            node.position = piece.center
+            exportRoot.addChild(node)
+        }
+        exportRoot.addChild(fullMapGridNode())
+
+        let previousTransparency = view.allowsTransparency
+        view.allowsTransparency = true
+        defer { view.allowsTransparency = previousTransparency }
+
+        guard let texture = view.texture(from: exportRoot, crop: VillageTileLayout.bounds),
+              let data = UIImage(cgImage: texture.cgImage()).pngData() else {
+            status.text = "Export PNG gagal."
+            return
+        }
+
+        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("village-carto-puzzle-pieces-transparent.png")
+        do {
+            try data.write(to: url, options: .atomic)
+            status.text = "Transparent PNG siap dibagikan: \(url.lastPathComponent)"
+            shareExportedPNG(url, from: view)
+        } catch {
+            status.text = "Export PNG gagal: \(error.localizedDescription)"
+        }
+    }
+    private func shareExportedPNG(_ url: URL, from view: SKView) {
+        let activity = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        activity.popoverPresentationController?.sourceView = view
+        activity.popoverPresentationController?.sourceRect = view.convert(
+            CGRect(x: board.midX - 1, y: board.midY - 1, width: 2, height: 2),
+            from: self
+        )
+
+        var presenter = view.window?.rootViewController
+        while let presented = presenter?.presentedViewController {
+            presenter = presented
+        }
+        presenter?.present(activity, animated: true)
+    }
     private func returnSelected() {
         if let buildingID = selectedBuilding {
             if layout.removeBuilding(id: buildingID) {
@@ -514,6 +637,10 @@ final class VillageCartoScene: SKScene {
             return
         }
         if isMap {
+            if actions.contains("exportPNG") {
+                exportVisibleMapPNG()
+                return
+            }
             if actions.contains("rotate") {
                 guard selected != nil else { status.text = "Pilih keping terlebih dahulu."; return }
                 draftTurns = (draftTurns+1)%4
@@ -590,7 +717,7 @@ final class VillageCartoScene: SKScene {
             }
             let touchPoint = touch.location(in:world)
             let center = CGPoint(x: touchPoint.x + dragOffset.x, y: touchPoint.y + dragOffset.y)
-            let unit = VillageTileLayout.side / 3
+            let unit = VillageCartoMap.subcellSide
             let snapped = CGPoint(x: round(center.x / unit) * unit, y: round(center.y / unit) * unit)
             ghost?.position = snapped
             world.childNode(withName:"dropSlot")?.removeFromParent()
@@ -633,7 +760,7 @@ final class VillageCartoScene: SKScene {
         if let buildingID = selectedBuilding,
            board.contains(p),
            (wasDrag || layout.buildingPlacements.contains(where: { $0.id == buildingID })) {
-            let unit = VillageTileLayout.side / 3
+            let unit = VillageCartoMap.subcellSide
             let snapped = CGPoint(x: round(q.x / unit) * unit, y: round(q.y / unit) * unit)
             if let (subColumn, subRow) = buildingSubcell(id: buildingID, centeredAt: snapped),
                layout.placeBuilding(id: buildingID, subColumn: subColumn, subRow: subRow) {

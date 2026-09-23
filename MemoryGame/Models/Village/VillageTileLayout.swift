@@ -300,7 +300,7 @@ struct VillageTileLayout {
     }
     static func buildingRect(_ placement: BuildingPlacement) -> CGRect? {
         guard let building = building(placement.id) else { return nil }
-        let unit = side / 3
+        let unit = VillageCartoMap.subcellSide
         return CGRect(
             x: CGFloat(placement.subColumn) * unit,
             y: CGFloat(placement.subRow) * unit,
@@ -329,8 +329,8 @@ struct VillageTileLayout {
         guard let building = building(placement.id),
               placement.subColumn >= 0,
               placement.subRow >= 0,
-              placement.subColumn + building.width <= columns * 3,
-              placement.subRow + building.height <= rows * 3,
+              placement.subColumn + building.width <= columns * VillageCartoMap.subdivisions,
+              placement.subRow + building.height <= rows * VillageCartoMap.subdivisions,
               let rect = buildingRect(placement) else {
             return false
         }

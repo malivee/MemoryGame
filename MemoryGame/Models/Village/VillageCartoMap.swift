@@ -3,7 +3,7 @@ import CoreGraphics
 
 /// Geometry and terrain for the independent Carto map, not the story village.
 enum VillageCartoMap {
-    static let imageName = "VillageCartoMap"
+    static let imageName = "white"
     static let columns = 18, rows = 10
     static let side: CGFloat = 96
     static let size = CGSize(width: CGFloat(columns) * side, height: CGFloat(rows) * side)
@@ -16,7 +16,7 @@ enum VillageCartoMap {
         }
     })
     static let grassBuildPieceNumbers = Set(grassBuildPieceIDs.map { $0 + 1 })
-    static let subdivisions = 3
+    static let subdivisions = 6
     static let subcellSide = side / CGFloat(subdivisions)
     struct Cell: Hashable {
         let x: Int
@@ -38,7 +38,7 @@ enum VillageCartoMap {
         }
     }
 
-    // Building dimensions are measured in the 3 x 3 subgrid inside each map cell.
+    // Building dimensions are measured in the 6 x 6 subgrid inside each map cell.
     static let buildings: [Building] = [
         .init(id: "building-3x2", title: "Bangunan 1", width: 3, height: 2, kind: .house),
         .init(id: "building-4x3-a", title: "Bangunan 2", width: 4, height: 3, kind: .house),
@@ -168,11 +168,27 @@ enum VillageCartoMap {
             insideBuildingZone(CGPoint(x: p.x + delta.x, y: p.y + delta.y))
         }
     }
-    // Generated from blue pixels in 123.jpg; any water overlap blocks the entire
-    // subcell. Indices use bottom-left origin, row * 54 + column.
-    static let waterSubcellIndices: Set<Int> = [
+    // Generated from blue pixels in 123.jpg at the original 3 x 3 resolution.
+    // It is expanded to the active subgrid so the water mask follows 6 x 6 cells.
+    private static let waterCoarseSubcellIndices: Set<Int> = [
         41, 42, 43, 54, 55, 56, 92, 93, 94, 95, 96, 108, 109, 110, 111, 112, 145, 146, 147, 148, 149, 164, 165, 166, 167, 198, 199, 200, 201, 202, 220, 221, 222, 223, 250, 251, 252, 253, 254, 275, 276, 277, 278, 303, 304, 305, 306, 330, 331, 332, 333, 334, 355, 356, 357, 358, 359, 386, 387, 388, 389, 408, 409, 410, 411, 442, 443, 462, 463, 464, 496, 497, 498, 515, 516, 517, 551, 552, 553, 554, 567, 568, 569, 570, 571, 606, 607, 608, 609, 620, 621, 622, 623, 661, 662, 663, 664, 673, 674, 675, 676, 715, 716, 717, 718, 719, 726, 727, 728, 771, 772, 773, 774, 775, 776, 777, 778, 779, 780, 781, 782, 826, 827, 828, 829, 830, 831, 832, 833, 834, 880, 881, 882, 883, 884, 934, 935, 987, 988, 989, 1041, 1042, 1043, 1094, 1095, 1096, 1147, 1148, 1149, 1200, 1201, 1202, 1203, 1252, 1253, 1254, 1255, 1256, 1305, 1306, 1307, 1308, 1309, 1356, 1357, 1358, 1359, 1360, 1361, 1407, 1408, 1409, 1410, 1411, 1412, 1413, 1414, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1512, 1513, 1514
     ]
+    static let waterSubcellIndices: Set<Int> = {
+        let coarseSubdivisions = 3
+        let coarseColumns = columns * coarseSubdivisions
+        let scale = max(1, subdivisions / coarseSubdivisions)
+        return Set(waterCoarseSubcellIndices.flatMap { index in
+            let coarseX = index % coarseColumns
+            let coarseY = index / coarseColumns
+            return (0..<scale).flatMap { dx in
+                (0..<scale).map { dy in
+                    let x = coarseX * scale + dx
+                    let y = coarseY * scale + dy
+                    return y * (columns * subdivisions) + x
+                }
+            }
+        })
+    }()
     // Stable source-space mask: eligibility follows a tile through every rotation.
     // A feathered center test keeps edge subcells visible when they sit on the contour.
     static let buildableSourceSubcells: Set<Cell> = {

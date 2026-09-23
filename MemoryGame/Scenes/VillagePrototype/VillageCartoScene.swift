@@ -10,7 +10,6 @@ final class VillageCartoScene: SKScene {
     private let world = SKNode(), hud = SKNode(), backdrop = SKNode()
     private let viewport = SKCropNode()
     private let actor = MemoryCharacter(title: "Arthur", color: .systemGreen)
-    private let village = SKTexture(imageNamed: VillageCartoMap.imageName)
     private var isMap = true
     private var selected: Int?, draftTurns = 0, page = 0
     private var selectedBuilding: String?
@@ -48,7 +47,6 @@ final class VillageCartoScene: SKScene {
         guard world.parent == nil else { return }
         backgroundColor = SKColor(red:0.045,green:0.20,blue:0.24,alpha:1)
         addChild(backdrop); addChild(viewport); viewport.addChild(world); addChild(hud); hud.zPosition = 1000
-        village.filteringMode = .linear
         rebuild()
     }
     private func text(_ value: String, at p: CGPoint, size: CGFloat = 14, parent: SKNode, color: SKColor = .white) {
@@ -65,6 +63,34 @@ final class VillageCartoScene: SKScene {
         node.children.first?.name = name; hud.addChild(node)
     }
 
+    private func biomeColor(_ biome: BiomeType) -> SKColor {
+        switch biome {
+        case .rockSalt:
+            return SKColor(red: 0.86, green: 0.76, blue: 0.42, alpha: 1)
+        case .villageSoil:
+            return SKColor(red: 0.56, green: 0.73, blue: 0.33, alpha: 1)
+        case .naturalGrass:
+            return SKColor(red: 0.38, green: 0.62, blue: 0.27, alpha: 1)
+        case .darkGreenForest:
+            return SKColor(red: 0.12, green: 0.34, blue: 0.20, alpha: 1)
+        case .hillSoil:
+            return SKColor(red: 0.56, green: 0.58, blue: 0.54, alpha: 1)
+        case .water:
+            return SKColor(red: 0.30, green: 0.74, blue: 0.94, alpha: 1)
+        }
+    }
+
+    private func triangleNode(points: [CGPoint], color: SKColor) -> SKShapeNode {
+        let path = CGMutablePath()
+        path.move(to: points[0])
+        points.dropFirst().forEach { path.addLine(to: $0) }
+        path.closeSubpath()
+        let node = SKShapeNode(path: path)
+        node.fillColor = color
+        node.strokeColor = .clear
+        return node
+    }
+
     // Map editing shows the puzzle outline; exploration draws clean map cells without cutout seams.
     private func tile(_ id: Int, turns: Int, miniature: Bool) -> SKNode {
         let s = VillageTileLayout.side, h = s/2
@@ -73,59 +99,54 @@ final class VillageCartoScene: SKScene {
         let node = SKNode()
         node.zRotation = CGFloat(turns) * .pi / 2
 
-        if !miniature {
-            for cell in cells {
-                let minX = CGFloat(cell.x) * s
-                let minY = CGFloat(cell.y) * s
-                let rect = CGRect(
-                    x: minX / VillageCartoMap.size.width,
-                    y: minY / VillageCartoMap.size.height,
-                    width: s / VillageCartoMap.size.width,
-                    height: s / VillageCartoMap.size.height
-                )
-                let texture = SKTexture(rect: rect, in: village)
-                texture.filteringMode = .linear
-                let image = SKSpriteNode(texture: texture, size: CGSize(width: s + 1, height: s + 1))
-                image.position = CGPoint(
-                    x: minX + h - origin.x - h,
-                    y: minY + h - origin.y - h
-                )
-                node.addChild(image)
+        for cell in cells {
+            let center = CGPoint(
+                x: CGFloat(cell.x) * s + h - origin.x - h,
+                y: CGFloat(cell.y) * s + h - origin.y - h
+            )
+            let diagonal = VillageCartoMap.diagonalBiomes(for: cell)
+            let bottomLeft = CGPoint(x: center.x - h, y: center.y - h)
+            let bottomRight = CGPoint(x: center.x + h, y: center.y - h)
+            let topLeft = CGPoint(x: center.x - h, y: center.y + h)
+            let topRight = CGPoint(x: center.x + h, y: center.y + h)
+            node.addChild(triangleNode(points: [bottomLeft, bottomRight, topLeft], color: biomeColor(diagonal.primary)))
+            node.addChild(triangleNode(points: [topRight, topLeft, bottomRight], color: biomeColor(diagonal.secondary)))
+
+            let cellBorder = SKShapeNode(rectOf: CGSize(width: s, height: s))
+            cellBorder.position = center
+            cellBorder.strokeColor = SKColor(white: 0.05, alpha: miniature ? 0.28 : 0.18)
+            cellBorder.fillColor = .clear
+            cellBorder.lineWidth = miniature ? 1 : 0.8
+            node.addChild(cellBorder)
+
+            let gridPath = CGMutablePath()
+            for index in 1..<VillageCartoMap.subdivisions {
+                let offset = -h + CGFloat(index) * VillageCartoMap.subcellSide
+                gridPath.move(to: CGPoint(x: center.x - h, y: center.y + offset))
+                gridPath.addLine(to: CGPoint(x: center.x + h, y: center.y + offset))
+                gridPath.move(to: CGPoint(x: center.x + offset, y: center.y - h))
+                gridPath.addLine(to: CGPoint(x: center.x + offset, y: center.y + h))
             }
-            return node
+            let subgrid = SKShapeNode(path: gridPath)
+            subgrid.strokeColor = SKColor.systemBlue.withAlphaComponent(miniature ? 0.26 : 0.18)
+            subgrid.lineWidth = miniature ? 0.8 : 0.5
+            node.addChild(subgrid)
         }
 
-        let minX = CGFloat(cells.map(\.x).min()!) * s
-        let minY = CGFloat(cells.map(\.y).min()!) * s
-        let width = CGFloat(cells.map(\.x).max()! - cells.map(\.x).min()! + 1) * s
-        let height = CGFloat(cells.map(\.y).max()! - cells.map(\.y).min()! + 1) * s
-        let rect = CGRect(x:minX/VillageCartoMap.size.width,y:minY/VillageCartoMap.size.height,
-                          width:width/VillageCartoMap.size.width,height:height/VillageCartoMap.size.height)
-        let texture = SKTexture(rect:rect,in:village)
-        texture.filteringMode = .linear
-        let image = SKSpriteNode(texture:texture,size:CGSize(width:width,height:height))
-        image.position = CGPoint(x:minX+width/2-origin.x-h,y:minY+height/2-origin.y-h)
         let path = VillageTileLayout.outline(id)
-        let crop = SKCropNode()
-        let mask = SKShapeNode(path:path)
-        mask.fillColor = .white; mask.strokeColor = .clear
-        crop.maskNode = mask; crop.addChild(image)
-        node.addChild(crop)
+        let outerShadow = SKShapeNode(path: path)
+        outerShadow.strokeColor = SKColor(white: 0.04, alpha: 0.78)
+        outerShadow.fillColor = .clear
+        outerShadow.lineWidth = miniature ? 5 : 3
+        node.addChild(outerShadow)
+
+        let outerBorder = SKShapeNode(path: path)
+        outerBorder.strokeColor = selected == id ? .systemOrange : cream
+        outerBorder.fillColor = .clear
+        outerBorder.lineWidth = selected == id ? 4 : (miniature ? 2 : 1.6)
+        node.addChild(outerBorder)
+
         if miniature {
-            let border = SKShapeNode(path:path)
-            border.strokeColor = selected == id ? .systemOrange : cream
-            border.fillColor = .clear; border.lineWidth = selected == id ? 4 : 2
-            let ink = SKShapeNode(path:path)
-            ink.strokeColor = SKColor(white:0.08,alpha:0.8)
-            ink.fillColor = .clear; ink.lineWidth = border.lineWidth+3
-            node.addChild(ink); node.addChild(border)
-            for port in VillageTileLayout.boundaryPorts(id) {
-                let marker = SKShapeNode(rectOf:port.edge%2 == 0
-                    ? CGSize(width:5,height:12) : CGSize(width:12,height:5))
-                marker.position = port.point
-                marker.fillColor = .systemOrange; marker.strokeColor = cream
-                node.addChild(marker)
-            }
             let badge = SKShapeNode(circleOfRadius:13)
             badge.fillColor = SKColor(white:0,alpha:0.7); badge.strokeColor = .clear
             badge.zRotation = -node.zRotation
@@ -137,7 +158,7 @@ final class VillageCartoScene: SKScene {
 
     private func buildingNode(_ id: String, miniature: Bool) -> SKNode {
         guard let building = VillageTileLayout.building(id) else { return SKNode() }
-        let unit = VillageTileLayout.side / 3
+        let unit = VillageCartoMap.subcellSide
         let size = CGSize(width: CGFloat(building.width) * unit, height: CGFloat(building.height) * unit)
         let node = SKNode()
         let footprint = SKShapeNode(rectOf: size, cornerRadius: miniature ? 5 : 8)
@@ -189,7 +210,7 @@ final class VillageCartoScene: SKScene {
 
     private func buildingRect(id: String, centeredAt center: CGPoint) -> CGRect? {
         guard let building = VillageTileLayout.building(id) else { return nil }
-        let unit = VillageTileLayout.side / 3
+        let unit = VillageCartoMap.subcellSide
         return CGRect(
             x: center.x - CGFloat(building.width) * unit / 2,
             y: center.y - CGFloat(building.height) * unit / 2,
@@ -200,23 +221,17 @@ final class VillageCartoScene: SKScene {
 
     private func buildingSubcell(id: String, centeredAt center: CGPoint) -> (Int, Int)? {
         guard let rect = buildingRect(id: id, centeredAt: center) else { return nil }
-        let unit = VillageTileLayout.side / 3
+        let unit = VillageCartoMap.subcellSide
         return (Int(round(rect.minX / unit)), Int(round(rect.minY / unit)))
     }
 
     private func showBuildingGrid() {
         guard buildingGrid == nil else { return }
-        let side = VillageTileLayout.side
-        let unit = side / 3
+        let unit = VillageCartoMap.subcellSide
         let path = CGMutablePath()
-        let borderPath = CGMutablePath()
 
         for piece in layout.placements {
             for cell in VillageTileLayout.cells(of: piece) {
-                let origin = cell.origin
-                let cellRect = CGRect(origin: origin, size: CGSize(width: side, height: side))
-
-                borderPath.addRect(cellRect)
                 for row in 0..<VillageCartoMap.subdivisions {
                     for column in 0..<VillageCartoMap.subdivisions {
                         let x = cell.column*VillageCartoMap.subdivisions+column
@@ -242,9 +257,9 @@ final class VillageCartoScene: SKScene {
         world.addChild(grid)
         buildingGrid = grid
 
-        let border = SKShapeNode(path: borderPath)
+        let border = SKShapeNode(path: path)
         border.name = "buildingGrid"
-        border.strokeColor = SKColor.white.withAlphaComponent(0.2)
+        border.strokeColor = SKColor.systemBlue.withAlphaComponent(0.55)
         border.fillColor = .clear
         border.lineWidth = 1
         border.zPosition = 33
@@ -354,7 +369,7 @@ final class VillageCartoScene: SKScene {
                 .prefix(buildingPageSize)
                 .enumerated() {
                 let node = buildingNode(building.id, miniature: true)
-                let unit = VillageTileLayout.side / 3
+                let unit = VillageCartoMap.subcellSide
                 let maxSide = max(CGFloat(building.width) * unit, CGFloat(building.height) * unit)
                 node.setScale(min(0.9, 76 / maxSide))
                 node.name = "building-\(building.id)"
@@ -590,7 +605,7 @@ final class VillageCartoScene: SKScene {
             }
             let touchPoint = touch.location(in:world)
             let center = CGPoint(x: touchPoint.x + dragOffset.x, y: touchPoint.y + dragOffset.y)
-            let unit = VillageTileLayout.side / 3
+            let unit = VillageCartoMap.subcellSide
             let snapped = CGPoint(x: round(center.x / unit) * unit, y: round(center.y / unit) * unit)
             ghost?.position = snapped
             world.childNode(withName:"dropSlot")?.removeFromParent()
@@ -633,7 +648,7 @@ final class VillageCartoScene: SKScene {
         if let buildingID = selectedBuilding,
            board.contains(p),
            (wasDrag || layout.buildingPlacements.contains(where: { $0.id == buildingID })) {
-            let unit = VillageTileLayout.side / 3
+            let unit = VillageCartoMap.subcellSide
             let snapped = CGPoint(x: round(q.x / unit) * unit, y: round(q.y / unit) * unit)
             if let (subColumn, subRow) = buildingSubcell(id: buildingID, centeredAt: snapped),
                layout.placeBuilding(id: buildingID, subColumn: subColumn, subRow: subRow) {

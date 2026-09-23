@@ -7,6 +7,7 @@ struct VillageTileLayout {
     static let sourceColumns = VillageCartoMap.columns, sourceRows = VillageCartoMap.rows
     static let columns = 28, rows = 20
     static let count = VillageCartoMap.pieces.count
+    static let playablePieceIDs = VillageCartoMap.playablePieceIDs
     static let bounds = CGRect(x: 0, y: 0, width: CGFloat(columns)*side, height: CGFloat(rows)*side)
 
     struct Placement: Codable, Equatable {
@@ -21,36 +22,6 @@ struct VillageTileLayout {
         let id: String
         var subColumn: Int
         var subRow: Int
-        var isRotated: Bool
-
-        init(id: String, subColumn: Int, subRow: Int, isRotated: Bool = false) {
-            self.id = id
-            self.subColumn = subColumn
-            self.subRow = subRow
-            self.isRotated = isRotated
-        }
-
-        enum CodingKeys: String, CodingKey {
-            case id, subColumn, subRow, isRotated
-        }
-
-        init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            id = try container.decode(String.self, forKey: .id)
-            subColumn = try container.decode(Int.self, forKey: .subColumn)
-            subRow = try container.decode(Int.self, forKey: .subRow)
-            isRotated = try container.decodeIfPresent(Bool.self, forKey: .isRotated) ?? false
-        }
-
-        func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(id, forKey: .id)
-            try container.encode(subColumn, forKey: .subColumn)
-            try container.encode(subRow, forKey: .subRow)
-            if isRotated {
-                try container.encode(isRotated, forKey: .isRotated)
-            }
-        }
     }
     private struct Save: Codable {
         let version: Int
@@ -70,8 +41,14 @@ struct VillageTileLayout {
         placements = [Self.initial]
         buildingPlacements = []
         if let data, let saved = try? JSONDecoder().decode(Save.self, from: data),
-           (3...4).contains(saved.version), Self.valid(saved.placements) {
-            placements = saved.placements
+           (3...4).contains(saved.version) {
+            var playablePlacements = saved.placements.filter { Self.playablePieceIDs.contains($0.id) }
+            if !playablePlacements.contains(where: { $0.id == Self.initial.id }) {
+                playablePlacements.insert(Self.initial, at: 0)
+            }
+            if Self.valid(playablePlacements) {
+                placements = playablePlacements
+            }
             let savedBuildings = saved.buildingPlacements ?? []
             for building in savedBuildings {
                 if Self.validBuilding(building, pieces: placements, otherBuildings: buildingPlacements) {
@@ -83,7 +60,9 @@ struct VillageTileLayout {
     var encoded: Data? {
         try? JSONEncoder().encode(Save(version: 4, placements: placements, buildingPlacements: buildingPlacements))
     }
-    var inventory: [Int] { (0..<Self.count).filter { id in !placements.contains { $0.id == id } } }
+    var inventory: [Int] {
+        Self.playablePieceIDs.filter { id in !placements.contains { $0.id == id } }
+    }
     var buildingInventory: [VillageCartoMap.Building] {
         VillageCartoMap.buildings.filter { building in
             !buildingPlacements.contains { $0.id == building.id }
@@ -101,6 +80,12 @@ struct VillageTileLayout {
     }
     private static func cellOrigin(_ id: Int) -> CGPoint {
         CGPoint(x: CGFloat(id%sourceColumns)*side, y: CGFloat(id/sourceColumns)*side)
+    }
+    private static func sourceCell(_ placement: Placement) -> VillageCartoMap.Cell {
+        VillageCartoMap.Cell(x: placement.id % sourceColumns, y: placement.id / sourceColumns)
+    }
+    private static func sourceEdge(fromWorldEdge edge: Int, turns: Int) -> Int {
+        (edge - turns % 4 + 4) % 4
     }
     static func cell(_ p: CGPoint) -> (Int, Int)? {
         guard p.x >= 0, p.y >= 0, p.x < bounds.width, p.y < bounds.height else { return nil }
@@ -248,8 +233,9 @@ struct VillageTileLayout {
         }
     }
     private static func cellMatching(_ a: Placement, _ b: Placement, edge: Int) -> Bool {
-        let aa = ports(a, edge: edge), bb = ports(b, edge: (edge+2)%4)
-        return aa.count == bb.count && zip(aa,bb).allSatisfy { abs($0-$1) <= 12 }
+        let first = VillageCartoMap.sideBiome(for: sourceCell(a), edge: sourceEdge(fromWorldEdge: edge, turns: a.turns))
+        let second = VillageCartoMap.sideBiome(for: sourceCell(b), edge: sourceEdge(fromWorldEdge: edge + 2, turns: b.turns))
+        return first == second
     }
     static func matching(_ a: Placement, _ b: Placement) -> Bool {
         cells(of:a).allSatisfy { first in
@@ -263,15 +249,15 @@ struct VillageTileLayout {
         cells(of:a).contains { first in
             cells(of:b).contains { second in
                 guard let edge = edge(from:first,to:second) else { return false }
-                return !ports(first,edge:edge).isEmpty && cellMatching(first,second,edge:edge)
+                return cellMatching(first,second,edge:edge)
             }
         }
     }
     static func valid(_ pieces: [Placement]) -> Bool {
-        guard pieces.count <= count, Set(pieces.map(\.id)).count == pieces.count else { return false }
+        guard pieces.count <= playablePieceIDs.count, Set(pieces.map(\.id)).count == pieces.count else { return false }
         var occupied = Set<Int>()
         for p in pieces {
-            guard (0..<count).contains(p.id), (0..<4).contains(p.turns) else { return false }
+            guard playablePieceIDs.contains(p.id), (0..<count).contains(p.id), (0..<4).contains(p.turns) else { return false }
             for cell in cells(of:p) {
                 guard (0..<columns).contains(cell.column), (0..<rows).contains(cell.row),
                       occupied.insert(cell.column+cell.row*columns).inserted else { return false }
@@ -307,7 +293,7 @@ struct VillageTileLayout {
         let initialAnchor = VillageCartoMap.pieces[Self.initial.id][0]
         let columnOffset = Self.initial.column - initialAnchor.x
         let rowOffset = Self.initial.row - initialAnchor.y
-        let solved = (0..<Self.count).map { id in
+        let solved = Self.playablePieceIDs.map { id in
             let anchor = VillageCartoMap.pieces[id][0]
             return Placement(
                 id: id,
@@ -328,19 +314,14 @@ struct VillageTileLayout {
     static func building(_ id: String) -> VillageCartoMap.Building? {
         VillageCartoMap.buildings.first { $0.id == id }
     }
-    static func buildingDimensions(_ id: String, isRotated: Bool = false) -> (width: Int, height: Int)? {
-        guard let b = building(id) else { return nil }
-        return isRotated ? (b.height, b.width) : (b.width, b.height)
-    }
-
     static func buildingRect(_ placement: BuildingPlacement) -> CGRect? {
-        guard let dims = buildingDimensions(placement.id, isRotated: placement.isRotated) else { return nil }
-        let unit = side / 3
+        guard let building = building(placement.id) else { return nil }
+        let unit = VillageCartoMap.subcellSide
         return CGRect(
             x: CGFloat(placement.subColumn) * unit,
             y: CGFloat(placement.subRow) * unit,
-            width: CGFloat(dims.width) * unit,
-            height: CGFloat(dims.height) * unit
+            width: CGFloat(building.width) * unit,
+            height: CGFloat(building.height) * unit
         )
     }
     func buildingPlacement(at point: CGPoint) -> BuildingPlacement? {
@@ -361,17 +342,17 @@ struct VillageTileLayout {
         pieces: [Placement],
         otherBuildings: [BuildingPlacement]
     ) -> Bool {
-        guard let dims = buildingDimensions(placement.id, isRotated: placement.isRotated),
+        guard let building = building(placement.id),
               placement.subColumn >= 0,
               placement.subRow >= 0,
-              placement.subColumn + dims.width <= columns * 3,
-              placement.subRow + dims.height <= rows * 3,
+              placement.subColumn + building.width <= columns * VillageCartoMap.subdivisions,
+              placement.subRow + building.height <= rows * VillageCartoMap.subdivisions,
               let rect = buildingRect(placement) else {
             return false
         }
 
-        for subColumn in placement.subColumn..<(placement.subColumn + dims.width) {
-            for subRow in placement.subRow..<(placement.subRow + dims.height) {
+        for subColumn in placement.subColumn..<(placement.subColumn + building.width) {
+            for subRow in placement.subRow..<(placement.subRow + building.height) {
                 guard buildableSubcell(column: subColumn, row: subRow, pieces: pieces) else {
                     return false
                 }
@@ -395,17 +376,17 @@ struct VillageTileLayout {
         let origin = sourceOrigin(piece.id)
         let source = VillageCartoMap.Cell(x:Int(floor((origin.x+side/2+local.x)/unit)),
                                          y:Int(floor((origin.y+side/2+local.y)/unit)))
-        return VillageCartoMap.buildableSourceSubcells.contains(source)
+        return VillageCartoMap.canPlaceObject(onSubcell: source)
     }
-    func canPlaceBuilding(id: String, subColumn: Int, subRow: Int, isRotated: Bool = false) -> Bool {
-        let candidate = BuildingPlacement(id: id, subColumn: subColumn, subRow: subRow, isRotated: isRotated)
+    func canPlaceBuilding(id: String, subColumn: Int, subRow: Int) -> Bool {
+        let candidate = BuildingPlacement(id: id, subColumn: subColumn, subRow: subRow)
         let others = buildingPlacements.filter { $0.id != id }
         return Self.validBuilding(candidate, pieces: placements, otherBuildings: others)
     }
-    @discardableResult mutating func placeBuilding(id: String, subColumn: Int, subRow: Int, isRotated: Bool = false) -> Bool {
-        guard canPlaceBuilding(id: id, subColumn: subColumn, subRow: subRow, isRotated: isRotated) else { return false }
+    @discardableResult mutating func placeBuilding(id: String, subColumn: Int, subRow: Int) -> Bool {
+        guard canPlaceBuilding(id: id, subColumn: subColumn, subRow: subRow) else { return false }
         buildingPlacements.removeAll { $0.id == id }
-        buildingPlacements.append(BuildingPlacement(id: id, subColumn: subColumn, subRow: subRow, isRotated: isRotated))
+        buildingPlacements.append(BuildingPlacement(id: id, subColumn: subColumn, subRow: subRow))
         return true
     }
     @discardableResult mutating func removeBuilding(id: String) -> Bool {
@@ -425,9 +406,7 @@ struct VillageTileLayout {
                 default: boundary = first.origin.y
                 }
                 guard abs((edge%2 == 0 ? point.x : point.y)-boundary) <= 9 else { return false }
-                let t = edge%2 == 0 ? point.y-first.origin.y : point.x-first.origin.x
-                return ports(first,edge:edge).contains { abs($0-t) <= 23 }
-                    && ports(second,edge:(edge+2)%4).contains { abs($0-t) <= 23 }
+                return cellMatching(first, second, edge: edge)
             }
         }
     }

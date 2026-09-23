@@ -119,8 +119,8 @@ for index in VillageCartoMap.waterSubcellIndices {
           "Every subcell touching blue water is excluded, including feathered edges")
 }
 func terrainSubcell(_ x: CGFloat, _ y: CGFloat) -> VillageCartoMap.Cell {
-    .init(x:Int(x/1818*CGFloat(VillageCartoMap.columns*3)),
-          y:Int((1-y/1344)*CGFloat(VillageCartoMap.rows*3)))
+    .init(x:Int(x/1818*CGFloat(VillageCartoMap.columns * VillageCartoMap.subdivisions)),
+          y:Int((1-y/1344)*CGFloat(VillageCartoMap.rows * VillageCartoMap.subdivisions)))
 }
 check(mask.contains(terrainSubcell(1000,350)), "Northern plateau is not clipped by old piece IDs")
 check(mask.contains(terrainSubcell(650,880)), "Southwestern plateau is covered")
@@ -134,9 +134,12 @@ for id in 0..<VillageTileLayout.count {
         sample.remove(id:start.id)
         check(sample.place(id:id,column:12,row:10,turns:turns), "Isolated rotated building test")
         for cell in VillageCartoMap.pieces[id] {
-            for row in 0..<3 {
-                for column in 0..<3 {
-                    let sub = VillageCartoMap.Cell(x:cell.x*3+column,y:cell.y*3+row)
+            for row in 0..<VillageCartoMap.subdivisions {
+                for column in 0..<VillageCartoMap.subdivisions {
+                    let sub = VillageCartoMap.Cell(
+                        x: cell.x * VillageCartoMap.subdivisions + column,
+                        y: cell.y * VillageCartoMap.subdivisions + row
+                    )
                     let source = CGPoint(x:(CGFloat(sub.x)+0.5)*unit,y:(CGFloat(sub.y)+0.5)*unit)
                     let world = sample.world(source)!
                     let actual = VillageTileLayout.buildableSubcell(
@@ -156,8 +159,8 @@ check(!VillageTileLayout.buildableSubcell(column:0,row:0,pieces:[]), "Empty spac
 var validSitesByBuilding: [String: [(Int, Int)]] = [:]
 for building in VillageCartoMap.buildings {
     var sites: [(Int, Int)] = []
-    for row in 0..<(VillageTileLayout.rows*3) {
-        for column in 0..<(VillageTileLayout.columns*3) {
+    for row in 0..<(VillageTileLayout.rows * VillageCartoMap.subdivisions) {
+        for column in 0..<(VillageTileLayout.columns * VillageCartoMap.subdivisions) {
             if assembled.canPlaceBuilding(id:building.id,subColumn:column,subRow:row) {
                 sites.append((column, row))
             }

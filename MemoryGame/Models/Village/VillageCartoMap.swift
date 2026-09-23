@@ -16,7 +16,7 @@ enum VillageCartoMap {
         }
     })
     static let grassBuildPieceNumbers = Set(grassBuildPieceIDs.map { $0 + 1 })
-    static let subdivisions = 3
+    static let subdivisions = 6
     static let subcellSide = side / CGFloat(subdivisions)
     struct Cell: Hashable {
         let x: Int
@@ -29,44 +29,25 @@ enum VillageCartoMap {
         let width: Int
         let height: Int
         let kind: Kind
-        let subtitle: String
-        let stage: Int
-
-        init(id: String, title: String, width: Int, height: Int, kind: Kind, subtitle: String = "", stage: Int = 1) {
-            self.id = id
-            self.title = title
-            self.width = width
-            self.height = height
-            self.kind = kind
-            self.subtitle = subtitle
-            self.stage = stage
-        }
 
         enum Kind: String, Codable {
             case house
             case barn
             case well
             case pen
-            case arthurHouse
-            case maraPottery
-            case kenethGranary
-            case annethKitchen
-            case rolandPen
-            case villageWell
-            case berynLodge
-            case gudangKosong
         }
     }
 
-    // Building dimensions are measured in the 3 x 3 subgrid inside each map cell.
+    // Footprints use the 6 x 6 subgrid. Values are doubled from the original
+    // 3 x 3 design so their world-space size remains unchanged.
     static let buildings: [Building] = [
-        .init(id: "building-3x2", title: "Rumah Arthur & Kakek", width: 3, height: 2, kind: .arthurHouse, subtitle: "Pondok Kayu, Cerobong & Kayu Bakar", stage: 1),
-        .init(id: "building-4x3-a", title: "Pondok Tembikar Bu Mara", width: 4, height: 3, kind: .maraPottery, subtitle: "Bengkel Keramik, Rak Pot & Tungku", stage: 1),
-        .init(id: "building-7x5", title: "Lumbung Gandum Keneth", width: 7, height: 5, kind: .kenethGranary, subtitle: "Lumbung Besar, Jerami & Karung Panen", stage: 2),
-        .init(id: "building-5x5", title: "Rumah & Dapur Anneth", width: 5, height: 5, kind: .annethKitchen, subtitle: "Homestead Asri & Kebun Sayur Umbi", stage: 3),
-        .init(id: "building-10x2", title: "Peternakan Roland", width: 10, height: 2, kind: .rolandPen, subtitle: "Kandang Memanjang, Palungan & Pagar", stage: 2),
-        .init(id: "building-3x3", title: "Gudang Kosong (Markas)", width: 3, height: 3, kind: .gudangKosong, subtitle: "Markas Rahasia Tepi Sungai 4 Sahabat", stage: 3),
-        .init(id: "building-4x3-b", title: "Rumah Sesepuh Beryn", width: 3, height: 4, kind: .berynLodge, subtitle: "Rumah Panggung Sesepuh Menegak (Lebar > Panjang)", stage: 3)
+        .init(id: "building-3x2", title: "Bangunan 1", width: 6, height: 4, kind: .house),
+        .init(id: "building-4x3-a", title: "Bangunan 2", width: 8, height: 6, kind: .house),
+        .init(id: "building-7x5", title: "Bangunan 3", width: 14, height: 10, kind: .barn),
+        .init(id: "building-5x5", title: "Bangunan 4", width: 10, height: 10, kind: .house),
+        .init(id: "building-10x2", title: "Bangunan 5", width: 20, height: 4, kind: .barn),
+        .init(id: "building-3x3", title: "Bangunan 6", width: 6, height: 6, kind: .well),
+        .init(id: "building-4x3-b", title: "Bangunan 7", width: 8, height: 6, kind: .pen)
     ]
 
     // Four edge-connected source cells form one indivisible piece.
@@ -117,6 +98,152 @@ enum VillageCartoMap {
         [.init(x: 8, y: 0), .init(x: 9, y: 0), .init(x: 10, y: 0), .init(x: 11, y: 0)],
         [.init(x: 12, y: 0), .init(x: 13, y: 0), .init(x: 14, y: 0), .init(x: 15, y: 0)],
     ]
+
+    // Prototype Carto uses a small playable set, not the whole source-map slice.
+    static let playablePieceIDs: [Int] = [5, 6, 16, 26, 2, 13]
+
+    static func biome(for cell: Cell) -> BiomeType {
+        if hasWater(in: cell) {
+            return .water
+        }
+        if cell.x <= 4 && cell.y >= 1 {
+            return .darkGreenForest
+        }
+        if cell.x >= 14 || (cell.x >= 13 && cell.y >= 5) {
+            return .rockSalt
+        }
+        if cell.y >= 8 || cell.x >= 16 {
+            return .hillSoil
+        }
+        if (8...13).contains(cell.x) && (3...6).contains(cell.y) {
+            return .villageSoil
+        }
+        return .naturalGrass
+    }
+
+    static func diagonalBiomes(for cell: Cell) -> (primary: BiomeType, secondary: BiomeType) {
+        let primary = biome(for: cell)
+        let diagonalNeighbor = [Cell(x: cell.x + 1, y: cell.y), Cell(x: cell.x, y: cell.y + 1)]
+            .first { candidate in
+                candidate.x >= 0 && candidate.x < columns &&
+                candidate.y >= 0 && candidate.y < rows &&
+                biome(for: candidate) != primary
+            }
+        let secondary = diagonalNeighbor.map { neighbor in
+            biome(for: neighbor)
+        } ?? primary
+        return (primary, secondary)
+    }
+
+    static func biomeForSubcell(_ subcell: Cell) -> BiomeType {
+        let source = Cell(x: subcell.x / subdivisions, y: subcell.y / subdivisions)
+        let localX = subcell.x % subdivisions
+        let localY = subcell.y % subdivisions
+        let diagonal = diagonalBiomes(for: source)
+        return localX + localY >= subdivisions ? diagonal.secondary : diagonal.primary
+    }
+
+    static func canPlaceObject(onSubcell subcell: Cell) -> Bool {
+        biomeForSubcell(subcell) == .villageSoil
+    }
+
+    // Edge indices follow VillageTileLayout: east, north, west, south.
+    static func sideBiome(for cell: Cell, edge: Int) -> BiomeType {
+        let diagonal = diagonalBiomes(for: cell)
+        switch (edge % 4 + 4) % 4 {
+        case 0, 1:
+            return diagonal.secondary
+        default:
+            return diagonal.primary
+        }
+    }
+
+    static func tetromino(id: Int, originX: Int = 0, originY: Int = 0, rotation: GridRotation = .degrees0) -> Tetromino? {
+        guard pieces.indices.contains(id) else { return nil }
+        let shapeCells = pieces[id]
+        let anchor = shapeCells[0]
+        let squares = shapeCells.map { cell in
+            let diagonal = diagonalBiomes(for: cell)
+            let grid = (0..<subdivisions).flatMap { row in
+                (0..<subdivisions).map { column in
+                    GridCell(
+                        id: "\(cell.x)-\(cell.y)-\(column)-\(row)",
+                        x: column,
+                        y: row,
+                        biome: column + row >= subdivisions ? diagonal.secondary : diagonal.primary,
+                        isFilled: true,
+                        isWalkable: diagonal.primary != .water
+                    )
+                }
+            }
+            return SquarePlace(
+                id: "\(cell.x),\(cell.y)",
+                image: "",
+                localX: cell.x - anchor.x,
+                localY: cell.y - anchor.y,
+                westSide: .biome(sideBiome(for: cell, edge: 2)),
+                northSide: .biome(sideBiome(for: cell, edge: 1)),
+                eastSide: .biome(sideBiome(for: cell, edge: 0)),
+                southSide: .biome(sideBiome(for: cell, edge: 3)),
+                grid: grid
+            )
+        }
+        return Tetromino(
+            id: "carto-\(id + 1)",
+            shape: tetrominoShape(for: shapeCells),
+            originX: originX,
+            originY: originY,
+            squares: squares,
+            rotation: rotation
+        )
+    }
+
+    static var tetrominoes: [Tetromino] {
+        pieces.indices.compactMap { tetromino(id: $0) }
+    }
+
+    private static func hasWater(in cell: Cell) -> Bool {
+        let startX = cell.x * subdivisions
+        let startY = cell.y * subdivisions
+        for row in 0..<subdivisions {
+            for column in 0..<subdivisions {
+                let index = (startY + row) * (columns * subdivisions) + startX + column
+                if waterSubcellIndices.contains(index) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private static func tetrominoShape(for cells: [Cell]) -> TetrominoShape {
+        let normalized = normalizedVariants(for: cells)
+        for shape in TetrominoShape.allCases where normalized.contains(normalizedShape(shape.baseSquares)) {
+            return shape
+        }
+        return .o
+    }
+
+    private static func normalizedVariants(for cells: [Cell]) -> Set<String> {
+        let positions = cells.map { GridPosition(x: $0.x, y: $0.y) }
+        return Set(GridRotation.allCases.map { rotation in
+            normalizedShape(positions.map(rotation.rotated(position:)))
+        })
+    }
+
+    private static func normalizedShape(_ positions: [GridPosition]) -> String {
+        let minX = positions.map(\.x).min() ?? 0
+        let minY = positions.map(\.y).min() ?? 0
+        let normalized = positions.map { position in
+            GridPosition(x: position.x - minX, y: position.y - minY)
+        }
+        let sorted = normalized.sorted { first, second in
+            first.x == second.x ? first.y < second.y : first.x < second.x
+        }
+        return sorted.map { position in
+            "\(position.x),\(position.y)"
+        }.joined(separator: "|")
+    }
 
     // Reference coordinates use the supplied 1672 x 941 image's top-left corner.
     static func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
@@ -188,11 +315,24 @@ enum VillageCartoMap {
             insideBuildingZone(CGPoint(x: p.x + delta.x, y: p.y + delta.y))
         }
     }
-    // Generated from blue pixels in 123.jpg; any water overlap blocks the entire
-    // subcell. Indices use bottom-left origin, row * 54 + column.
-    static let waterSubcellIndices: Set<Int> = [
+    // Generated from blue pixels in 123.jpg at the former 3 x 3 resolution.
+    // Those blocked cells are expanded below to preserve the river contour at 6 x 6.
+    private static let waterSubcellIndicesAt3x3: Set<Int> = [
         41, 42, 43, 54, 55, 56, 92, 93, 94, 95, 96, 108, 109, 110, 111, 112, 145, 146, 147, 148, 149, 164, 165, 166, 167, 198, 199, 200, 201, 202, 220, 221, 222, 223, 250, 251, 252, 253, 254, 275, 276, 277, 278, 303, 304, 305, 306, 330, 331, 332, 333, 334, 355, 356, 357, 358, 359, 386, 387, 388, 389, 408, 409, 410, 411, 442, 443, 462, 463, 464, 496, 497, 498, 515, 516, 517, 551, 552, 553, 554, 567, 568, 569, 570, 571, 606, 607, 608, 609, 620, 621, 622, 623, 661, 662, 663, 664, 673, 674, 675, 676, 715, 716, 717, 718, 719, 726, 727, 728, 771, 772, 773, 774, 775, 776, 777, 778, 779, 780, 781, 782, 826, 827, 828, 829, 830, 831, 832, 833, 834, 880, 881, 882, 883, 884, 934, 935, 987, 988, 989, 1041, 1042, 1043, 1094, 1095, 1096, 1147, 1148, 1149, 1200, 1201, 1202, 1203, 1252, 1253, 1254, 1255, 1256, 1305, 1306, 1307, 1308, 1309, 1356, 1357, 1358, 1359, 1360, 1361, 1407, 1408, 1409, 1410, 1411, 1412, 1413, 1414, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1512, 1513, 1514
     ]
+    static let waterSubcellIndices: Set<Int> = {
+        let oldColumns = columns * 3
+        let scale = subdivisions / 3
+        return Set(waterSubcellIndicesAt3x3.flatMap { index in
+            let oldColumn = index % oldColumns
+            let oldRow = index / oldColumns
+            return (0..<scale).flatMap { row in
+                (0..<scale).map { column in
+                    (oldRow * scale + row) * (columns * subdivisions) + oldColumn * scale + column
+                }
+            }
+        })
+    }()
     // Stable source-space mask: eligibility follows a tile through every rotation.
     // A feathered center test keeps edge subcells visible when they sit on the contour.
     static let buildableSourceSubcells: Set<Cell> = {

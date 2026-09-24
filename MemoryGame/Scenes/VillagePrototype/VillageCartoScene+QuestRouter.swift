@@ -9,6 +9,8 @@ extension VillageCartoScene {
             quest2: quest2,
             quest3: quest3,
             quest4: quest4,
+            quest5: quest5,
+            placedPieceIDs: Set(layout.placements.map(\.id)),
             placedBuildingIDs: Set(layout.buildingPlacements.map(\.id))
         )
     }
@@ -34,8 +36,10 @@ extension VillageCartoScene {
             renderQuest2World()
         } else if !quest3.completed {
             renderQuest3World()
-        } else {
+        } else if !quest4.completed {
             renderQuest4World()
+        } else {
+            renderQuest5World()
         }
     }
 
@@ -43,6 +47,7 @@ extension VillageCartoScene {
         if !quest1.returnedHome { return handleQuest1Interaction(at: point) }
         if !quest2.completed { return handleQuest2Interaction(at: point) }
         if !quest3.completed { return handleQuest3Interaction(at: point) }
-        return handleQuest4Interaction(at: point)
+        if !quest4.completed { return handleQuest4Interaction(at: point) }
+        return handleQuest5Interaction(at: point)
     }
 }

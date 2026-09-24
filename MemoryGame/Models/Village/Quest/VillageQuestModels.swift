@@ -98,11 +98,35 @@ struct VillageQuest4Progress: Codable {
     }
 }
 
+struct VillageQuest5Progress: Codable {
+    static let saveKey = "village.carto.quest5.v1"
+
+    var minedSalt = false
+    var heardSeaLegend = false
+    var deliveredSalt = false
+    var receivedSilverLeafMission = false
+    var completed = false
+
+    static func load(defaults: UserDefaults = .standard) -> Self {
+        guard let data = defaults.data(forKey: saveKey),
+              let saved = try? JSONDecoder().decode(Self.self, from: data) else {
+            return Self()
+        }
+        return saved
+    }
+
+    func save(defaults: UserDefaults = .standard) {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        defaults.set(data, forKey: Self.saveKey)
+    }
+}
+
 enum VillageQuestStage: Int, CaseIterable {
     case quest1 = 1
     case quest2
     case quest3
     case quest4
+    case quest5
 }
 
 struct VillageQuestSnapshot {
@@ -110,6 +134,8 @@ struct VillageQuestSnapshot {
     let quest2: VillageQuest2Progress
     let quest3: VillageQuest3Progress
     let quest4: VillageQuest4Progress
+    let quest5: VillageQuest5Progress
+    let placedPieceIDs: Set<Int>
     let placedBuildingIDs: Set<String>
 }
 
@@ -146,8 +172,8 @@ enum VillageQuestCatalog {
         static let buMaraPath = 5
         static let barnPath = 20
         static let rolandPenPath = 38
-        static let annethHousePath = 6
-        static let rockSaltPath = 12
+        static let rockSaltMinePath = 6
+        static let futurePath = 12
     }
 
     enum BuildingID {

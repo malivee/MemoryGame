@@ -193,6 +193,6 @@ extension VillageCartoScene {
         progress.isRockSaltUnlocked = true
         PrologueStore.shared.save()
         saveQuest4()
-        rebuild("Quest 4 selesai. Keping Rock Salt terbuka dan Arthur mendapat cloth bag.")
+        rebuild("Quest 4 selesai. Arthur mendapat cloth bag dan misi Rock Salt dimulai.")
     }
 }

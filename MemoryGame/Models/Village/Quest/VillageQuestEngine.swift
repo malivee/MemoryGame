@@ -5,7 +5,8 @@ enum VillageQuestEngine {
         if !snapshot.quest1.returnedHome { return .quest1 }
         if !snapshot.quest2.completed { return .quest2 }
         if !snapshot.quest3.completed { return .quest3 }
-        return .quest4
+        if !snapshot.quest4.completed { return .quest4 }
+        return .quest5
     }
 
     static func unlocks(for snapshot: VillageQuestSnapshot) -> VillageQuestUnlocks {
@@ -30,12 +31,12 @@ enum VillageQuestEngine {
 
         if snapshot.quest2.completed {
             pieces.insert(VillageQuestCatalog.PieceID.rolandPenPath)
-            pieces.insert(VillageQuestCatalog.PieceID.rockSaltPath)
+            pieces.insert(VillageQuestCatalog.PieceID.futurePath)
             buildings.insert(VillageQuestCatalog.BuildingID.rolandPen)
         }
 
         if snapshot.quest3.completed {
-            pieces.insert(VillageQuestCatalog.PieceID.annethHousePath)
+            pieces.insert(VillageQuestCatalog.PieceID.rockSaltMinePath)
             buildings.insert(VillageQuestCatalog.BuildingID.annethHouse)
         }
 
@@ -53,8 +54,10 @@ enum VillageQuestEngine {
 
     private static func pieceRoles(for snapshot: VillageQuestSnapshot) -> [Int: VillageQuestPieceRole] {
         var roles: [Int: VillageQuestPieceRole] = [:]
-        roles[VillageQuestCatalog.PieceID.annethHousePath] = .reserved(label: "Pengecoh")
-        roles[VillageQuestCatalog.PieceID.rockSaltPath] = .reserved(label: "Pengecoh")
+        if !snapshot.quest4.completed {
+            roles[VillageQuestCatalog.PieceID.rockSaltMinePath] = .reserved(label: "Pengecoh")
+        }
+        roles[VillageQuestCatalog.PieceID.futurePath] = .reserved(label: "Pengecoh")
         return roles
     }
 
@@ -68,6 +71,8 @@ enum VillageQuestEngine {
             return quest3Objective(for: snapshot)
         case .quest4:
             return quest4Objective(for: snapshot)
+        case .quest5:
+            return quest5Objective(for: snapshot)
         }
     }
 
@@ -144,10 +149,24 @@ enum VillageQuestEngine {
             ? "Jelajahi dan temui Anneth di dapur belakang."
             : "Tempatkan Rumah Anneth (6x9), lalu Jelajahi."
     }
+
+    static func quest5Objective(for snapshot: VillageQuestSnapshot) -> String {
+        let quest = snapshot.quest5
+        if quest.completed { return "Quest 5 selesai: misi Daun Perak telah terbuka." }
+        if quest.deliveredSalt { return "Temui Anak Kecil di persimpangan jalan." }
+        if quest.minedSalt { return "Kembali ke Rumah Anneth dan serahkan rock salt ke Ibu Anneth." }
+        return snapshot.hasPiece(VillageQuestCatalog.PieceID.rockSaltMinePath)
+            ? "Jelajahi ke mulut tambang di keping Rock Salt."
+            : "Tempatkan keping Rock Salt (piece 5), lalu Jelajahi ke mulut tambang."
+    }
 }
 
 private extension VillageQuestSnapshot {
     func hasBuilding(_ id: String) -> Bool {
         placedBuildingIDs.contains(id)
+    }
+
+    func hasPiece(_ id: Int) -> Bool {
+        placedPieceIDs.contains(id)
     }
 }

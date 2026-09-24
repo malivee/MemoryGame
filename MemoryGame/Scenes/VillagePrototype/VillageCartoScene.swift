@@ -513,6 +513,8 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
                 actor.position = p; sourcePosition = layout.source(p) ?? sourcePosition
             }
             if !isMap {
+                actor.zRotation = 0
+                world.zRotation = 0
                 actor.setScale(0.3)
                 keepActorAboveMap(); world.addChild(actor)
             } else {
@@ -1021,7 +1023,13 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         }
         guard activeTouch == nil, stickTouch == nil, let touch = touches.first else { return }
         let p = touch.location(in:hud), actions = names(at:p)
+        if actions.contains("quest8UnlockCard") {
+            hud.childNode(withName: "quest8UnlockCard")?.removeFromParent()
+            return
+        }
         if handleQuestChoiceTap(actions: actions) { return }
+        if handleQuest8ChoiceTap(actions: actions) { return }
+        if handleQuest8HUDTap(actions: actions) { return }
         if handleQuestDebugTouch(actions: actions) { return }
         if actions.contains("exit") { stopInput(); onExit?(); return }
         if actions.contains("debugSolveCarto") {
@@ -1257,5 +1265,6 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         sourcePosition = layout.source(next) ?? sourcePosition
         if !cameraTransitioning { updateCamera() }
         checkQuest7Proximity()
+        checkQuest8Proximity()
     }
 }

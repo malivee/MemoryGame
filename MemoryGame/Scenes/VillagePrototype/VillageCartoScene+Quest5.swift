@@ -32,8 +32,19 @@ extension VillageCartoScene {
             return nil
         }
         let source = CGPoint(
-            x: (8.5 * VillageCartoMap.side),
-            y: (7.5 * VillageCartoMap.side)
+            x: 8.35 * VillageCartoMap.side,
+            y: 7.55 * VillageCartoMap.side
+        )
+        return layout.world(source)
+    }
+
+    var quest5OldMinerPosition: CGPoint? {
+        guard layout.placements.contains(where: { $0.id == VillageQuestCatalog.PieceID.rockSaltMinePath }) else {
+            return nil
+        }
+        let source = CGPoint(
+            x: 8.78 * VillageCartoMap.side,
+            y: 7.18 * VillageCartoMap.side
         )
         return layout.world(source)
     }
@@ -51,8 +62,9 @@ extension VillageCartoScene {
 
         if let mine = quest5RockSaltMinePosition {
             renderQuest5SaltMine(at: mine)
-            let miner = CGPoint(x: mine.x + 44, y: mine.y - 8)
-            questNPC(at: miner, name: "Penambang Tua", color: .systemGray)
+            if let miner = quest5OldMinerPosition {
+                questNPC(at: miner, name: "Penambang Tua", color: .systemGray)
+            }
             if !quest5.minedSalt {
                 questMarker(at: CGPoint(x: mine.x, y: mine.y + 32), name: "quest5-mine", color: .systemOrange, symbol: "!")
             }
@@ -146,12 +158,15 @@ extension VillageCartoScene {
 
     func handleQuest5Interaction(at point: CGPoint) -> Bool {
         if !quest5.minedSalt,
-           let mine = quest5RockSaltMinePosition,
-           hypot(point.x - mine.x, point.y - mine.y) <= 58 {
-            approachOrInteract(mine, message: "Dekati mulut tambang garam.") { [weak self] in
-                self?.startQuest5RockSaltQTE()
+           let mine = quest5RockSaltMinePosition {
+            let miner = quest5OldMinerPosition ?? mine
+            if hypot(point.x - miner.x, point.y - miner.y) <= 58 ||
+                hypot(point.x - mine.x, point.y - mine.y) <= 58 {
+                approachOrInteract(miner, message: "Dekati Penambang Tua untuk meminta rock salt.") { [weak self] in
+                    self?.startQuest5MinerOpeningDialogue()
+                }
+                return true
             }
-            return true
         }
 
         if quest5.minedSalt,
@@ -179,6 +194,17 @@ extension VillageCartoScene {
         return false
     }
 
+    func startQuest5MinerOpeningDialogue() {
+        guard activeQuest5QTE == nil, !quest5.minedSalt else { return }
+        presentQuestDialogue([
+            .init(speaker: "Arthur", text: "Afternoon sir. Anneth's mother needs a bag of rock salt."),
+            .init(speaker: "Penambang Tua", text: "Hand me the bag. But you'll have to crack the rest off that wall yourself."),
+            .init(speaker: "Penambang Tua", text: "My arms are done for the day.")
+        ]) { [weak self] in
+            self?.startQuest5RockSaltQTE()
+        }
+    }
+
     func startQuest5RockSaltQTE() {
         guard activeQuest5QTE == nil, !quest5.minedSalt else { return }
         route = []
@@ -190,7 +216,7 @@ extension VillageCartoScene {
             stage2Duration: 1.10,
             stage1Zone: QTETargetZone(start: 0.58, end: 0.85, greatStart: 0.70, greatEnd: 0.75),
             stage2Zone: QTETargetZone(start: 0.20, end: 0.45, greatStart: 0.28, greatEnd: 0.33),
-            buttonPrompt: "PAHAT GARAM",
+            buttonPrompt: "MINE SALT",
             allowTouchAnywhere: true,
             autoDismissDelay: 0.65
         ))
@@ -222,10 +248,21 @@ extension VillageCartoScene {
     func startQuest5SeaDialogue() {
         presentQuestDialogue([
             .init(speaker: "Arthur", text: "These pieces... they're smaller than they used to be."),
+            .init(speaker: "Penambang Tua", text: "The big ones don't just walk to the door anymore, Arthur."),
+            .init(speaker: "Arthur", text: "Do we have to go deeper?"),
             .init(speaker: "Penambang Tua", text: "The spots near the entrance are picked clean. The easy hits are gone."),
-            .init(speaker: "Penambang Tua", text: "My father used to say there’s an old legend about a place far away with white earth."),
+            .init(speaker: "Penambang Tua", text: "There's still salt, but we move more useless rock just to reach the good parts."),
+            .init(speaker: "Arthur", text: "What if the inside runs out?"),
+            .init(speaker: "Penambang Tua", text: "It hasn't run out yet."),
+            .init(speaker: "Penambang Tua", text: "My father said salt wasn't this hard to find in his father's time."),
+            .init(speaker: "Penambang Tua", text: "Maybe the mine was more generous. Maybe old people like saying everything was easier."),
+            .init(speaker: "Penambang Tua", text: "There's also a story... an old legend about a place far away with white earth."),
             .init(speaker: "Penambang Tua", text: "They say the water is salty. Even the wind tastes like salt."),
-            .init(speaker: "Penambang Tua", text: "If that’s true, we’re a bunch of fools hitting rocks here every day.")
+            .init(speaker: "Penambang Tua", text: "If that's true, we're a bunch of fools hitting rocks here every day."),
+            .init(speaker: "Arthur", text: "Salty water? Because it flows over salt rocks?"),
+            .init(speaker: "Penambang Tua", text: "Could be."),
+            .init(speaker: "Arthur", text: "Where is this place?"),
+            .init(speaker: "Penambang Tua", text: "If I knew, I probably wouldn't be sitting here.")
         ]) { [weak self] in
             self?.rebuild("Rock salt didapat. Kembali ke Rumah Anneth.")
         }
@@ -233,9 +270,22 @@ extension VillageCartoScene {
 
     func startQuest5DeliveryDialogue() {
         presentQuestDialogue([
-            .init(speaker: "Ibu Anneth", text: "It’s not just the salt. The fever-leaves are getting scarce."),
-            .init(speaker: "Ibu Anneth", text: "Dry wood has to be scavenged further out. And the tubers... many are rotting."),
-            .init(speaker: "Arthur", text: "The old miner told me a story... about a place with salty wind. Why hasn't anyone tried looking for it?"),
+            .init(speaker: "Ibu Anneth", text: "Thank you, Arthur. I'll crush this right away."),
+            .init(speaker: "Arthur", text: "The miner said they have to dig deeper now."),
+            .init(speaker: "Ibu Anneth", text: "It's been like that for a while. That's why we make sure nothing goes to waste."),
+            .init(speaker: "Ibu Anneth", text: "It's not just the salt. The fever-leaves near the ditch are getting scarce."),
+            .init(speaker: "Ibu Anneth", text: "Dry wood has to be scavenged further out. And the lower tubers are soft and rotting."),
+            .init(speaker: "Arthur", text: "Is the soil sick?"),
+            .init(speaker: "Ibu Anneth", text: "Could be too much water. Could be that the earth just needs to rest."),
+            .init(speaker: "Arthur", text: "The old miner told me a story... about a place with salty wind."),
+            .init(speaker: "Ibu Anneth", text: "My grandmother used to tell stories like that."),
+            .init(speaker: "Ibu Anneth", text: "She said long ago, humans had much wider spaces to live in."),
+            .init(speaker: "Ibu Anneth", text: "There was a flow of water far wider than our river."),
+            .init(speaker: "Arthur", text: "As wide as the gardens?"),
+            .init(speaker: "Ibu Anneth", text: "Maybe even wider."),
+            .init(speaker: "Arthur", text: "Then how did people cross it?"),
+            .init(speaker: "Ibu Anneth", text: "She never finished the story to tell me how."),
+            .init(speaker: "Arthur", text: "Why hasn't anyone tried looking for it? If this place with the salt is real."),
             .init(speaker: "Ibu Anneth", text: "Because humans stay alive by knowing their limits, Arthur."),
             .init(speaker: "Ibu Anneth", text: "Beyond the boundaries, there are things that hunt us.")
         ]) { [weak self] in
@@ -251,8 +301,12 @@ extension VillageCartoScene {
 
     func startQuest5ChildDialogue() {
         presentQuestDialogue([
-            .init(speaker: "Anak Kecil", text: "Brother Arthur! Grandpa Beryn’s knees are hurting. Can you find some of these leaves?"),
-            .init(speaker: "Arthur", text: "Daun perak? Aku akan mencarinya." )
+            .init(speaker: "Anak Kecil", text: "Brother Arthur! Can you find some leaves for an ointment?"),
+            .init(speaker: "Anak Kecil", text: "Grandpa's knees are hurting."),
+            .init(speaker: "Anak Kecil", text: "Mother is helping deliver a baby at the edge of the village."),
+            .init(speaker: "Anak Kecil", text: "And Grandpa forbade me from going out to look for it myself."),
+            .init(speaker: "Arthur", text: "I'll try to find it. Wait at your house."),
+            .init(speaker: "Anak Kecil", text: "My house is the one with the big flat stone in front!")
         ]) { [weak self] in
             guard let self else { return }
             self.quest5.receivedSilverLeafMission = true
@@ -263,7 +317,7 @@ extension VillageCartoScene {
             progress.mapBStage = .herbalHills
             PrologueStore.shared.save()
             self.saveQuest5()
-            self.rebuild("Quest 5 selesai. Misi Daun Perak terbuka.")
+            self.rebuild("Quest 5 selesai. Keping hutan T dan Rumah Kakek Beryn terbuka.")
         }
     }
 }

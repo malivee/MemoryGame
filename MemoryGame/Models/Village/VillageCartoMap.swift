@@ -111,6 +111,15 @@ enum VillageCartoMap {
             explorationWidth: 2,
             explorationHeight: 3,
             kind: .house
+        ),
+        .init(
+            id: "beryn-house",
+            title: "Rumah Kakek Beryn",
+            width: 9,
+            height: 9,
+            explorationWidth: 3,
+            explorationHeight: 3,
+            kind: .house
         )
     ]
 

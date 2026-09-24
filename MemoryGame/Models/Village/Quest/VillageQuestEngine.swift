@@ -31,13 +31,17 @@ enum VillageQuestEngine {
 
         if snapshot.quest2.completed {
             pieces.insert(VillageQuestCatalog.PieceID.rolandPenPath)
-            pieces.insert(VillageQuestCatalog.PieceID.futurePath)
             buildings.insert(VillageQuestCatalog.BuildingID.rolandPen)
         }
 
         if snapshot.quest3.completed {
             pieces.insert(VillageQuestCatalog.PieceID.rockSaltMinePath)
             buildings.insert(VillageQuestCatalog.BuildingID.annethHouse)
+        }
+
+        if snapshot.quest5.completed {
+            pieces.insert(VillageQuestCatalog.PieceID.futurePath)
+            buildings.insert(VillageQuestCatalog.BuildingID.berynHouse)
         }
 
         return VillageQuestUnlocks(
@@ -57,7 +61,9 @@ enum VillageQuestEngine {
         if !snapshot.quest4.completed {
             roles[VillageQuestCatalog.PieceID.rockSaltMinePath] = .reserved(label: "Pengecoh")
         }
-        roles[VillageQuestCatalog.PieceID.futurePath] = .reserved(label: "Pengecoh")
+        if !snapshot.quest5.completed {
+            roles[VillageQuestCatalog.PieceID.futurePath] = .reserved(label: "Pengecoh")
+        }
         return roles
     }
 
@@ -152,7 +158,7 @@ enum VillageQuestEngine {
 
     static func quest5Objective(for snapshot: VillageQuestSnapshot) -> String {
         let quest = snapshot.quest5
-        if quest.completed { return "Quest 5 selesai: misi Daun Perak telah terbuka." }
+        if quest.completed { return "Quest 5 selesai: keping hutan T dan Rumah Kakek Beryn telah terbuka." }
         if quest.deliveredSalt { return "Temui Anak Kecil di persimpangan jalan." }
         if quest.minedSalt { return "Kembali ke Rumah Anneth dan serahkan rock salt ke Ibu Anneth." }
         return snapshot.hasPiece(VillageQuestCatalog.PieceID.rockSaltMinePath)

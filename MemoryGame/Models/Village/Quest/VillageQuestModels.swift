@@ -183,5 +183,6 @@ enum VillageQuestCatalog {
         static let villageBarn = "village-barn"
         static let rolandPen = "roland-pen"
         static let annethHouse = "anneth-house"
+        static let berynHouse = "beryn-house"
     }
 }

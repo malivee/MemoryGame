@@ -9,6 +9,7 @@ extension VillageCartoScene {
             quest2: quest2,
             quest3: quest3,
             quest4: quest4,
+            quest6RewardUnlocked: PrologueStore.shared.progress.metBerynAfterHerbal,
             placedBuildingIDs: Set(layout.buildingPlacements.map(\.id))
         )
     }

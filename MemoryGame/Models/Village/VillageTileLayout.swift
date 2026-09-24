@@ -294,9 +294,9 @@ struct VillageTileLayout {
         return true
     }
     mutating func solveAllPieces() {
-        // Posisi debug dibuat renggang supaya keenam bentuk storyboard tidak
+        // Posisi debug dibuat renggang supaya seluruh bentuk tidak
         // saling bertumpuk walau orientasi awalnya berbeda-beda.
-        let debugAnchors = [(4, 15), (10, 15), (17, 15), (4, 8), (11, 8), (18, 8)]
+        let debugAnchors = [(4, 15), (10, 15), (17, 15), (4, 8), (11, 8), (18, 8), (24, 8)]
         let solved = zip(Self.playablePieceIDs, debugAnchors).map { id, anchor in
             return Placement(
                 id: id,

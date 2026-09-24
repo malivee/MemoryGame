@@ -7,7 +7,7 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String) {
 let allCells = VillageCartoMap.pieces.flatMap { $0 }
 check(allCells.count == VillageCartoMap.columns * VillageCartoMap.rows, "Full source coverage")
 check(Set(allCells).count == allCells.count, "No overlapping source cells")
-check(VillageCartoMap.playablePieceIDs == [5, 26, 20, 38, 6, 12], "Storyboard order 1...6")
+check(VillageCartoMap.playablePieceIDs == [5, 26, 20, 38, 6, 12, 8], "Storyboard order plus Quest 6 reward")
 check(VillageCartoMap.subdivisions == 6, "Every terrain square uses a 6x6 subgrid")
 check(VillageCartoMap.playablePieceIDs.enumerated().allSatisfy {
     VillageCartoMap.displayNumber(forPieceID: $0.element) == $0.offset + 1
@@ -31,10 +31,26 @@ let referenceShapes: [Set<String>] = [
     ["0,1", "1,1", "1,0", "2,0"],
     ["0,1", "1,1", "2,1", "0,0"],
     ["0,2", "1,2", "1,1", "1,0"],
-    ["1,1", "0,0", "1,0", "2,0"]
+    ["1,1", "0,0", "1,0", "2,0"],
+    ["0,3", "0,2", "0,1", "0,0"]
 ]
 for (index, id) in VillageCartoMap.playablePieceIDs.enumerated() {
     check(normalizedCells(id: id) == referenceShapes[index], "Tetromino \(index + 1) matches its reference")
+}
+let quest6RewardID = 8
+check(quest6RewardID == 8 && normalizedCells(id: quest6RewardID) == ["0,3", "0,2", "0,1", "0,0"],
+      "Quest 6 reward is an I tetromino")
+for cell in VillageCartoMap.pieces[quest6RewardID] {
+    for row in 0..<VillageCartoMap.subdivisions {
+        for column in 0..<VillageCartoMap.subdivisions {
+            let subcell = VillageCartoMap.Cell(
+                x: cell.x * VillageCartoMap.subdivisions + column,
+                y: cell.y * VillageCartoMap.subdivisions + row
+            )
+            check(VillageCartoMap.biomeForSubcell(subcell) == .darkGreenForest,
+                  "Every Quest 6 reward subgrid is dark-green forest")
+        }
+    }
 }
 
 // Pada keping 1, kedua segitiga hijau berada di kiri-bawah kotaknya seperti
@@ -238,15 +254,15 @@ for id in VillageTileLayout.playablePieceIDs {
     }
 }
 
-// Debug layout contains the six storyboard pieces without overlap.
+// Debug layout contains all storyboard and reward pieces without overlap.
 var assembled = VillageTileLayout()
 assembled.solveAllPieces()
 check(assembled.inventory.isEmpty, "All pieces assembled")
 check(VillageTileLayout(data:assembled.encoded).placements == assembled.placements, "Save roundtrip")
-check(Set(assembled.placements.map(\.id)) == Set(VillageTileLayout.playablePieceIDs), "Debug layout uses only pieces 1...6")
+check(Set(assembled.placements.map(\.id)) == Set(VillageTileLayout.playablePieceIDs), "Debug layout uses all seven pieces")
 check(assembled.placements.allSatisfy {
     $0.turns == VillageCartoMap.preferredTurns(forPieceID: $0.id)
-}, "Initial orientations match the six references")
+}, "Initial orientations match all references")
 
 // Matching must examine every exposed subcell edge, not only the anchor.
 var good = 0, bad = 0
@@ -278,7 +294,7 @@ check(layout.walkable(layout.world(VillageCartoMap.spawn)!), "Arthur stays walka
 check(VillageTileLayout(data:Data("bad".utf8)).placements == [start], "Corrupt save fallback")
 let legacy = try JSONEncoder().encode([start])
 check(VillageTileLayout(data:legacy).placements == [start], "Old square schema cannot be interpreted as groups")
-print("PASS: six ordered tetrominoes, 6x6 subgrids, all rotations/hit paths, player transforms, \(good) valid and \(bad) invalid placements, saves and boundaries")
+print("PASS: seven ordered tetrominoes, 6x6 subgrids, all rotations/hit paths, player transforms, \(good) valid and \(bad) invalid placements, saves and boundaries")
 
 let mask = VillageCartoMap.buildableSourceSubcells
 check(!mask.isEmpty, "Outlined zone has usable land")
@@ -334,12 +350,14 @@ check(VillageCartoMap.biomeForSubcell(crossedSubcell) == .villageSoil,
 check(!VillageCartoMap.canPlaceObject(onSubcell: crossedSubcell),
       "A subcell cut by the yellow-green boundary cannot support a building")
 
-check(VillageCartoMap.buildings.count == 4,
-      "Arthur's house, the well, Bu Mara's house, and the barn are available")
+check(VillageCartoMap.buildings.count == 6,
+      "All six progression buildings are available")
 let house = VillageCartoMap.buildings[0]
 let well = VillageCartoMap.buildings[1]
 let buMaraHouse = VillageCartoMap.buildings[2]
 let barn = VillageCartoMap.buildings[3]
+let rolandPen = VillageCartoMap.buildings[4]
+let annethHouse = VillageCartoMap.buildings[5]
 check(house.id == "arthur-house" && house.title == "Rumah Arthur" &&
       house.width == 6 && house.height == 9 &&
       house.explorationWidth == 2 && house.explorationHeight == 3,
@@ -356,6 +374,14 @@ check(barn.id == "village-barn" && barn.title == "Lumbung Desa" &&
       barn.width == 9 && barn.height == 15 &&
       barn.explorationWidth == 3 && barn.explorationHeight == 5,
       "The barn is 9 wide x 15 high on the map and 3x5 in exploration")
+check(rolandPen.id == "roland-pen" && rolandPen.title == "Kandang Roland" &&
+      rolandPen.width == 12 && rolandPen.height == 9 &&
+      rolandPen.explorationWidth == 4 && rolandPen.explorationHeight == 3,
+      "Roland's pen is 12x9 on the map and 4x3 in exploration")
+check(annethHouse.id == "anneth-house" && annethHouse.title == "Rumah Anneth" &&
+      annethHouse.width == 6 && annethHouse.height == 9 &&
+      annethHouse.explorationWidth == 2 && annethHouse.explorationHeight == 3,
+      "Anneth's house is 6x9 on the map and 2x3 in exploration")
 
 var validSitesByBuilding: [String: [(Int, Int)]] = [:]
 var questTwoLayout = VillageTileLayout()
@@ -363,7 +389,9 @@ check(questTwoLayout.place(id: 5, column: 7, row: 5, turns: 0),
       "Quest 2 can place the second piece")
 check(questTwoLayout.place(id: 20, column: 8, row: 6, turns: 0),
       "Quest 2 can place its unlocked Z piece")
-for building in VillageCartoMap.buildings {
+// Empat bangunan awal mempunyai fixture susunan map di validasi ini. Dua
+// bangunan berikutnya memakai susunan keping sesuai progres quest masing-masing.
+for building in VillageCartoMap.buildings.prefix(4) {
     let placementLayout = building.id == "village-barn" ? questTwoLayout : assembled
     var sites: [(Int, Int)] = []
     for row in 0..<(VillageTileLayout.rows * VillageCartoMap.subdivisions) {
@@ -414,4 +442,4 @@ if let (houseSite, wellSite) = adjacentPair {
     check(touching.placeBuilding(id: "village-well", subColumn: wellSite.0, subRow: wellSite.1),
           "Buildings may touch exactly without a forced gap")
 }
-print("PASS: \(mask.count) outlined-zone subcells; \(allowedCount) rotated valid and \(rejectedCount) invalid checks; four scaled buildings, touching edges, and strict yellow placement")
+print("PASS: \(mask.count) outlined-zone subcells; \(allowedCount) rotated valid and \(rejectedCount) invalid checks; six scaled buildings and strict early-quest placement")

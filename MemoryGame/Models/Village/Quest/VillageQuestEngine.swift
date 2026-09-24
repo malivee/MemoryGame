@@ -39,6 +39,10 @@ enum VillageQuestEngine {
             buildings.insert(VillageQuestCatalog.BuildingID.annethHouse)
         }
 
+        if snapshot.quest6RewardUnlocked {
+            pieces.insert(VillageQuestCatalog.PieceID.hollowForestReward)
+        }
+
         return VillageQuestUnlocks(
             pieceOrder: VillageQuestCatalog.pieceOrder,
             unlockedPieceIDs: pieces,

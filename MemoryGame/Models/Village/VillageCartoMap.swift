@@ -163,10 +163,11 @@ enum VillageCartoMap {
         [.init(x: 12, y: 0), .init(x: 13, y: 0), .init(x: 14, y: 0), .init(x: 15, y: 0)],
     ]
 
-    // Urutan enam keping mengikuti storyboard pemain (gambar 1 ... gambar 6).
+    // Enam keping pertama mengikuti storyboard. Keping ketujuh adalah hadiah
+    // Quest 6 berupa tetromino I yang seluruhnya biome hutan hijau tua.
     // ID tetap menunjuk empat sel unik pada atlas sumber, sedangkan nomor yang
     // dilihat pemain berasal dari posisi ID di array ini.
-    static let playablePieceIDs: [Int] = [5, 26, 20, 38, 6, 12]
+    static let playablePieceIDs: [Int] = [5, 26, 20, 38, 6, 12, 8]
 
     static func displayNumber(forPieceID id: Int) -> Int? {
         playablePieceIDs.firstIndex(of: id).map { $0 + 1 }
@@ -222,6 +223,12 @@ enum VillageCartoMap {
                 (1, 1, .darkGreenForest, .darkGreenForest),
                 (2, 1, .darkGreenForest, .darkGreenForest),
                 (1, 0, .darkGreenForest, .villageSoil)
+            ]),
+            (8, [
+                (0, 3, .darkGreenForest, .darkGreenForest),
+                (0, 2, .darkGreenForest, .darkGreenForest),
+                (0, 1, .darkGreenForest, .darkGreenForest),
+                (0, 0, .darkGreenForest, .darkGreenForest)
             ])
         ]
 

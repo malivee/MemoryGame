@@ -190,6 +190,7 @@ extension ExplorationScene {
         local.hasRockSalt = progress.hasRockSalt
         local.deliveredRockSalt = progress.deliveredRockSalt
         local.hasHerbal = progress.hasHerbal
+        local.encounteredHollow = progress.encounteredHollow
         local.metBerynAfterHerbal = progress.metBerynAfterHerbal
         local.gatheredWood = progress.gatheredWood
         local.hasEliasBook = progress.hasEliasBook

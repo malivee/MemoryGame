@@ -110,6 +110,7 @@ struct VillageQuestSnapshot {
     let quest2: VillageQuest2Progress
     let quest3: VillageQuest3Progress
     let quest4: VillageQuest4Progress
+    let quest6RewardUnlocked: Bool
     let placedBuildingIDs: Set<String>
 }
 
@@ -139,7 +140,7 @@ struct VillageQuestUnlocks {
 }
 
 enum VillageQuestCatalog {
-    static let pieceOrder = [26, 5, 20, 38, 6, 12]
+    static let pieceOrder = [26, 5, 20, 38, 6, 12, 8]
 
     enum PieceID {
         static let first = 26
@@ -148,6 +149,7 @@ enum VillageQuestCatalog {
         static let rolandPenPath = 38
         static let annethHousePath = 6
         static let rockSaltPath = 12
+        static let hollowForestReward = 8
     }
 
     enum BuildingID {

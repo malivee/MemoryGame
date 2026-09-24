@@ -183,14 +183,14 @@ enum VillageCartoMap {
                 (2, 1, .darkGreenForest, .villageSoil)
             ]),
             (6, [
-                (0, 2, .villageSoil, .rockSalt),
-                (1, 2, .rockSalt, .rockSalt),
-                (1, 1, .rockSalt, .rockSalt),
-                (1, 0, .rockSalt, .rockSalt)
+                (0, 2, .darkGreenForest, .darkGreenForest),
+                (1, 2, .darkGreenForest, .villageSoil),
+                (1, 1, .darkGreenForest, .villageSoil),
+                (1, 0, .darkGreenForest, .villageSoil)
             ]),
             (12, [
                 (0, 1, .darkGreenForest, .darkGreenForest),
-                (1, 1, .darkGreenForest, .villageSoil),
+                (1, 1, .darkGreenForest, .darkGreenForest),
                 (2, 1, .darkGreenForest, .darkGreenForest),
                 (1, 0, .darkGreenForest, .villageSoil)
             ])
@@ -212,11 +212,19 @@ enum VillageCartoMap {
     // Pada keping 2, kotak kanan sepenuhnya hijau muda. Warnanya masuk ke
     // kotak tengah sebagai segitiga sama kaki sejauh 3/6 subgrid. Kotak bawah
     // memakai diagonal kebalikan agar hijau tua berada di kanan bawah.
+    // Keping 5 memakai irisan kanan seperempat untuk village soil.
+    // Keping T diputar 180° di storyboard, jadi pojok kiri-atas sel batang
+    // sumbernya tampil sebagai pojok kanan-bawah.
     static func terrainSplit(for cell: Cell) -> TerrainSplit {
         switch cell {
-        case Cell(x: 11, y: 9): return .centeredRightTriangle
-        case Cell(x: 10, y: 8): return .lowerRightTriangle
-        default: return .diagonal
+        case Cell(x: 11, y: 9), Cell(x: 8, y: 8), Cell(x: 8, y: 7), Cell(x: 8, y: 6):
+            return .centeredRightTriangle
+        case Cell(x: 10, y: 5):
+            return .centeredRightTriangle
+        case Cell(x: 10, y: 8):
+            return .lowerRightTriangle
+        default:
+            return .diagonal
         }
     }
 

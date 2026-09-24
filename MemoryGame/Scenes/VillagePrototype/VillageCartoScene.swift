@@ -207,41 +207,43 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
                 ))
             }
 
-            let cellBorder = SKShapeNode(rectOf: CGSize(width: s, height: s))
-            cellBorder.position = center
-            cellBorder.strokeColor = SKColor(white: 0.05, alpha: miniature ? 0.28 : 0.18)
-            cellBorder.fillColor = .clear
-            cellBorder.lineWidth = miniature ? 1 : 0.8
-            node.addChild(cellBorder)
+            if miniature {
+                let cellBorder = SKShapeNode(rectOf: CGSize(width: s, height: s))
+                cellBorder.position = center
+                cellBorder.strokeColor = SKColor(white: 0.05, alpha: 0.28)
+                cellBorder.fillColor = .clear
+                cellBorder.lineWidth = 1
+                node.addChild(cellBorder)
 
-            let gridPath = CGMutablePath()
-            for index in 1..<VillageCartoMap.subdivisions {
-                let offset = -h + CGFloat(index) * VillageCartoMap.subcellSide
-                gridPath.move(to: CGPoint(x: center.x - h, y: center.y + offset))
-                gridPath.addLine(to: CGPoint(x: center.x + h, y: center.y + offset))
-                gridPath.move(to: CGPoint(x: center.x + offset, y: center.y - h))
-                gridPath.addLine(to: CGPoint(x: center.x + offset, y: center.y + h))
+                let gridPath = CGMutablePath()
+                for index in 1..<VillageCartoMap.subdivisions {
+                    let offset = -h + CGFloat(index) * VillageCartoMap.subcellSide
+                    gridPath.move(to: CGPoint(x: center.x - h, y: center.y + offset))
+                    gridPath.addLine(to: CGPoint(x: center.x + h, y: center.y + offset))
+                    gridPath.move(to: CGPoint(x: center.x + offset, y: center.y - h))
+                    gridPath.addLine(to: CGPoint(x: center.x + offset, y: center.y + h))
+                }
+                let subgrid = SKShapeNode(path: gridPath)
+                subgrid.strokeColor = SKColor.systemBlue.withAlphaComponent(0.26)
+                subgrid.lineWidth = 0.8
+                node.addChild(subgrid)
             }
-            let subgrid = SKShapeNode(path: gridPath)
-            subgrid.strokeColor = SKColor.systemBlue.withAlphaComponent(miniature ? 0.26 : 0.18)
-            subgrid.lineWidth = miniature ? 0.8 : 0.5
-            node.addChild(subgrid)
         }
 
         let path = VillageTileLayout.outline(id)
-        let outerShadow = SKShapeNode(path: path)
-        outerShadow.strokeColor = SKColor(white: 0.04, alpha: 0.78)
-        outerShadow.fillColor = .clear
-        outerShadow.lineWidth = miniature ? 5 : 3
-        node.addChild(outerShadow)
-
-        let outerBorder = SKShapeNode(path: path)
-        outerBorder.strokeColor = selected == id ? .systemOrange : cream
-        outerBorder.fillColor = .clear
-        outerBorder.lineWidth = selected == id ? 4 : (miniature ? 2 : 1.6)
-        node.addChild(outerBorder)
-
         if miniature {
+            let outerShadow = SKShapeNode(path: path)
+            outerShadow.strokeColor = SKColor(white: 0.04, alpha: 0.78)
+            outerShadow.fillColor = .clear
+            outerShadow.lineWidth = 5
+            node.addChild(outerShadow)
+
+            let outerBorder = SKShapeNode(path: path)
+            outerBorder.strokeColor = selected == id ? .systemOrange : cream
+            outerBorder.fillColor = .clear
+            outerBorder.lineWidth = selected == id ? 4 : 2
+            node.addChild(outerBorder)
+
             let badge = SKShapeNode(circleOfRadius:13)
             badge.fillColor = SKColor(white:0,alpha:0.7); badge.strokeColor = .clear
             badge.zRotation = -node.zRotation

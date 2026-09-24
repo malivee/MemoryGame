@@ -3,18 +3,32 @@
 import SpriteKit
 import UIKit
 
+enum CartoUIMode: String {
+    case classic
+    case coc
+}
+
 final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
     var onExit: (() -> Void)?
+    var uiMode: CartoUIMode = .classic
+    var isCocMode: Bool { uiMode == .coc }
+    private var cocBuildingPage = 0
+
+    convenience init(size: CGSize, uiMode: CartoUIMode) {
+        self.init(size: size)
+        self.uiMode = uiMode
+    }
+
     private static let saveKey = "village.carto.layout.v7"
     var layout = VillageTileLayout(data: UserDefaults.standard.data(forKey: saveKey))
     let world = SKNode(), hud = SKNode(), backdrop = SKNode()
     private let viewport = SKCropNode()
     let actor = MemoryCharacter(title: "Arthur", color: .systemGreen)
-    private var isMap = true
-    private var selected: Int?, draftTurns = 0, page = 0
-    private var selectedBuilding: String?
+    var isMap = true
+    var selected: Int?, draftTurns = 0, page = 0
+    var selectedBuilding: String?
     private var buildingPage = 0
-    private var sourcePosition = VillageCartoMap.spawn
+    var sourcePosition = VillageCartoMap.spawn
     private var mapCenter = VillageTileLayout.initial.center
     private var zoom: CGFloat = 1
     private weak var pinchGesture: UIPinchGestureRecognizer?
@@ -43,7 +57,15 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
     private var knob = SKShapeNode(circleOfRadius: 19)
     var route: [CGPoint] = [], lastTime: TimeInterval = 0
     let status = SKLabelNode(fontNamed: "AvenirNext-Medium")
-    private var board: CGRect { CGRect(x:20,y:80,width:max(150,rightEdge-208),height:max(110,size.height-148)) }
+    private var board: CGRect {
+        if isCocMode {
+            let bWidth = max(200, rightEdge - 20)
+            let bHeight = max(130, size.height - 188)
+            return CGRect(x: 10, y: 104, width: bWidth, height: bHeight)
+        } else {
+            return CGRect(x:20,y:80,width:max(150,rightEdge-208),height:max(110,size.height-148))
+        }
+    }
     private var stickCenter: CGPoint { CGPoint(x:85,y:105) }
     private let actorExplorationZ: CGFloat = 80
 
@@ -387,7 +409,70 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         }
     }
 
+    func spawnUnlockedPiecesOnMap() {
+        guard isCocMode else { return }
+        let unlocked = villageQuestPieceOrder.filter { villageUnlockedPieceIDs.contains($0) }
+        var changed = false
+
+        let stagingSlots: [(Int, Int)] = [
+            (2, 14), (8, 14), (16, 14), (22, 14),
+            (2, 8),  (8, 8),  (16, 8),  (22, 8),
+            (2, 2),  (8, 2),  (16, 2),  (22, 2)
+        ]
+
+        for id in unlocked {
+            if !layout.placements.contains(where: { $0.id == id }) {
+                let preferredTurns = VillageCartoMap.preferredTurns(forPieceID: id)
+                var placed = false
+
+                // 1. Coba slot staging di perairan kosong
+                for (c, r) in stagingSlots {
+                    if layout.place(id: id, column: c, row: r, turns: preferredTurns) {
+                        placed = true
+                        changed = true
+                        break
+                    }
+                }
+
+                // 2. Jika slot staging terisi, cari slot kosong pada grid
+                if !placed {
+                    for r in stride(from: 1, to: VillageTileLayout.rows - 3, by: 1) {
+                        for c in stride(from: 1, to: VillageTileLayout.columns - 3, by: 1) {
+                            if layout.place(id: id, column: c, row: r, turns: preferredTurns) {
+                                placed = true
+                                changed = true
+                                break
+                            }
+                        }
+                        if placed { break }
+                    }
+                }
+            }
+        }
+
+        if changed {
+            save()
+        }
+    }
+
+    private func shortBuildingTitle(_ id: String) -> String {
+        switch id {
+        case "arthur-house": return "R. Arthur"
+        case "village-well": return "Sumur"
+        case "bu-mara-house": return "R. Bu Mara"
+        case "village-barn": return "Lumbung"
+        case "roland-pen": return "Kandang"
+        case "anneth-house": return "R. Anneth"
+        case "beryn-house": return "R. Beryn"
+        case "empty-warehouse": return "Gudang"
+        default: return VillageTileLayout.building(id)?.title ?? id
+        }
+    }
+
     func rebuild(_ message: String? = nil) {
+        if isCocMode {
+            spawnUnlockedPiecesOnMap()
+        }
         let mask = SKShapeNode(rect:isMap ? board : CGRect(origin:.zero,size:size))
         mask.fillColor = .white; mask.strokeColor = .clear; viewport.maskNode = mask
         ghost?.removeFromParent(); ghost = nil; hideBuildingGrid(); inventoryHits = []; buildingInventoryHits = []
@@ -428,6 +513,8 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
                 actor.position = p; sourcePosition = layout.source(p) ?? sourcePosition
             }
             if !isMap {
+                actor.zRotation = 0
+                world.zRotation = 0
                 actor.setScale(0.3)
                 keepActorAboveMap(); world.addChild(actor)
             } else {
@@ -441,80 +528,19 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         if isMap {
             button("Debug selesai",name:"debugSolveCarto",at:CGPoint(x:210,y:size.height-32),width:145)
         }
-        text(isMap ? "KEPING DESA" : "DESA ARTHUR",at:CGPoint(x:size.width/2,y:size.height-30),size:18,parent:hud,color:cream)
+        addQuestDebugButton()
+        let titleText: String
+        if !isMap {
+            titleText = "DESA ARTHUR"
+        } else {
+            titleText = isCocMode ? "CARTO DESA" : "KEPING DESA"
+        }
+        text(titleText,at:CGPoint(x:size.width/2,y:size.height-30),size:18,parent:hud,color:cream)
         if isMap {
-            let panel = SKShapeNode(rect:inventoryArea,cornerRadius:8)
-            panel.fillColor = SKColor(red:0.035,green:0.15,blue:0.18,alpha:0.98); panel.strokeColor = cream.withAlphaComponent(0.2); hud.addChild(panel)
-            text("PUZZLE",at:CGPoint(x:rightEdge-94,y:size.height-85),size:13,parent:hud,color:cream)
-            page = min(page,pages-1)
-            let puzzleRows: CGFloat = 2
-            let puzzleTopY = size.height - 120
-            let buildingReserve: CGFloat = 150
-            let availablePuzzleHeight = max(108, inventoryArea.height - buildingReserve)
-            let thumb = min(CGFloat(54), max(32, (availablePuzzleHeight - 28) / puzzleRows))
-            let puzzleSpacing = thumb + 10
-            for (index,id) in available.dropFirst(page*pageSize).prefix(pageSize).enumerated() {
-                let inventoryTurns = selected == id
-                    ? draftTurns
-                    : VillageCartoMap.preferredTurns(forPieceID: id)
-                let node = tile(id,turns:inventoryTurns,miniature:true)
-                let bounds = VillageTileLayout.outline(id).boundingBoxOfPath
-                node.setScale(thumb/max(bounds.width,bounds.height)); node.name = "inventory-\(id)"
-                node.position = CGPoint(
-                    x: rightEdge - 134 + CGFloat(index % 2) * 80,
-                    y: puzzleTopY - CGFloat(index / 2) * puzzleSpacing
-                )
-                let center = VillageTileLayout.rotated(CGPoint(x:bounds.midX,y:bounds.midY),
-                    turns:inventoryTurns)
-                node.position.x -= center.x*node.xScale
-                node.position.y -= center.y*node.yScale
-                hud.addChild(node)
-                inventoryHits.append((id,node))
-            }
-            let puzzleBottomY = puzzleTopY - (puzzleRows - 1) * puzzleSpacing - thumb * 0.5
-            let buildingHeaderY = max(146, min(puzzleBottomY - 30, 225))
-            let divider = SKShapeNode(rectOf: CGSize(width: 138, height: 1))
-            divider.position = CGPoint(x: rightEdge - 94, y: buildingHeaderY + 16)
-            divider.fillColor = cream.withAlphaComponent(0.22)
-            divider.strokeColor = .clear
-            hud.addChild(divider)
-            text("BANGUNAN",at:CGPoint(x:rightEdge-94,y:buildingHeaderY),size:11,parent:hud,color:cream)
-            let buildingInventory = unlockedBuildingInventory
-            let buildingPages = max(1, Int(ceil(Double(buildingInventory.count) / Double(buildingPageSize))))
-            buildingPage = min(buildingPage, buildingPages - 1)
-            for (index, building) in buildingInventory
-                .dropFirst(buildingPage * buildingPageSize)
-                .prefix(buildingPageSize)
-                .enumerated() {
-                let node = buildingNode(building.id, miniature: true)
-                let unit = VillageCartoMap.subcellSide
-                let maxSide = max(CGFloat(building.width) * unit, CGFloat(building.height) * unit)
-                node.setScale(min(0.9, 76 / maxSide))
-                node.name = "building-\(building.id)"
-                node.position = CGPoint(
-                    x: rightEdge - 94,
-                    y: buildingHeaderY - 42 - CGFloat(index) * 54
-                )
-                hud.addChild(node)
-                buildingInventoryHits.append((building.id,node))
-            }
-            text("\(buildingPage + 1)/\(buildingPages)",at:CGPoint(x:rightEdge-94,y:buildingHeaderY-130),size:10,parent:hud,color:cream)
-            button("‹",name:"building-prev",at:CGPoint(x:rightEdge-134,y:buildingHeaderY-130),width:28)
-            button("›",name:"building-next",at:CGPoint(x:rightEdge-54,y:buildingHeaderY-130),width:28)
-            button("‹",name:"prev",at:CGPoint(x:rightEdge-147,y:82),width:35)
-            button("›",name:"next",at:CGPoint(x:rightEdge-39,y:82),width:35)
-            text("\(page+1)/\(pages)",at:CGPoint(x:rightEdge-94,y:82),size:12,parent:hud,color:cream)
-            button("Putar 90°",name:"rotate",at:CGPoint(x:82,y:56),width:120)
-            button("Balikkan keping",name:"remove",at:CGPoint(x:219,y:56),width:140)
-            button("−",name:"minus",at:CGPoint(x:315,y:56),width:38)
-            button("+",name:"plus",at:CGPoint(x:362,y:56),width:38)
-            button("Pusatkan",name:"center",at:CGPoint(x:435,y:56),width:90)
-            if let id = selected {
-                let number = VillageCartoMap.displayNumber(forPieceID: id) ?? (id + 1)
-                let role = villageQuestUnlocks.role(forPieceID: id).label.map { " · \($0)" } ?? ""
-                text("Keping \(number)\(role) · \(draftTurns*90)°",at:CGPoint(x:board.midX,y:size.height-58),size:12,parent:hud,color:cream)
-            } else if let id = selectedBuilding, let building = VillageTileLayout.building(id) {
-                text("\(building.title) · \(building.width)x\(building.height) subgrid",at:CGPoint(x:board.midX,y:size.height-58),size:12,parent:hud,color:cream)
+            if isCocMode {
+                renderCocBottomBar()
+            } else {
+                renderClassicRightPanel()
             }
         } else {
             let base = SKShapeNode(circleOfRadius:49); base.position = stickCenter
@@ -523,12 +549,217 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             knob.fillColor = SKColor(white:1,alpha:0.65); knob.strokeColor = .clear; hud.addChild(knob)
         }
         status.removeFromParent(); status.fontSize = 11; status.fontColor = cream; status.verticalAlignmentMode = .center
-        status.position = CGPoint(x:size.width/2,y:19); hud.addChild(status)
+        if isCocMode && isMap {
+            status.position = CGPoint(x: size.width / 2, y: size.height - 54)
+        } else {
+            status.position = CGPoint(x: size.width / 2, y: 19)
+        }
+        hud.addChild(status)
         status.text = message ?? villageQuestObjective
         updateCamera()
     }
 
-    private func nearestSafePoint(_ current: CGPoint) -> CGPoint? {
+    private func renderCocBottomBar() {
+        let barWidth = min(size.width - 32, 740)
+        let barHeight: CGFloat = 80
+        let barCenterY: CGFloat = 46
+
+        let bar = SKShapeNode(rectOf: CGSize(width: barWidth, height: barHeight), cornerRadius: 14)
+        bar.position = CGPoint(x: size.width / 2, y: barCenterY)
+        bar.name = "cocBarPanel"
+        bar.fillColor = SKColor(red: 0.10, green: 0.22, blue: 0.14, alpha: 0.96)
+        bar.strokeColor = SKColor(red: 0.85, green: 0.72, blue: 0.38, alpha: 0.95)
+        bar.lineWidth = 2
+        hud.addChild(bar)
+
+        // Label pita atas
+        let badge = SKShapeNode(rectOf: CGSize(width: 104, height: 16), cornerRadius: 4)
+        badge.fillColor = SKColor(red: 0.16, green: 0.34, blue: 0.20, alpha: 1)
+        badge.strokeColor = SKColor(red: 0.85, green: 0.72, blue: 0.38, alpha: 0.8)
+        badge.position = CGPoint(x: 0, y: barHeight / 2 - 2)
+        let badgeLbl = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        badgeLbl.text = "LIST RUMAH"
+        badgeLbl.fontSize = 9.5
+        badgeLbl.fontColor = .systemYellow
+        badgeLbl.verticalAlignmentMode = .center
+        badge.addChild(badgeLbl)
+        bar.addChild(badge)
+
+        let unlocked = VillageCartoMap.buildings.filter { villageUnlockedBuildingIDs.contains($0.id) }
+        let cardW: CGFloat = 90
+        let cardGap: CGFloat = 10
+        let availableW = barWidth - 80
+        let maxCards = max(2, min(5, Int(availableW / (cardW + cardGap))))
+        let pages = max(1, Int(ceil(Double(unlocked.count) / Double(maxCards))))
+        cocBuildingPage = min(cocBuildingPage, pages - 1)
+        let pagedBuildings = Array(unlocked.dropFirst(cocBuildingPage * maxCards).prefix(maxCards))
+        let totalRowW = CGFloat(pagedBuildings.count) * cardW + CGFloat(max(0, pagedBuildings.count - 1)) * cardGap
+        let startX = -totalRowW / 2 + cardW / 2
+
+        for (idx, building) in pagedBuildings.enumerated() {
+            let cx = startX + CGFloat(idx) * (cardW + cardGap)
+            let card = SKShapeNode(rectOf: CGSize(width: cardW, height: 60), cornerRadius: 8)
+            card.position = CGPoint(x: cx, y: -4)
+            card.name = "coc-building-\(building.id)"
+
+            let isPlaced = layout.buildingPlacements.contains(where: { $0.id == building.id })
+            let isSelected = selectedBuilding == building.id
+            card.fillColor = isSelected
+                ? SKColor(red: 0.20, green: 0.38, blue: 0.24, alpha: 0.98)
+                : SKColor(red: 0.05, green: 0.14, blue: 0.09, alpha: 0.85)
+            card.strokeColor = isSelected
+                ? .systemYellow
+                : (isPlaced ? SKColor(red: 0.30, green: 0.70, blue: 0.40, alpha: 0.8) : SKColor(white: 1, alpha: 0.25))
+            card.lineWidth = isSelected ? 2.5 : 1.2
+
+            let bNode = buildingNode(building.id, miniature: true)
+            let unit = VillageCartoMap.subcellSide
+            let maxSide = max(CGFloat(building.width) * unit, CGFloat(building.height) * unit)
+            bNode.setScale(min(0.55, 36 / maxSide))
+            bNode.position = CGPoint(x: 0, y: 11)
+            bNode.name = "coc-building-\(building.id)"
+            card.addChild(bNode)
+
+            let tLbl = SKLabelNode(fontNamed: "AvenirNext-Bold")
+            tLbl.text = shortBuildingTitle(building.id)
+            tLbl.fontSize = 8.5
+            tLbl.fontColor = isSelected ? .systemYellow : .white
+            tLbl.position = CGPoint(x: 0, y: -10)
+            tLbl.name = "coc-building-\(building.id)"
+            card.addChild(tLbl)
+
+            let pill = SKShapeNode(rectOf: CGSize(width: 64, height: 12), cornerRadius: 3)
+            pill.fillColor = isPlaced
+                ? SKColor(red: 0.12, green: 0.36, blue: 0.18, alpha: 0.9)
+                : SKColor(red: 0.44, green: 0.32, blue: 0.12, alpha: 0.9)
+            pill.strokeColor = .clear
+            pill.position = CGPoint(x: 0, y: -21)
+            pill.name = "coc-building-\(building.id)"
+
+            let pLbl = SKLabelNode(fontNamed: "AvenirNext-Bold")
+            pLbl.text = isPlaced ? "✓ Di Peta" : "+ Pasang"
+            pLbl.fontSize = 7.5
+            pLbl.fontColor = isPlaced ? .systemGreen : .systemYellow
+            pLbl.verticalAlignmentMode = .center
+            pLbl.name = "coc-building-\(building.id)"
+            pill.addChild(pLbl)
+            card.addChild(pill)
+
+            bar.addChild(card)
+            buildingInventoryHits.append((building.id, card))
+        }
+
+        if pages > 1 {
+            button("‹", name: "coc-building-prev", at: CGPoint(x: size.width / 2 - barWidth / 2 + 20, y: barCenterY), width: 30)
+            button("›", name: "coc-building-next", at: CGPoint(x: size.width / 2 + barWidth / 2 - 20, y: barCenterY), width: 30)
+            text("\(cocBuildingPage + 1)/\(pages)", at: CGPoint(x: barWidth / 2 - 20, y: -28), size: 9, parent: bar, color: cream)
+        }
+
+        // Action buttons di atas bar
+        let actionY: CGFloat = 100
+        if selected != nil {
+            button("Putar 90°", name: "rotate", at: CGPoint(x: 75, y: actionY), width: 105)
+            button("Pusatkan", name: "center", at: CGPoint(x: 180, y: actionY), width: 85)
+        } else if let bID = selectedBuilding {
+            if layout.buildingPlacements.contains(where: { $0.id == bID }) {
+                button("Simpan ke Bar", name: "removeBuilding", at: CGPoint(x: 88, y: actionY), width: 130)
+                button("Pusatkan", name: "center", at: CGPoint(x: 205, y: actionY), width: 85)
+            } else {
+                button("Batal Pasang", name: "cancelBuilding", at: CGPoint(x: 85, y: actionY), width: 120)
+                button("Pusatkan", name: "center", at: CGPoint(x: 195, y: actionY), width: 85)
+            }
+        } else {
+            button("Pusatkan", name: "center", at: CGPoint(x: 65, y: actionY), width: 85)
+        }
+        button("−", name: "minus", at: CGPoint(x: size.width - 64, y: actionY), width: 36)
+        button("+", name: "plus", at: CGPoint(x: size.width - 24, y: actionY), width: 36)
+
+        if let id = selected {
+            let number = VillageCartoMap.displayNumber(forPieceID: id) ?? (id + 1)
+            let role = villageQuestUnlocks.role(forPieceID: id).label.map { " · \($0)" } ?? ""
+            text("Keping \(number)\(role) · \(draftTurns * 90)°", at: CGPoint(x: size.width / 2, y: size.height - 76), size: 12, parent: hud, color: cream)
+        } else if let id = selectedBuilding, let building = VillageTileLayout.building(id) {
+            text("\(building.title) · \(building.width)x\(building.height) subgrid", at: CGPoint(x: size.width / 2, y: size.height - 76), size: 12, parent: hud, color: cream)
+        }
+    }
+
+    private func renderClassicRightPanel() {
+        let panel = SKShapeNode(rect:inventoryArea,cornerRadius:8)
+        panel.fillColor = SKColor(red:0.035,green:0.15,blue:0.18,alpha:0.98); panel.strokeColor = cream.withAlphaComponent(0.2); hud.addChild(panel)
+        text("PUZZLE",at:CGPoint(x:rightEdge-94,y:size.height-85),size:13,parent:hud,color:cream)
+        page = min(page,pages-1)
+        let puzzleRows: CGFloat = 2
+        let puzzleTopY = size.height - 120
+        let buildingReserve: CGFloat = 150
+        let availablePuzzleHeight = max(108, inventoryArea.height - buildingReserve)
+        let thumb = min(CGFloat(54), max(32, (availablePuzzleHeight - 28) / puzzleRows))
+        let puzzleSpacing = thumb + 10
+        for (index,id) in available.dropFirst(page*pageSize).prefix(pageSize).enumerated() {
+            let inventoryTurns = selected == id
+                ? draftTurns
+                : VillageCartoMap.preferredTurns(forPieceID: id)
+            let node = tile(id,turns:inventoryTurns,miniature:true)
+            let bounds = VillageTileLayout.outline(id).boundingBoxOfPath
+            node.setScale(thumb/max(bounds.width,bounds.height)); node.name = "inventory-\(id)"
+            node.position = CGPoint(
+                x: rightEdge - 134 + CGFloat(index % 2) * 80,
+                y: puzzleTopY - CGFloat(index / 2) * puzzleSpacing
+            )
+            let center = VillageTileLayout.rotated(CGPoint(x:bounds.midX,y:bounds.midY),
+                turns:inventoryTurns)
+            node.position.x -= center.x*node.xScale
+            node.position.y -= center.y*node.yScale
+            hud.addChild(node)
+            inventoryHits.append((id,node))
+        }
+        let puzzleBottomY = puzzleTopY - (puzzleRows - 1) * puzzleSpacing - thumb * 0.5
+        let buildingHeaderY = max(146, min(puzzleBottomY - 30, 225))
+        let divider = SKShapeNode(rectOf: CGSize(width: 138, height: 1))
+        divider.position = CGPoint(x: rightEdge - 94, y: buildingHeaderY + 16)
+        divider.fillColor = cream.withAlphaComponent(0.22)
+        divider.strokeColor = .clear
+        hud.addChild(divider)
+        text("BANGUNAN",at:CGPoint(x:rightEdge-94,y:buildingHeaderY),size:11,parent:hud,color:cream)
+        let buildingInventory = unlockedBuildingInventory
+        let buildingPages = max(1, Int(ceil(Double(buildingInventory.count) / Double(buildingPageSize))))
+        buildingPage = min(buildingPage, buildingPages - 1)
+        for (index, building) in buildingInventory
+            .dropFirst(buildingPage * buildingPageSize)
+            .prefix(buildingPageSize)
+            .enumerated() {
+            let node = buildingNode(building.id, miniature: true)
+            let unit = VillageCartoMap.subcellSide
+            let maxSide = max(CGFloat(building.width) * unit, CGFloat(building.height) * unit)
+            node.setScale(min(0.9, 76 / maxSide))
+            node.name = "building-\(building.id)"
+            node.position = CGPoint(
+                x: rightEdge - 94,
+                y: buildingHeaderY - 42 - CGFloat(index) * 54
+            )
+            hud.addChild(node)
+            buildingInventoryHits.append((building.id,node))
+        }
+        text("\(buildingPage + 1)/\(buildingPages)",at:CGPoint(x:rightEdge-94,y:buildingHeaderY-130),size:10,parent:hud,color:cream)
+        button("‹",name:"building-prev",at:CGPoint(x:rightEdge-134,y:buildingHeaderY-130),width:28)
+        button("›",name:"building-next",at:CGPoint(x:rightEdge-54,y:buildingHeaderY-130),width:28)
+        button("‹",name:"prev",at:CGPoint(x:rightEdge-147,y:82),width:35)
+        button("›",name:"next",at:CGPoint(x:rightEdge-39,y:82),width:35)
+        text("\(page+1)/\(pages)",at:CGPoint(x:rightEdge-94,y:82),size:12,parent:hud,color:cream)
+        button("Putar 90°",name:"rotate",at:CGPoint(x:82,y:56),width:120)
+        button("Balikkan keping",name:"remove",at:CGPoint(x:219,y:56),width:140)
+        button("−",name:"minus",at:CGPoint(x:315,y:56),width:38)
+        button("+",name:"plus",at:CGPoint(x:362,y:56),width:38)
+        button("Pusatkan",name:"center",at:CGPoint(x:435,y:56),width:90)
+        if let id = selected {
+            let number = VillageCartoMap.displayNumber(forPieceID: id) ?? (id + 1)
+            let role = villageQuestUnlocks.role(forPieceID: id).label.map { " · \($0)" } ?? ""
+            text("Keping \(number)\(role) · \(draftTurns*90)°",at:CGPoint(x:board.midX,y:size.height-58),size:12,parent:hud,color:cream)
+        } else if let id = selectedBuilding, let building = VillageTileLayout.building(id) {
+            text("\(building.title) · \(building.width)x\(building.height) subgrid",at:CGPoint(x:board.midX,y:size.height-58),size:12,parent:hud,color:cream)
+        }
+    }
+
+    func nearestSafePoint(_ current: CGPoint) -> CGPoint? {
         guard let piece = layout.placement(at:current) else { return nil }
         var result: CGPoint?, distance = CGFloat.greatestFiniteMagnitude
         for cell in VillageTileLayout.cells(of:piece) {
@@ -734,8 +965,8 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
     override func didChangeSize(_ oldSize: CGSize) {
         guard world.parent != nil else { return }; stopInput(); rebuild()
     }
-    private func stopInput() { activeTouch = nil; stickTouch = nil; stick = .zero; route = []; dragging = false; panning = false; ghost?.removeFromParent(); ghost = nil; hideBuildingGrid(); world.childNode(withName:"dropSlot")?.removeFromParent() }
-    private func save() { if let data = layout.encoded { UserDefaults.standard.set(data,forKey:Self.saveKey) } }
+    func stopInput() { activeTouch = nil; stickTouch = nil; stick = .zero; route = []; dragging = false; panning = false; ghost?.removeFromParent(); ghost = nil; hideBuildingGrid(); world.childNode(withName:"dropSlot")?.removeFromParent() }
+    func save() { if let data = layout.encoded { UserDefaults.standard.set(data,forKey:Self.saveKey) } }
     private func returnSelected() {
         if let buildingID = selectedBuilding {
             if layout.removeBuilding(id: buildingID) {
@@ -744,6 +975,9 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             } else {
                 status.text = "Bangunan ini sudah ada di inventori."
             }
+            return
+        }
+        if isCocMode {
             return
         }
         guard let id = selected else { status.text = "Pilih keping yang ingin dibalikkan."; return }
@@ -789,7 +1023,14 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         }
         guard activeTouch == nil, stickTouch == nil, let touch = touches.first else { return }
         let p = touch.location(in:hud), actions = names(at:p)
+        if actions.contains("quest8UnlockCard") {
+            hud.childNode(withName: "quest8UnlockCard")?.removeFromParent()
+            return
+        }
         if handleQuestChoiceTap(actions: actions) { return }
+        if handleQuest8ChoiceTap(actions: actions) { return }
+        if handleQuest8HUDTap(actions: actions) { return }
+        if handleQuestDebugTouch(actions: actions) { return }
         if actions.contains("exit") { stopInput(); onExit?(); return }
         if actions.contains("debugSolveCarto") {
             stopInput()
@@ -818,6 +1059,44 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             return
         }
         if isMap {
+            if actions.contains("coc-building-prev") || actions.contains("coc-building-next") {
+                let unlocked = VillageCartoMap.buildings.filter { villageUnlockedBuildingIDs.contains($0.id) }
+                let availableW = min(size.width - 32, 740) - 80
+                let maxCards = max(2, min(5, Int(availableW / 100)))
+                let totalPages = max(1, Int(ceil(Double(unlocked.count) / Double(maxCards))))
+                cocBuildingPage = (cocBuildingPage + (actions.contains("coc-building-next") ? 1 : totalPages - 1)) % totalPages
+                rebuild()
+                return
+            }
+            if actions.contains("removeBuilding") {
+                if let buildingID = selectedBuilding {
+                    if layout.removeBuilding(id: buildingID) {
+                        save()
+                        selectedBuilding = nil
+                        rebuild("Bangunan disimpan kembali ke bar.")
+                    }
+                }
+                return
+            }
+            if actions.contains("cancelBuilding") {
+                selectedBuilding = nil
+                rebuild()
+                return
+            }
+            if let buildingAction = actions.first(where: { $0.hasPrefix("coc-building-") }) {
+                let buildingID = String(buildingAction.dropFirst("coc-building-".count))
+                selectBuilding(buildingID)
+                if let placement = layout.buildingPlacements.first(where: { $0.id == buildingID }),
+                   let rect = VillageTileLayout.buildingRect(placement) {
+                    mapCenter = CGPoint(x: rect.midX, y: rect.midY)
+                    updateCamera()
+                    let q = touch.location(in: world)
+                    dragOffset = CGPoint(x: rect.midX - q.x, y: rect.midY - q.y)
+                } else {
+                    dragOffset = .zero
+                }
+                activeTouch = touch; touchStart = p; return
+            }
             if actions.contains("rotate") {
                 guard let selectedID = selected else { status.text = "Pilih keping terlebih dahulu."; return }
                 guard !layout.hasBuilding(onPieceID: selectedID) else {
@@ -945,7 +1224,12 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         let touchPoint = touch.location(in:world)
         let q = CGPoint(x:touchPoint.x+dragOffset.x,y:touchPoint.y+dragOffset.y)
         stopInput()
-        if wasDrag && !wasPan && inventoryArea.contains(p) { returnSelected(); return }
+        if wasDrag && !wasPan {
+            let hitInventoryArea = (!isCocMode && inventoryArea.contains(p)) || (isCocMode && p.y < 100)
+            if hitInventoryArea {
+                returnSelected(); return
+            }
+        }
         let changedRotation = selected.flatMap { id in layout.placements.first(where:{$0.id == id}) }.map { $0.turns != draftTurns } ?? false
         if let buildingID = selectedBuilding,
            board.contains(p),
@@ -980,5 +1264,7 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         keepActorAboveMap()
         sourcePosition = layout.source(next) ?? sourcePosition
         if !cameraTransitioning { updateCamera() }
+        checkQuest7Proximity()
+        checkQuest8Proximity()
     }
 }

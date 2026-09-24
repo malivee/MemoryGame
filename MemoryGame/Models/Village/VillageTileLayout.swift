@@ -314,6 +314,35 @@ struct VillageTileLayout {
             )
         }
     }
+    mutating func autoPlaceBuildings(buildingIDs: [String]) {
+        let divisions = VillageCartoMap.subdivisions
+        for id in buildingIDs {
+            if buildingPlacements.contains(where: { $0.id == id }) { continue }
+            guard let building = Self.building(id) else { continue }
+            var placed = false
+            for piece in placements {
+                if placed { break }
+                for cell in Self.cells(of: piece) {
+                    if placed { break }
+                    let minSubCol = max(0, cell.column * divisions - 1)
+                    let maxSubCol = min(Self.columns * divisions - building.width, (cell.column + 1) * divisions)
+                    let minSubRow = max(0, cell.row * divisions - 1)
+                    let maxSubRow = min(Self.rows * divisions - building.height, (cell.row + 1) * divisions)
+                    if minSubCol > maxSubCol || minSubRow > maxSubRow { continue }
+                    for r in minSubRow...maxSubRow {
+                        if placed { break }
+                        for c in minSubCol...maxSubCol {
+                            if canPlaceBuilding(id: id, subColumn: c, subRow: r) {
+                                placeBuilding(id: id, subColumn: c, subRow: r)
+                                placed = true
+                                break
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
     static func building(_ id: String) -> VillageCartoMap.Building? {
         VillageCartoMap.buildings.first { $0.id == id }
     }

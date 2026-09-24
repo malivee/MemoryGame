@@ -20,6 +20,23 @@ extension RightDeckPuzzleScene {
         view.presentScene(village, transition: .fade(withDuration: 0.25))
     }
 
+    // Membuka modul Carto Desa (COC Mode): bar rumah di bawah, keping langsung di map
+    func openCocCartoPreview() {
+        guard !enteringMemory, let view else { return }
+        enteringMemory = true
+        trackedTouch = nil
+        dragPiece = nil
+        let village = VillageCartoScene(size: view.bounds.size, uiMode: .coc)
+        village.scaleMode = .resizeFill
+        village.onExit = { [weak view] in
+            guard let view else { return }
+            let puzzle = RightDeckPuzzleScene(size: view.bounds.size)
+            puzzle.scaleMode = .resizeFill
+            view.presentScene(puzzle, transition: .fade(withDuration: 0.25))
+        }
+        view.presentScene(village, transition: .fade(withDuration: 0.25))
+    }
+
     func changed(focusInventory: Bool = false) {
         let wasComplete = progress.assembled
         session.synchronize()

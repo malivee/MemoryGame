@@ -91,6 +91,13 @@ extension RightDeckPuzzleScene {
         villageButton.fillColor = worldBadge.fillColor
         villageButton.strokeColor = worldBadge.strokeColor
 
+        // Carto Desa (COC Mode) persis di bawahnya
+        let cocCartoButton = canvas.storyButton("Carto Desa", name: "cocCartoPreview",
+            at: CGPoint(x: viewport.minX + 88, y: viewport.maxY - 66), width: 140)
+        cocCartoButton.zPosition = 110
+        cocCartoButton.fillColor = SKColor(red: 0.14, green: 0.28, blue: 0.18, alpha: 0.95)
+        cocCartoButton.strokeColor = SKColor(red: 0.85, green: 0.72, blue: 0.40, alpha: 0.85)
+
         let deck = SKShapeNode(rect: deckBounds)
         deck.zPosition = 65
         deck.fillColor = SKColor(red: 0.25, green: 0.20, blue: 0.15, alpha: 0.9)

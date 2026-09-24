@@ -28,23 +28,23 @@ extension VillageCartoScene {
     }
 
     var quest5RockSaltMinePosition: CGPoint? {
-        guard layout.placements.contains(where: { $0.id == VillageQuestCatalog.PieceID.rockSaltMinePath }) else {
+        guard layout.placements.contains(where: { $0.id == VillageQuestCatalog.PieceID.rockSaltPath }) else {
             return nil
         }
         let source = CGPoint(
-            x: 8.35 * VillageCartoMap.side,
-            y: 7.55 * VillageCartoMap.side
+            x: 10.45 * VillageCartoMap.side,
+            y: 6.45 * VillageCartoMap.side
         )
         return layout.world(source)
     }
 
     var quest5OldMinerPosition: CGPoint? {
-        guard layout.placements.contains(where: { $0.id == VillageQuestCatalog.PieceID.rockSaltMinePath }) else {
+        guard layout.placements.contains(where: { $0.id == VillageQuestCatalog.PieceID.rockSaltPath }) else {
             return nil
         }
         let source = CGPoint(
-            x: 8.78 * VillageCartoMap.side,
-            y: 7.18 * VillageCartoMap.side
+            x: 11.10 * VillageCartoMap.side,
+            y: 6.12 * VillageCartoMap.side
         )
         return layout.world(source)
     }
@@ -317,7 +317,7 @@ extension VillageCartoScene {
             progress.mapBStage = .herbalHills
             PrologueStore.shared.save()
             self.saveQuest5()
-            self.rebuild("Quest 5 selesai. Keping hutan T dan Rumah Kakek Beryn terbuka.")
+            self.rebuild("Quest 5 selesai. Rumah Kakek Beryn terbuka.")
         }
     }
 }

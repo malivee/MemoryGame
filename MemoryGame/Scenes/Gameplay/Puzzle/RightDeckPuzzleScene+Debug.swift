@@ -212,12 +212,17 @@ extension RightDeckPuzzleScene {
             progress.isRockSaltUnlocked = true
             progress.hasRockSalt = false
             progress.deliveredRockSalt = false
+            progress.isHerbalUnlocked = false
+            progress.hasHerbal = false
+            progress.encounteredHollow = false
+            progress.metBerynAfterHerbal = false
         case .herbalHills:
             progress.isRockSaltUnlocked = true
             progress.hasRockSalt = true
             progress.deliveredRockSalt = true
             progress.isHerbalUnlocked = true
             progress.hasHerbal = false
+            progress.encounteredHollow = false
             progress.metBerynAfterHerbal = false
         case .woodcutterSlope:
             progress.isRockSaltUnlocked = true
@@ -225,6 +230,7 @@ extension RightDeckPuzzleScene {
             progress.deliveredRockSalt = true
             progress.isHerbalUnlocked = true
             progress.hasHerbal = true
+            progress.encounteredHollow = true
             progress.metBerynAfterHerbal = true
             progress.gatheredWood = false
             progress.hasEliasBook = false
@@ -233,6 +239,7 @@ extension RightDeckPuzzleScene {
             progress.deliveredRockSalt = true
             progress.isHerbalUnlocked = true
             progress.hasHerbal = true
+            progress.encounteredHollow = true
             progress.metBerynAfterHerbal = true
             progress.gatheredWood = true
             progress.hasEliasBook = true

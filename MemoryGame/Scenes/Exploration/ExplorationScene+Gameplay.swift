@@ -194,23 +194,7 @@ extension ExplorationScene {
 
         case .herbalPlant:
             clearNearbyInteraction()
-            HapticsService.shared.playNotification(.success)
-            progress.hasHerbal = true
-            PrologueStore.shared.save()
-            herbalNode?.removeFromParent()
-            herbalNode = nil
-            objective.text = progress.currentObjective(for: entry.region)
-            startDialogue([
-                .init(speaker: "Arthur", text: "Daun Chamomile Emas! Tumbuh subur di atas batu menjorok ini."),
-                .init(speaker: "Arthur", text: "Aroma bunganya manis dan menenangkan. Ini tepat seperti yang dipesan Kakek Beryn untuk ramuan obatnya."),
-                .init(speaker: "Arthur", text: "Tapi tunggu... angin dingin berhembus dari arah timur. Ada sesuatu yang mengawasi dari pinggir hutan...")
-            ]) { [weak self] in
-                self?.showAnnouncementBanner(
-                    icon: "🌿",
-                    title: "Herbal Langka Dipetik!",
-                    subtitle: "Ada sosok misterius memperhatikan dari batas pohon di timur!"
-                )
-            }
+            startQuest6Foraging()
 
         case .boundaryStone:
             clearNearbyInteraction()
@@ -223,7 +207,7 @@ extension ExplorationScene {
 
         case .hollowEncounter:
             clearNearbyInteraction()
-            startHollow2StageDialQTE()
+            startQuest6HollowEncounter()
 
         case .firewood:
             clearNearbyInteraction()
@@ -441,13 +425,13 @@ extension ExplorationScene {
             switch progress.mapBStage {
             case .rockSalt:
                 if progress.hasRockSalt {
-                    say("Arthur kembali ke desa membawa bongkahan rock salt murni untuk Anneth.")
+                    finishQuest5VillageReturn()
                 } else {
                     say("Ambil rock salt terlebih dahulu di dekat mulut tambang sebelum kembali.")
                 }
             case .herbalHills:
                 if progress.encounteredHollow {
-                    say("Arthur bergegas kembali ke desa untuk melaporkan penampakan The Hollow ke Kakek Beryn.")
+                    finishQuest6VillageReturn()
                 } else if progress.hasHerbal {
                     say("Selidiki sosok bayangan di pinggir pohon sebelum kembali ke desa.")
                 } else {

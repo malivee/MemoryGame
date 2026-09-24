@@ -35,13 +35,16 @@ enum VillageQuestEngine {
         }
 
         if snapshot.quest3.completed {
-            pieces.insert(VillageQuestCatalog.PieceID.rockSaltMinePath)
+            pieces.insert(VillageQuestCatalog.PieceID.annethHousePath)
             buildings.insert(VillageQuestCatalog.BuildingID.annethHouse)
         }
 
         if snapshot.quest5.completed {
-            pieces.insert(VillageQuestCatalog.PieceID.futurePath)
             buildings.insert(VillageQuestCatalog.BuildingID.berynHouse)
+        }
+
+        if snapshot.quest6RewardUnlocked {
+            pieces.insert(VillageQuestCatalog.PieceID.hollowForestReward)
         }
 
         return VillageQuestUnlocks(
@@ -59,10 +62,10 @@ enum VillageQuestEngine {
     private static func pieceRoles(for snapshot: VillageQuestSnapshot) -> [Int: VillageQuestPieceRole] {
         var roles: [Int: VillageQuestPieceRole] = [:]
         if !snapshot.quest4.completed {
-            roles[VillageQuestCatalog.PieceID.rockSaltMinePath] = .reserved(label: "Pengecoh")
+            roles[VillageQuestCatalog.PieceID.annethHousePath] = .reserved(label: "Pengecoh")
         }
         if !snapshot.quest5.completed {
-            roles[VillageQuestCatalog.PieceID.futurePath] = .reserved(label: "Pengecoh")
+            roles[VillageQuestCatalog.PieceID.rockSaltPath] = .reserved(label: "Pengecoh")
         }
         return roles
     }
@@ -158,10 +161,10 @@ enum VillageQuestEngine {
 
     static func quest5Objective(for snapshot: VillageQuestSnapshot) -> String {
         let quest = snapshot.quest5
-        if quest.completed { return "Quest 5 selesai: keping hutan T dan Rumah Kakek Beryn telah terbuka." }
+        if quest.completed { return "Quest 5 selesai: Rumah Kakek Beryn telah terbuka." }
         if quest.deliveredSalt { return "Temui Anak Kecil di persimpangan jalan." }
         if quest.minedSalt { return "Kembali ke Rumah Anneth dan serahkan rock salt ke Ibu Anneth." }
-        return snapshot.hasPiece(VillageQuestCatalog.PieceID.rockSaltMinePath)
+        return snapshot.hasPiece(VillageQuestCatalog.PieceID.rockSaltPath)
             ? "Jelajahi ke mulut tambang di keping Rock Salt."
             : "Tempatkan keping Rock Salt (piece 5), lalu Jelajahi ke mulut tambang."
     }

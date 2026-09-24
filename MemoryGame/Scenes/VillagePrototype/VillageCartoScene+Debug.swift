@@ -9,7 +9,7 @@ extension VillageCartoScene {
     func addQuestDebugButton() {
         let btnX: CGFloat = isMap ? 345 : 210
         let btn = buttonNode(
-            "⚙️ Quest 1-8",
+            "⚙️ Quest 1-9",
             name: "debugQuestMenu",
             at: CGPoint(x: btnX, y: size.height - 32),
             width: 120
@@ -80,7 +80,7 @@ extension VillageCartoScene {
         panel.addChild(innerFrame)
 
         // Header Title
-        let title = SKLabelNode(text: "⚙️ DEBUG IN-GAME · SELEKTOR QUEST (1 - 8)")
+        let title = SKLabelNode(text: "⚙️ DEBUG IN-GAME · SELEKTOR QUEST (1 - 9)")
         title.fontName = "AvenirNext-Bold"
         title.fontSize = 13
         title.fontColor = SKColor(red: 0.98, green: 0.88, blue: 0.45, alpha: 1.0)
@@ -180,7 +180,7 @@ extension VillageCartoScene {
         finishAllBtn.name = "debug-quest-complete-all"
         panel.addChild(finishAllBtn)
 
-        let finishAllLbl = SKLabelNode(text: "🏆 Selesaikan Semua Quest (1-8)")
+        let finishAllLbl = SKLabelNode(text: "🌲 Mulai Quest 9 (Lewati Q1-8)")
         finishAllLbl.fontName = "AvenirNext-Bold"
         finishAllLbl.fontSize = 10
         finishAllLbl.fontColor = SKColor(red: 0.82, green: 0.98, blue: 0.85, alpha: 1.0)
@@ -314,6 +314,7 @@ extension VillageCartoScene {
         saveQuest5()
         saveQuest7()
         saveQuest8()
+        saveQuest9()
     }
 
     func setArthurSafePosition(_ target: CGPoint) {
@@ -664,6 +665,8 @@ extension VillageCartoScene {
                 q8.annethBackyardMet = true
             }
             quest8 = q8
+            quest9 = VillageQuest9Progress()
+            resetQuest9RuntimeFlags()
             saveAllVillageQuests()
 
             layout.solveAllPieces()
@@ -741,6 +744,8 @@ extension VillageCartoScene {
         q8.packedJournal = true
         q8.completed = true
         quest8 = q8
+        quest9 = VillageQuest9Progress()
+        resetQuest9RuntimeFlags()
 
         let progress = PrologueStore.shared.progress
         progress.metBerynAfterHerbal = true
@@ -761,9 +766,9 @@ extension VillageCartoScene {
             VillageQuestCatalog.BuildingID.berynHouse,
             VillageQuestCatalog.BuildingID.emptyWarehouse
         ])
-        setArthurSafePosition(layout.world(sourcePosition) ?? VillageTileLayout.initial.center)
+        setArthurSafePosition(quest9HomePosition)
         save()
-        rebuild("Debug In-Game: Seluruh Quest 1 - 8 selesai! Rombongan siap menjelajah ke luar desa.")
+        rebuild("Debug In-Game: Quest 1-8 selesai. Quest 9 Perjalanan Keluar Desa dimulai.")
     }
 
     func resetAllQuests() {
@@ -778,8 +783,10 @@ extension VillageCartoScene {
         quest5 = VillageQuest5Progress()
         quest7 = VillageQuest7Progress()
         quest8 = VillageQuest8Progress()
+        quest9 = VillageQuest9Progress()
         resetQuest7RuntimeFlags()
         resetQuest8RuntimeFlags()
+        resetQuest9RuntimeFlags()
 
         let progress = PrologueStore.shared.progress
         progress.metBerynAfterHerbal = false
@@ -796,6 +803,6 @@ extension VillageCartoScene {
         ])
         setArthurSafePosition(layout.world(sourcePosition) ?? VillageTileLayout.initial.center)
         save()
-        rebuild("Debug In-Game: Seluruh progres Quest 1 - 8 telah di-reset ke awal mula.")
+        rebuild("Debug In-Game: Seluruh progres Quest 1 - 9 telah di-reset ke awal mula.")
     }
 }

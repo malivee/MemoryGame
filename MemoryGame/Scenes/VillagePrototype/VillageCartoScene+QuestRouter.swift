@@ -12,6 +12,7 @@ extension VillageCartoScene {
             quest5: quest5,
             quest7: quest7,
             quest8: quest8,
+            quest9: quest9,
             placedPieceIDs: Set(layout.placements.map(\.id)),
             quest6RewardUnlocked: PrologueStore.shared.progress.metBerynAfterHerbal,
             placedBuildingIDs: Set(layout.buildingPlacements.map(\.id))
@@ -50,8 +51,10 @@ extension VillageCartoScene {
             renderQuest6VillageWorld()
         } else if !quest7.completed {
             renderQuest7World()
-        } else {
+        } else if !quest8.completed {
             renderQuest8World()
+        } else {
+            renderQuest9World()
         }
     }
 
@@ -65,6 +68,7 @@ extension VillageCartoScene {
             return handleQuest6VillageInteraction(at: point)
         }
         if !quest7.completed { return handleQuest7Interaction(at: point) }
-        return handleQuest8Interaction(at: point)
+        if !quest8.completed { return handleQuest8Interaction(at: point) }
+        return handleQuest9Interaction(at: point)
     }
 }

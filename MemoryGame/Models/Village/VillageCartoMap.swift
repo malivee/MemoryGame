@@ -185,7 +185,7 @@ enum VillageCartoMap {
     // Quest 6 berupa tetromino I yang seluruhnya biome hutan hijau tua.
     // ID tetap menunjuk empat sel unik pada atlas sumber, sedangkan nomor yang
     // dilihat pemain berasal dari posisi ID di array ini.
-    static let playablePieceIDs: [Int] = [5, 26, 20, 38, 6, 12, 8]
+    static let playablePieceIDs: [Int] = [5, 26, 20, 38, 6, 12, 8, 0, 1, 3]
 
     static func displayNumber(forPieceID id: Int) -> Int? {
         playablePieceIDs.firstIndex(of: id).map { $0 + 1 }
@@ -246,6 +246,24 @@ enum VillageCartoMap {
                 (0, 3, .darkGreenForest, .darkGreenForest),
                 (0, 2, .darkGreenForest, .darkGreenForest),
                 (0, 1, .darkGreenForest, .darkGreenForest),
+                (0, 0, .darkGreenForest, .darkGreenForest)
+            ]),
+            (0, [
+                (0, 1, .darkGreenForest, .hillSoil),
+                (1, 1, .hillSoil, .darkGreenForest),
+                (0, 0, .darkGreenForest, .darkGreenForest),
+                (1, 0, .hillSoil, .darkGreenForest)
+            ]),
+            (1, [
+                (0, 2, .darkGreenForest, .hillSoil),
+                (0, 1, .darkGreenForest, .darkGreenForest),
+                (0, 0, .hillSoil, .darkGreenForest),
+                (1, 0, .darkGreenForest, .darkGreenForest)
+            ]),
+            (3, [
+                (0, 3, .hillSoil, .darkGreenForest),
+                (0, 2, .darkGreenForest, .darkGreenForest),
+                (0, 1, .darkGreenForest, .hillSoil),
                 (0, 0, .darkGreenForest, .darkGreenForest)
             ])
         ]

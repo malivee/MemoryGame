@@ -9,7 +9,7 @@ extension VillageCartoScene {
     func addQuestDebugButton() {
         let btnX: CGFloat = isMap ? 345 : 210
         let btn = buttonNode(
-            "⚙️ Quest 1-9",
+            "⚙️ Quest 1-10",
             name: "debugQuestMenu",
             at: CGPoint(x: btnX, y: size.height - 32),
             width: 120
@@ -63,7 +63,7 @@ extension VillageCartoScene {
 
         // Panel dialog kayu Carto
         let panelW: CGFloat = min(size.width - 36, 680)
-        let panelH: CGFloat = min(size.height - 24, 345)
+        let panelH: CGFloat = min(size.height - 24, 390)
         let panel = SKShapeNode(rectOf: CGSize(width: panelW, height: panelH), cornerRadius: 18)
         panel.fillColor = SKColor(red: 0.10, green: 0.12, blue: 0.14, alpha: 0.98)
         panel.strokeColor = SKColor(red: 0.95, green: 0.82, blue: 0.42, alpha: 1.0)
@@ -80,7 +80,7 @@ extension VillageCartoScene {
         panel.addChild(innerFrame)
 
         // Header Title
-        let title = SKLabelNode(text: "⚙️ DEBUG IN-GAME · SELEKTOR QUEST (1 - 9)")
+        let title = SKLabelNode(text: "⚙️ DEBUG IN-GAME · SELEKTOR QUEST (1 - 10)")
         title.fontName = "AvenirNext-Bold"
         title.fontSize = 13
         title.fontColor = SKColor(red: 0.98, green: 0.88, blue: 0.45, alpha: 1.0)
@@ -118,8 +118,8 @@ extension VillageCartoScene {
         let leftColX: CGFloat = -panelW / 4 + 2
         let rightColX: CGFloat = panelW / 4 - 2
 
-        let cardH: CGFloat = 36
-        let cardSpacing: CGFloat = 5
+        let cardH: CGFloat = 31
+        let cardSpacing: CGFloat = 4
         let startY: CGFloat = panelH / 2 - 58
 
         // Kolom Kiri: Quest 1 - 5
@@ -136,13 +136,15 @@ extension VillageCartoScene {
             addQuestCard(to: panel, title: item.title, desc: item.desc, key: item.key, color: item.color, at: CGPoint(x: leftColX, y: cy), width: colW, height: cardH)
         }
 
-        // Kolom Kanan: Quest 6 - 8
+        // Kolom Kanan: Quest 6 - 10
         let rightQuests: [(title: String, desc: String, key: String, color: SKColor)] = [
             ("🌿 In-Game Q6: Perbukitan Herbal", "Daun perak & perjumpaan The Hollow", "debug-quest-6", SKColor(red: 0.45, green: 0.92, blue: 0.65, alpha: 1)),
             ("🪵 In-Game Q7: Hutan & Jurnal Elias", "Kayu bakar & temukan Buku Elias", "debug-quest-7", SKColor(red: 0.35, green: 0.75, blue: 0.48, alpha: 1)),
             ("🏚️ In-Game Q8: Markas Gudang", "Cerita Buku Elias & scripted failure", "debug-quest-8-step1", SKColor(red: 0.95, green: 0.65, blue: 0.35, alpha: 1)),
             ("🌫️ In-Game Q8: Kabut Senja (Old Fog)", "Jalanan berkabut tebal & Tetua Desa", "debug-quest-8-step2", SKColor(red: 0.68, green: 0.68, blue: 0.95, alpha: 1)),
-            ("🎒 In-Game Q8: Anneth & Loadout", "Malam hari & kemas 5 barang ekspedisi", "debug-quest-8-step3", SKColor(red: 0.45, green: 0.95, blue: 0.65, alpha: 1))
+            ("🎒 In-Game Q8: Anneth & Loadout", "Malam hari & kemas 5 barang ekspedisi", "debug-quest-8-step3", SKColor(red: 0.45, green: 0.95, blue: 0.65, alpha: 1)),
+            ("🌲 In-Game Q9: Masuk Hutan", "Fajar, stealth, investigasi & ilusi desa", "debug-quest-9", SKColor(red: 0.50, green: 0.85, blue: 0.55, alpha: 1)),
+            ("⛰️ Map Q10: Tidak Ada Jalan Pulang", "Board khusus O-L-I hutan-bukit", "debug-quest-10-map", SKColor(red: 0.90, green: 0.35, blue: 0.35, alpha: 1))
         ]
 
         for (idx, item) in rightQuests.enumerated() {
@@ -286,6 +288,14 @@ extension VillageCartoScene {
             warpToQuest(stage: 8, step: 3)
             return true
         }
+        if actions.contains("debug-quest-9") {
+            warpToQuest(stage: 9)
+            return true
+        }
+        if actions.contains("debug-quest-10-map") {
+            warpToQuest(stage: 10)
+            return true
+        }
         if actions.contains("debug-quest-reset") {
             resetAllQuests()
             return true
@@ -315,6 +325,7 @@ extension VillageCartoScene {
         saveQuest7()
         saveQuest8()
         saveQuest9()
+        saveQuest10()
     }
 
     func setArthurSafePosition(_ target: CGPoint) {
@@ -695,6 +706,85 @@ extension VillageCartoScene {
                 rebuild("Debug In-Game: Quest 8 Fase 3 & 4 (Belakang Rumah Anneth & Party Loadout).")
             }
 
+        case 9:
+            completeAllQuests()
+
+        case 10:
+            var q1 = VillageQuest1Progress()
+            q1.spokeToGrandpa = true; q1.collectedWater = true; q1.spokeToMara = true; q1.rackFixed = true; q1.returnedHome = true
+            quest1 = q1
+
+            var q2 = VillageQuest2Progress()
+            q2.spokeToGrandpa = true; q2.hasBasket = true; q2.metKeneth = true; q2.washedHands = true; q2.sortedSeeds = true; q2.doorWedged = true; q2.completed = true
+            quest2 = q2
+
+            var q3 = VillageQuest3Progress()
+            q3.spokeToRoland = true; q3.fenceChecked = true; q3.completed = true
+            quest3 = q3
+
+            var q4 = VillageQuest4Progress()
+            q4.metAnneth = true; q4.sortedTubers = true; q4.receivedSaltErrand = true; q4.completed = true
+            quest4 = q4
+
+            var q5 = VillageQuest5Progress()
+            q5.minedSalt = true; q5.deliveredSalt = true; q5.heardSeaLegend = true; q5.receivedSilverLeafMission = true; q5.completed = true
+            quest5 = q5
+
+            var q7 = VillageQuest7Progress()
+            q7.spokeToGrandpa = true; q7.woodCollectedCount = 5; q7.hasGatheredWood = true
+            q7.inspectedLandslide = true; q7.foundEliasBook = true; q7.confrontedGrandpa = true; q7.completed = true
+            quest7 = q7
+
+            var q8 = VillageQuest8Progress()
+            q8.secretBaseMetFriends = true
+            q8.convincingAttempted = true
+            q8.convincingFailed = true
+            q8.experiencedFog = true
+            q8.spokeToElderInFog = true
+            q8.annethBackyardMet = true
+            q8.packedKnife = true
+            q8.packedRope = true
+            q8.packedWater = true
+            q8.packedOintment = true
+            q8.packedJournal = true
+            q8.completed = true
+            quest8 = q8
+
+            var q9 = VillageQuest9Progress()
+            q9.departureChoiceMade = true
+            q9.choseToSayGoodbye = false
+            q9.stealthStarted = true
+            q9.stealthCompleted = true
+            q9.metPartyAtBoundary = true
+            q9.inspectedRock = true
+            q9.inspectedBark = true
+            q9.inspectedSoil = true
+            q9.heardForestVoices = true
+            q9.markedTree = true
+            q9.enteredDeepWoods = true
+            q9.completed = true
+            quest9 = q9
+
+            quest10 = VillageQuest10Progress()
+            resetQuest7RuntimeFlags()
+            resetQuest8RuntimeFlags()
+            resetQuest9RuntimeFlags()
+            resetQuest10RuntimeFlags()
+
+            let progress = PrologueStore.shared.progress
+            progress.metBerynAfterHerbal = true
+            progress.hasEliasBook = true
+            progress.hasBook = true
+            progress.boundaryMarked = true
+            progress.storyProgress = max(progress.storyProgress, 13)
+            PrologueStore.shared.save()
+
+            isMap = true
+            layout = VillageTileLayout()
+            saveAllVillageQuests()
+            save()
+            rebuild("Debug Map: Quest 10 dimulai. Susun keping O, L, dan I hutan-bukit.")
+
         default:
             break
         }
@@ -745,7 +835,9 @@ extension VillageCartoScene {
         q8.completed = true
         quest8 = q8
         quest9 = VillageQuest9Progress()
+        quest10 = VillageQuest10Progress()
         resetQuest9RuntimeFlags()
+        resetQuest10RuntimeFlags()
 
         let progress = PrologueStore.shared.progress
         progress.metBerynAfterHerbal = true
@@ -784,9 +876,11 @@ extension VillageCartoScene {
         quest7 = VillageQuest7Progress()
         quest8 = VillageQuest8Progress()
         quest9 = VillageQuest9Progress()
+        quest10 = VillageQuest10Progress()
         resetQuest7RuntimeFlags()
         resetQuest8RuntimeFlags()
         resetQuest9RuntimeFlags()
+        resetQuest10RuntimeFlags()
 
         let progress = PrologueStore.shared.progress
         progress.metBerynAfterHerbal = false
@@ -803,6 +897,6 @@ extension VillageCartoScene {
         ])
         setArthurSafePosition(layout.world(sourcePosition) ?? VillageTileLayout.initial.center)
         save()
-        rebuild("Debug In-Game: Seluruh progres Quest 1 - 9 telah di-reset ke awal mula.")
+        rebuild("Debug In-Game: Seluruh progres Quest 1 - 10 telah di-reset ke awal mula.")
     }
 }

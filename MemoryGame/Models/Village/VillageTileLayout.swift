@@ -293,6 +293,14 @@ struct VillageTileLayout {
         placements.removeAll { $0.id == id }
         return true
     }
+    mutating func replaceAll(placements newPlacements: [Placement], buildings newBuildings: [BuildingPlacement] = []) {
+        guard Self.valid(newPlacements),
+              Self.validBuildings(newBuildings, pieces: newPlacements) else {
+            return
+        }
+        placements = newPlacements
+        buildingPlacements = newBuildings
+    }
     mutating func solveAllPieces() {
         // Posisi debug dibuat renggang supaya seluruh bentuk tidak
         // saling bertumpuk walau orientasi awalnya berbeda-beda.
@@ -471,8 +479,30 @@ struct VillageTileLayout {
             let q = CGPoint(x:point.x+delta.x,y:point.y+delta.y)
             guard let neighbor = placement(at:q) else { return false }
             if center.id != neighbor.id && !Self.matching(center, neighbor) { return false }
+            guard let biome = Self.biome(at: q, in: neighbor),
+                  biome != .water,
+                  biome != .hillSoil else {
+                return false
+            }
             return true
         }
+    }
+    private static func biome(at point: CGPoint, in piece: Placement) -> BiomeType? {
+        let unit = VillageCartoMap.subcellSide
+        let local = rotated(
+            CGPoint(x: point.x - piece.center.x, y: point.y - piece.center.y),
+            turns: -piece.turns
+        )
+        let origin = sourceOrigin(piece.id)
+        let sourceX = Int(floor((origin.x + side / 2 + local.x) / unit))
+        let sourceY = Int(floor((origin.y + side / 2 + local.y) / unit))
+        guard sourceX >= 0,
+              sourceY >= 0,
+              sourceX < VillageCartoMap.columns * VillageCartoMap.subdivisions,
+              sourceY < VillageCartoMap.rows * VillageCartoMap.subdivisions else {
+            return nil
+        }
+        return VillageCartoMap.biomeForSubcell(.init(x: sourceX, y: sourceY))
     }
     func moved(from start: CGPoint, by delta: CGVector) -> CGPoint {
         var p = start

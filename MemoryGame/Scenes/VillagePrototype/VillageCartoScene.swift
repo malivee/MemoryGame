@@ -482,6 +482,7 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         mask.fillColor = .white; mask.strokeColor = .clear; viewport.maskNode = mask
         ghost?.removeFromParent(); ghost = nil; hideBuildingGrid(); inventoryHits = []; buildingInventoryHits = []
         actor.removeFromParent(); world.removeAllChildren(); hud.removeAllChildren(); backdrop.removeAllChildren()
+        prepareVillageQuestBoardIfNeeded()
         // Motif garis air di ruang kosong, tetap ringan karena hanya node vektor.
         if isMap {
             for row in 0..<8 { for col in 0..<14 {
@@ -1036,6 +1037,11 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             hud.childNode(withName: "quest9CompletionCard")?.removeFromParent()
             return
         }
+        if actions.contains("quest10ChapterCompleteBadge") {
+            hud.childNode(withName: "quest10ChapterCompleteBadge")?.removeFromParent()
+            return
+        }
+        if handleQuest10ChoiceTap(actions: actions) { return }
         if handleQuest9ChoiceTap(actions: actions) { return }
         if handleQuestChoiceTap(actions: actions) { return }
         if handleQuest8ChoiceTap(actions: actions) { return }
@@ -1277,5 +1283,6 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         checkQuest7Proximity()
         checkQuest8Proximity()
         updateQuest9Gameplay(dt: dt)
+        updateQuest10Gameplay(dt: dt)
     }
 }

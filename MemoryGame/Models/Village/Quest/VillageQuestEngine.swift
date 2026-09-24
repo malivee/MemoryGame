@@ -9,10 +9,21 @@ enum VillageQuestEngine {
         if !snapshot.quest5.completed { return .quest5 }
         if !snapshot.quest7.completed { return .quest7 }
         if !snapshot.quest8.completed { return .quest8 }
-        return .quest9
+        if !snapshot.quest9.completed { return .quest9 }
+        return .quest10
     }
 
     static func unlocks(for snapshot: VillageQuestSnapshot) -> VillageQuestUnlocks {
+        if snapshot.quest9.completed {
+            let pieces = Set(VillageQuestCatalog.quest10PieceOrder)
+            return VillageQuestUnlocks(
+                pieceOrder: VillageQuestCatalog.quest10PieceOrder,
+                unlockedPieceIDs: pieces,
+                unlockedBuildingIDs: [],
+                pieceRoles: [:]
+            )
+        }
+
         var pieces: Set<Int> = [VillageQuestCatalog.PieceID.first]
         var buildings: Set<String> = [
             VillageQuestCatalog.BuildingID.arthurHouse,
@@ -92,6 +103,8 @@ enum VillageQuestEngine {
             return quest8Objective(for: snapshot)
         case .quest9:
             return quest9Objective(for: snapshot)
+        case .quest10:
+            return quest10Objective(for: snapshot)
         }
     }
 
@@ -237,6 +250,19 @@ enum VillageQuestEngine {
         if quest.metPartyAtBoundary { return "Gunakan Investigate Mode: cari batu yang tidak pada tempatnya di lokasi longsor." }
         if quest.stealthStarted { return "Menyelinap ke titik kumpul tanpa masuk ke area pandang Kakek dan warga." }
         return "Keluar rumah saat fajar. Tentukan apakah Arthur akan pamit atau pergi diam-diam."
+    }
+
+    static func quest10Objective(for snapshot: VillageQuestSnapshot) -> String {
+        let quest = snapshot.quest10
+        if quest.completed { return "Quest 10 selesai: tidak ada jalan pulang. Rombongan masuk lebih dalam ke Hutan Dalam." }
+        if quest.rolandPulledArthur { return "Roland menarik Arthur lepas. Terus kabur ke celah hutan sebelum The Hollow menyusul lagi." }
+        if quest.routeChoiceMade { return "The Hollow mengejar. Gunakan jalur hasil puzzle untuk mencapai celah hutan." }
+        if quest.sawIllusion { return "Pilih reaksi Arthur saat jalan pulang menghilang." }
+        let placedQuest10Pieces = Set(VillageQuestCatalog.quest10PieceOrder).intersection(snapshot.placedPieceIDs).count
+        if placedQuest10Pieces < VillageQuestCatalog.quest10PieceOrder.count {
+            return "Semua tile lama hilang. Susun keping O, L, dan I hutan-bukit (\(placedQuest10Pieces)/3), lalu Jelajahi."
+        }
+        return "Jelajahi peta hutan ilusi. Tidak ada rumah, hanya satu celah jalan."
     }
 }
 

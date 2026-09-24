@@ -222,6 +222,31 @@ struct VillageQuest9Progress: Codable {
     }
 }
 
+struct VillageQuest10Progress: Codable {
+    static let saveKey = "village.carto.quest10.v1"
+
+    var boardPrepared = false
+    var sawIllusion = false
+    var routeChoiceMade = false
+    var choseForestGap = false
+    var rolandPulledArthur = false
+    var chaseCompleted = false
+    var completed = false
+
+    static func load(defaults: UserDefaults = .standard) -> Self {
+        guard let data = defaults.data(forKey: saveKey),
+              let saved = try? JSONDecoder().decode(Self.self, from: data) else {
+            return Self()
+        }
+        return saved
+    }
+
+    func save(defaults: UserDefaults = .standard) {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        defaults.set(data, forKey: Self.saveKey)
+    }
+}
+
 enum VillageQuestStage: Int, CaseIterable {
     case quest1 = 1
     case quest2
@@ -231,6 +256,7 @@ enum VillageQuestStage: Int, CaseIterable {
     case quest7
     case quest8
     case quest9
+    case quest10
 }
 
 struct VillageQuestSnapshot {
@@ -242,6 +268,7 @@ struct VillageQuestSnapshot {
     let quest7: VillageQuest7Progress
     let quest8: VillageQuest8Progress
     let quest9: VillageQuest9Progress
+    let quest10: VillageQuest10Progress
     let placedPieceIDs: Set<Int>
     let quest6RewardUnlocked: Bool
     let placedBuildingIDs: Set<String>
@@ -274,6 +301,7 @@ struct VillageQuestUnlocks {
 
 enum VillageQuestCatalog {
     static let pieceOrder = [26, 5, 20, 38, 6, 12, 8]
+    static let quest10PieceOrder = [0, 1, 3]
 
     enum PieceID {
         static let first = 26
@@ -284,6 +312,9 @@ enum VillageQuestCatalog {
         static let rockSaltMinePath = 6
         static let rockSaltPath = 12
         static let hollowForestReward = 8
+        static let noWayHomeO = 0
+        static let noWayHomeL = 1
+        static let noWayHomeI = 3
     }
 
     enum BuildingID {

@@ -164,6 +164,15 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
                     points: [center, bottomRight, topRight],
                     color: biomeColor(diagonal.secondary)
                 ))
+            case .centeredLeftTriangle:
+                node.addChild(triangleNode(
+                    points: [bottomLeft, bottomRight, topRight, topLeft],
+                    color: biomeColor(diagonal.primary)
+                ))
+                node.addChild(triangleNode(
+                    points: [center, topLeft, bottomLeft],
+                    color: biomeColor(diagonal.secondary)
+                ))
             case .centeredTopTriangle:
                 node.addChild(triangleNode(
                     points: [bottomLeft, bottomRight, topRight, topLeft],

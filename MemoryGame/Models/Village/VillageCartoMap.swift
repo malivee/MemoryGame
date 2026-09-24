@@ -26,6 +26,7 @@ enum VillageCartoMap {
     enum TerrainSplit: Equatable {
         case diagonal
         case centeredRightTriangle
+        case centeredLeftTriangle
         case centeredTopTriangle
         case lowerRightTriangle
     }
@@ -244,9 +245,10 @@ enum VillageCartoMap {
     static func terrainSplit(for cell: Cell) -> TerrainSplit {
         switch cell {
         case Cell(x: 11, y: 9),
-             Cell(x: 8, y: 8), Cell(x: 8, y: 7), Cell(x: 8, y: 6),
-             Cell(x: 10, y: 5):
+             Cell(x: 8, y: 8), Cell(x: 8, y: 7), Cell(x: 8, y: 6):
             return .centeredRightTriangle
+        case Cell(x: 10, y: 5):
+            return .centeredLeftTriangle
         case Cell(x: 10, y: 8):
             return .lowerRightTriangle
         // Keping 4 diputar 180° saat ditampilkan. Segitiga atas pada sumber
@@ -308,6 +310,10 @@ enum VillageCartoMap {
             let center = CGFloat(subdivisions) / 2
             let depth = localX - center
             return depth >= 0 && abs(localY - center) <= depth ? diagonal.secondary : diagonal.primary
+        case .centeredLeftTriangle:
+            let center = CGFloat(subdivisions) / 2
+            let depth = center - localX
+            return depth >= 0 && abs(localY - center) <= depth ? diagonal.secondary : diagonal.primary
         case .centeredTopTriangle:
             let center = CGFloat(subdivisions) / 2
             let depth = localY - center
@@ -343,6 +349,8 @@ enum VillageCartoMap {
         switch terrainSplit(for: cell) {
         case .centeredRightTriangle:
             return normalizedEdge == 0 ? diagonal.secondary : diagonal.primary
+        case .centeredLeftTriangle:
+            return normalizedEdge == 2 ? diagonal.secondary : diagonal.primary
         case .centeredTopTriangle:
             return normalizedEdge == 1 ? diagonal.secondary : diagonal.primary
         case .lowerRightTriangle:

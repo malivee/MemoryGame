@@ -122,15 +122,43 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         }
     }
 
-    private func triangleNode(points: [CGPoint], color: SKColor) -> SKShapeNode {
+    private func trianglePath(points: [CGPoint]) -> CGPath {
         let path = CGMutablePath()
         path.move(to: points[0])
         points.dropFirst().forEach { path.addLine(to: $0) }
         path.closeSubpath()
-        let node = SKShapeNode(path: path)
-        node.fillColor = color
-        node.strokeColor = .clear
-        return node
+        return path
+    }
+
+    private func triangleNode(points: [CGPoint], biome: BiomeType) -> SKNode {
+        let path = trianglePath(points: points)
+        guard let assetName = biome.backgroundAssetName else {
+            let node = SKShapeNode(path: path)
+            node.fillColor = biomeColor(biome)
+            node.strokeColor = .clear
+            return node
+        }
+
+        let bounds = path.boundingBoxOfPath
+        let texture = SKTexture(imageNamed: assetName)
+
+        let mask = SKShapeNode(path: path)
+        mask.fillColor = .white
+        mask.strokeColor = .clear
+
+        let sprite = SKSpriteNode(texture: texture)
+        sprite.position = CGPoint(x: bounds.midX, y: bounds.midY)
+        sprite.size = CGSize(
+            width: max(bounds.width, VillageCartoMap.side),
+            height: max(bounds.height, VillageCartoMap.side)
+        )
+        sprite.color = biomeColor(biome)
+        sprite.colorBlendFactor = 0.56
+
+        let crop = SKCropNode()
+        crop.maskNode = mask
+        crop.addChild(sprite)
+        return crop
     }
 
     // Map editing shows the puzzle outline; exploration draws clean map cells without cutout seams.
@@ -153,43 +181,43 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             let topRight = CGPoint(x: center.x + h, y: center.y + h)
             switch VillageCartoMap.terrainSplit(for: cell) {
             case .diagonal:
-                node.addChild(triangleNode(points: [bottomLeft, bottomRight, topLeft], color: biomeColor(diagonal.primary)))
-                node.addChild(triangleNode(points: [topRight, topLeft, bottomRight], color: biomeColor(diagonal.secondary)))
+                node.addChild(triangleNode(points: [bottomLeft, bottomRight, topLeft], biome: diagonal.primary))
+                node.addChild(triangleNode(points: [topRight, topLeft, bottomRight], biome: diagonal.secondary))
             case .centeredRightTriangle:
                 node.addChild(triangleNode(
                     points: [bottomLeft, bottomRight, topRight, topLeft],
-                    color: biomeColor(diagonal.primary)
+                    biome: diagonal.primary
                 ))
                 node.addChild(triangleNode(
                     points: [center, bottomRight, topRight],
-                    color: biomeColor(diagonal.secondary)
+                    biome: diagonal.secondary
                 ))
             case .centeredLeftTriangle:
                 node.addChild(triangleNode(
                     points: [bottomLeft, bottomRight, topRight, topLeft],
-                    color: biomeColor(diagonal.primary)
+                    biome: diagonal.primary
                 ))
                 node.addChild(triangleNode(
                     points: [center, topLeft, bottomLeft],
-                    color: biomeColor(diagonal.secondary)
+                    biome: diagonal.secondary
                 ))
             case .centeredTopTriangle:
                 node.addChild(triangleNode(
                     points: [bottomLeft, bottomRight, topRight, topLeft],
-                    color: biomeColor(diagonal.primary)
+                    biome: diagonal.primary
                 ))
                 node.addChild(triangleNode(
                     points: [topLeft, topRight, center],
-                    color: biomeColor(diagonal.secondary)
+                    biome: diagonal.secondary
                 ))
             case .lowerRightTriangle:
                 node.addChild(triangleNode(
                     points: [bottomLeft, bottomRight, topRight, topLeft],
-                    color: biomeColor(diagonal.primary)
+                    biome: diagonal.primary
                 ))
                 node.addChild(triangleNode(
                     points: [bottomLeft, bottomRight, topRight],
-                    color: biomeColor(diagonal.secondary)
+                    biome: diagonal.secondary
                 ))
             }
 

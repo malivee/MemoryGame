@@ -9,7 +9,7 @@ struct VillageQuestDialogueLine {
 }
 
 struct VillageQuest1Progress: Codable {
-    static let saveKey = "village.carto.quest1.v3"
+    static let saveKey = "village.carto.quest1.v4"
 
     var spokeToGrandpa = false
     var collectedWater = false
@@ -49,14 +49,17 @@ extension VillageCartoScene {
         set { VillageQuest1Runtime.shared.activeMinigame = newValue }
     }
 
-    // Quest 1 dimulai dengan L dan Z. Keping 3 dan 4 tersedia sebagai
-    // prototipe editor tanpa mengaktifkan Quest 2.
-    var quest1PieceOrder: [Int] { [26, 5, 20, 38] }
-    var quest1UnlockedPieceIDs: Set<Int> { [26, 5, 20, 38] }
+    // Quest 0 dimulai dengan satu keping awal, Rumah Arthur, dan Sumur.
+    // Quest 1 membuka keping kedua bersama Rumah Bu Mara.
+    var quest1PieceOrder: [Int] { [26, 5] }
+    var quest1UnlockedPieceIDs: Set<Int> {
+        var result: Set<Int> = [26]
+        if quest1.collectedWater { result.insert(5) }
+        return result
+    }
 
     var quest1UnlockedBuildingIDs: Set<String> {
-        var result: Set<String> = ["arthur-house"]
-        if quest1.spokeToGrandpa { result.insert("village-well") }
+        var result: Set<String> = ["arthur-house", "village-well"]
         if quest1.collectedWater { result.insert("bu-mara-house") }
         return result
     }
@@ -72,16 +75,19 @@ extension VillageCartoScene {
         if quest1.collectedWater {
             return layout.buildingPlacements.contains(where: { $0.id == "bu-mara-house" })
                 ? "Temui Bu Mara di depan rumahnya."
-                : "Tempatkan Rumah Bu Mara (6x6) di area kuning."
+                : "Keping kedua dan Rumah Bu Mara terbuka. Tempatkan Rumah Bu Mara (6x6) di area kuning."
         }
         if quest1.spokeToGrandpa {
             return layout.buildingPlacements.contains(where: { $0.id == "village-well" })
                 ? "Dekati Sumur dan ambil air."
-                : "Sumur terbuka. Tempatkan Sumur (3x3) pada susunan awal L dan Z."
+                : "Tempatkan Sumur (3x3) di area kuning keping awal."
         }
-        return layout.buildingPlacements.contains(where: { $0.id == "arthur-house" })
-            ? "Susun keping awal L dan Z, lalu Jelajahi dan bicara dengan Kakek di Rumah Arthur."
-            : "Tempatkan Rumah Arthur (6x9) di area kuning pada keping L, lalu susun L dan Z."
+        let hasArthur = layout.buildingPlacements.contains(where: { $0.id == "arthur-house" })
+        let hasWell = layout.buildingPlacements.contains(where: { $0.id == "village-well" })
+        if hasArthur && hasWell {
+            return "Jelajahi dan bicara dengan Kakek di Rumah Arthur."
+        }
+        return "Tempatkan Rumah Arthur dan Sumur di area kuning keping awal."
     }
 
     func presentQuestDialogue(
@@ -368,7 +374,7 @@ extension VillageCartoScene {
                             guard let self else { return }
                             self.quest1.spokeToGrandpa = true
                             self.saveQuest1()
-                            self.rebuild("Sumur terbuka. Tempatkan Sumur pada susunan L dan Z.")
+                            self.rebuild("Dekati Sumur dan ambil air.")
                         }
                     } else {
                         self.status.text = self.quest1Objective

@@ -213,28 +213,21 @@ enum VillageCartoMap {
     // Pada keping 2, kotak kanan sepenuhnya hijau muda. Warnanya masuk ke
     // kotak tengah sebagai segitiga sama kaki sejauh 3/6 subgrid. Kotak bawah
     // memakai diagonal kebalikan agar hijau tua berada di kanan bawah.
-    // Keping 5 memakai irisan kanan seperempat untuk village soil.
-    // Keping T diputar 180° di storyboard, jadi pojok kiri-atas sel batang
-    // sumbernya tampil sebagai pojok kanan-bawah.
+    // Keping 5 dan keping T memakai segitiga beralas satu sisi penuh.
     static func terrainSplit(for cell: Cell) -> TerrainSplit {
         switch cell {
-//<<<<<<< HEAD
-//        case Cell(x: 11, y: 9), Cell(x: 8, y: 8), Cell(x: 8, y: 7), Cell(x: 8, y: 6):
-//            return .centeredRightTriangle
-//        case Cell(x: 10, y: 5):
-//            return .centeredRightTriangle
-//        case Cell(x: 10, y: 8):
-//            return .lowerRightTriangle
-//        default:
-//            return .diagonal
-//=======
-        case Cell(x: 11, y: 9): return .centeredRightTriangle
-        case Cell(x: 10, y: 8): return .lowerRightTriangle
+        case Cell(x: 11, y: 9),
+             Cell(x: 8, y: 8), Cell(x: 8, y: 7), Cell(x: 8, y: 6),
+             Cell(x: 10, y: 5):
+            return .centeredRightTriangle
+        case Cell(x: 10, y: 8):
+            return .lowerRightTriangle
         // Keping 4 diputar 180° saat ditampilkan. Segitiga atas pada sumber
         // menjadi segitiga hijau tua beralas di bawah pada tampilan pemain.
-        case Cell(x: 15, y: 2): return .centeredTopTriangle
-        default: return .diagonal
-//>>>>>>> Bur
+        case Cell(x: 15, y: 2):
+            return .centeredTopTriangle
+        default:
+            return .diagonal
         }
     }
 

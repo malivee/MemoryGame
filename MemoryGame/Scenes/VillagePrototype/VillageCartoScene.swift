@@ -5,7 +5,7 @@ import UIKit
 
 final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
     var onExit: (() -> Void)?
-    private static let saveKey = "village.carto.layout.v6"
+    private static let saveKey = "village.carto.layout.v7"
     var layout = VillageTileLayout(data: UserDefaults.standard.data(forKey: saveKey))
     let world = SKNode(), hud = SKNode(), backdrop = SKNode()
     private let viewport = SKCropNode()
@@ -813,7 +813,7 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             if actions.contains("remove") { returnSelected(); return }
             if actions.contains("prev") || actions.contains("next") { page = (page+(actions.contains("next") ? 1 : pages-1))%pages; rebuild(); return }
             if actions.contains("building-prev") || actions.contains("building-next") {
-                let count = max(1, Int(ceil(Double(layout.buildingInventory.count) / Double(buildingPageSize))))
+                let count = max(1, Int(ceil(Double(unlockedBuildingInventory.count) / Double(buildingPageSize))))
                 buildingPage = (buildingPage + (actions.contains("building-next") ? 1 : count - 1)) % count
                 rebuild()
                 return

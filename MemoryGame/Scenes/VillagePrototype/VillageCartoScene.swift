@@ -768,6 +768,7 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         }
         guard activeTouch == nil, stickTouch == nil, let touch = touches.first else { return }
         let p = touch.location(in:hud), actions = names(at:p)
+        if handleQuestChoiceTap(actions: actions) { return }
         if actions.contains("exit") { stopInput(); onExit?(); return }
         if actions.contains("debugSolveCarto") {
             stopInput()

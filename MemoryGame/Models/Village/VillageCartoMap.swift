@@ -92,6 +92,24 @@ enum VillageCartoMap {
             explorationWidth: 3,
             explorationHeight: 5,
             kind: .barn
+        ),
+        .init(
+            id: "roland-pen",
+            title: "Kandang Roland",
+            width: 12,
+            height: 9,
+            explorationWidth: 4,
+            explorationHeight: 3,
+            kind: .pen
+        ),
+        .init(
+            id: "anneth-house",
+            title: "Rumah Anneth",
+            width: 6,
+            height: 9,
+            explorationWidth: 2,
+            explorationHeight: 3,
+            kind: .house
         )
     ]
 

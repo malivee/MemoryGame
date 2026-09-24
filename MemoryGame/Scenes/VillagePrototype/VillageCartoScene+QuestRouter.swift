@@ -12,6 +12,7 @@ extension VillageCartoScene {
             quest5: quest5,
             quest7: quest7,
             quest8: quest8,
+            quest9: quest9,
             placedPieceIDs: Set(layout.placements.map(\.id)),
             quest6RewardUnlocked: PrologueStore.shared.progress.metBerynAfterHerbal,
             placedBuildingIDs: Set(layout.buildingPlacements.map(\.id))
@@ -29,7 +30,10 @@ extension VillageCartoScene {
     var villageUnlockedBuildingIDs: Set<String> { villageQuestUnlocks.unlockedBuildingIDs }
 
     var villageQuestObjective: String {
-        VillageQuestEngine.objective(for: villageQuestSnapshot)
+        if quest5.completed && !PrologueStore.shared.progress.metBerynAfterHerbal {
+            return quest6VillageObjective
+        }
+        return VillageQuestEngine.objective(for: villageQuestSnapshot)
     }
 
     func renderVillageQuestWorld() {
@@ -43,10 +47,14 @@ extension VillageCartoScene {
             renderQuest4World()
         } else if !quest5.completed {
             renderQuest5World()
+        } else if !PrologueStore.shared.progress.metBerynAfterHerbal {
+            renderQuest6VillageWorld()
         } else if !quest7.completed {
             renderQuest7World()
-        } else {
+        } else if !quest8.completed {
             renderQuest8World()
+        } else {
+            renderQuest9World()
         }
     }
 
@@ -56,7 +64,11 @@ extension VillageCartoScene {
         if !quest3.completed { return handleQuest3Interaction(at: point) }
         if !quest4.completed { return handleQuest4Interaction(at: point) }
         if !quest5.completed { return handleQuest5Interaction(at: point) }
+        if !PrologueStore.shared.progress.metBerynAfterHerbal {
+            return handleQuest6VillageInteraction(at: point)
+        }
         if !quest7.completed { return handleQuest7Interaction(at: point) }
-        return handleQuest8Interaction(at: point)
+        if !quest8.completed { return handleQuest8Interaction(at: point) }
+        return handleQuest9Interaction(at: point)
     }
 }

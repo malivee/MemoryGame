@@ -192,6 +192,36 @@ struct VillageQuest8Progress: Codable {
     }
 }
 
+struct VillageQuest9Progress: Codable {
+    static let saveKey = "village.carto.quest9.v1"
+
+    var departureChoiceMade = false
+    var choseToSayGoodbye = false
+    var stealthStarted = false
+    var stealthCompleted = false
+    var metPartyAtBoundary = false
+    var inspectedRock = false
+    var inspectedBark = false
+    var inspectedSoil = false
+    var heardForestVoices = false
+    var markedTree = false
+    var enteredDeepWoods = false
+    var completed = false
+
+    static func load(defaults: UserDefaults = .standard) -> Self {
+        guard let data = defaults.data(forKey: saveKey),
+              let saved = try? JSONDecoder().decode(Self.self, from: data) else {
+            return Self()
+        }
+        return saved
+    }
+
+    func save(defaults: UserDefaults = .standard) {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        defaults.set(data, forKey: Self.saveKey)
+    }
+}
+
 enum VillageQuestStage: Int, CaseIterable {
     case quest1 = 1
     case quest2
@@ -200,6 +230,7 @@ enum VillageQuestStage: Int, CaseIterable {
     case quest5
     case quest7
     case quest8
+    case quest9
 }
 
 struct VillageQuestSnapshot {
@@ -210,6 +241,7 @@ struct VillageQuestSnapshot {
     let quest5: VillageQuest5Progress
     let quest7: VillageQuest7Progress
     let quest8: VillageQuest8Progress
+    let quest9: VillageQuest9Progress
     let placedPieceIDs: Set<Int>
     let quest6RewardUnlocked: Bool
     let placedBuildingIDs: Set<String>

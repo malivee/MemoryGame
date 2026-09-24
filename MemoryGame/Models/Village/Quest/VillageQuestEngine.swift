@@ -8,7 +8,8 @@ enum VillageQuestEngine {
         if !snapshot.quest4.completed { return .quest4 }
         if !snapshot.quest5.completed { return .quest5 }
         if !snapshot.quest7.completed { return .quest7 }
-        return .quest8
+        if !snapshot.quest8.completed { return .quest8 }
+        return .quest9
     }
 
     static func unlocks(for snapshot: VillageQuestSnapshot) -> VillageQuestUnlocks {
@@ -89,6 +90,8 @@ enum VillageQuestEngine {
             return quest7Objective(for: snapshot)
         case .quest8:
             return quest8Objective(for: snapshot)
+        case .quest9:
+            return quest9Objective(for: snapshot)
         }
     }
 
@@ -222,6 +225,18 @@ enum VillageQuestEngine {
             return "Bicarakan Buku Elias dan yakinkan teman-teman di Gudang Kosong."
         }
         return "Temui Roland, Keneth, dan Anneth di Gudang Kosong dekat sungai (Markas Rahasia)."
+    }
+
+    static func quest9Objective(for snapshot: VillageQuestSnapshot) -> String {
+        let quest = snapshot.quest9
+        if quest.completed { return "Quest 9 selesai: rombongan terperangkap di dalam ilusi Hutan Berkabut." }
+        if quest.markedTree { return "Masuki Hutan Berkabut. Tetap dekat dengan tanda Anneth dan jangan lebih dari dua puluh langkah." }
+        if quest.inspectedSoil && !quest.heardForestVoices { return "Waktu pencarian habis. Dengarkan suara dari kedalaman hutan." }
+        if quest.inspectedBark { return "Periksa bekas tanah basah di bawah akar pohon." }
+        if quest.inspectedRock { return "Cari dan periksa sisa kulit kayu di dekat akar." }
+        if quest.metPartyAtBoundary { return "Gunakan Investigate Mode: cari batu yang tidak pada tempatnya di lokasi longsor." }
+        if quest.stealthStarted { return "Menyelinap ke titik kumpul tanpa masuk ke area pandang Kakek dan warga." }
+        return "Keluar rumah saat fajar. Tentukan apakah Arthur akan pamit atau pergi diam-diam."
     }
 }
 

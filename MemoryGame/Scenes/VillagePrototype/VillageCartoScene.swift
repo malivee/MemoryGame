@@ -1032,6 +1032,11 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             hud.childNode(withName: "quest8UnlockCard")?.removeFromParent()
             return
         }
+        if actions.contains("quest9CompletionCard") {
+            hud.childNode(withName: "quest9CompletionCard")?.removeFromParent()
+            return
+        }
+        if handleQuest9ChoiceTap(actions: actions) { return }
         if handleQuestChoiceTap(actions: actions) { return }
         if handleQuest8ChoiceTap(actions: actions) { return }
         if handleQuest8HUDTap(actions: actions) { return }
@@ -1271,5 +1276,6 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         if !cameraTransitioning { updateCamera() }
         checkQuest7Proximity()
         checkQuest8Proximity()
+        updateQuest9Gameplay(dt: dt)
     }
 }

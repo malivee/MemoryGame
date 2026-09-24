@@ -52,12 +52,12 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
     var questDialogueCompletion: (() -> Void)?
 
     private var available: [Int] {
-        quest1PieceOrder.filter {
-            quest1UnlockedPieceIDs.contains($0) && layout.inventory.contains($0)
+        villageQuestPieceOrder.filter {
+            villageUnlockedPieceIDs.contains($0) && layout.inventory.contains($0)
         }
     }
     private var unlockedBuildingInventory: [VillageCartoMap.Building] {
-        layout.buildingInventory.filter { quest1UnlockedBuildingIDs.contains($0.id) }
+        layout.buildingInventory.filter { villageUnlockedBuildingIDs.contains($0.id) }
     }
     private let pageSize = 4
     private let buildingPageSize = 2
@@ -394,7 +394,7 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             world.addChild(node)
         }
         if !isMap {
-            renderQuest1World()
+            renderVillageQuestWorld()
         }
         // Keping Arthur boleh dikembalikan. Cari tempat aman di keping tersisa.
         if layout.world(sourcePosition) == nil {
@@ -503,7 +503,7 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         }
         status.removeFromParent(); status.fontSize = 11; status.fontColor = cream; status.verticalAlignmentMode = .center
         status.position = CGPoint(x:size.width/2,y:19); hud.addChild(status)
-        status.text = message ?? quest1Objective
+        status.text = message ?? villageQuestObjective
         updateCamera()
     }
 
@@ -862,7 +862,7 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
                 updateStick(touch)
             } else {
                 let destination = touch.location(in: world)
-                if handleQuest1Interaction(at: destination) { return }
+                if handleVillageQuestInteraction(at: destination) { return }
                 route = layout.route(from: actor.position, to: destination)
                 if route.isEmpty { status.text = "Tidak ada jalan ke sana. Coba susun kembali kepingnya." }
             }

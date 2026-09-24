@@ -83,6 +83,15 @@ enum VillageCartoMap {
             explorationWidth: 2,
             explorationHeight: 2,
             kind: .house
+        ),
+        .init(
+            id: "village-barn",
+            title: "Lumbung Desa",
+            width: 9,
+            height: 15,
+            explorationWidth: 3,
+            explorationHeight: 5,
+            kind: .barn
         )
     ]
 

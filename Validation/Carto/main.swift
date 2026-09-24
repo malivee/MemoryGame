@@ -334,11 +334,12 @@ check(VillageCartoMap.biomeForSubcell(crossedSubcell) == .villageSoil,
 check(!VillageCartoMap.canPlaceObject(onSubcell: crossedSubcell),
       "A subcell cut by the yellow-green boundary cannot support a building")
 
-check(VillageCartoMap.buildings.count == 3,
-      "Arthur's house, the well, and Bu Mara's house are available")
+check(VillageCartoMap.buildings.count == 4,
+      "Arthur's house, the well, Bu Mara's house, and the barn are available")
 let house = VillageCartoMap.buildings[0]
 let well = VillageCartoMap.buildings[1]
 let buMaraHouse = VillageCartoMap.buildings[2]
+let barn = VillageCartoMap.buildings[3]
 check(house.id == "arthur-house" && house.title == "Rumah Arthur" &&
       house.width == 6 && house.height == 9 &&
       house.explorationWidth == 2 && house.explorationHeight == 3,
@@ -351,13 +352,23 @@ check(buMaraHouse.id == "bu-mara-house" && buMaraHouse.title == "Rumah Bu Mara" 
       buMaraHouse.width == 6 && buMaraHouse.height == 6 &&
       buMaraHouse.explorationWidth == 2 && buMaraHouse.explorationHeight == 2,
       "Bu Mara's house is 6x6 on the map and 2x2 in exploration")
+check(barn.id == "village-barn" && barn.title == "Lumbung Desa" &&
+      barn.width == 9 && barn.height == 15 &&
+      barn.explorationWidth == 3 && barn.explorationHeight == 5,
+      "The barn is 9 wide x 15 high on the map and 3x5 in exploration")
 
 var validSitesByBuilding: [String: [(Int, Int)]] = [:]
+var questTwoLayout = VillageTileLayout()
+check(questTwoLayout.place(id: 5, column: 7, row: 5, turns: 0),
+      "Quest 2 can place the second piece")
+check(questTwoLayout.place(id: 20, column: 8, row: 6, turns: 0),
+      "Quest 2 can place its unlocked Z piece")
 for building in VillageCartoMap.buildings {
+    let placementLayout = building.id == "village-barn" ? questTwoLayout : assembled
     var sites: [(Int, Int)] = []
     for row in 0..<(VillageTileLayout.rows * VillageCartoMap.subdivisions) {
         for column in 0..<(VillageTileLayout.columns * VillageCartoMap.subdivisions) {
-            if assembled.canPlaceBuilding(id:building.id,subColumn:column,subRow:row) {
+            if placementLayout.canPlaceBuilding(id:building.id,subColumn:column,subRow:row) {
                 sites.append((column, row))
             }
         }
@@ -403,4 +414,4 @@ if let (houseSite, wellSite) = adjacentPair {
     check(touching.placeBuilding(id: "village-well", subColumn: wellSite.0, subRow: wellSite.1),
           "Buildings may touch exactly without a forced gap")
 }
-print("PASS: \(mask.count) outlined-zone subcells; \(allowedCount) rotated valid and \(rejectedCount) invalid checks; three scaled buildings, touching edges, and strict yellow placement")
+print("PASS: \(mask.count) outlined-zone subcells; \(allowedCount) rotated valid and \(rejectedCount) invalid checks; four scaled buildings, touching edges, and strict yellow placement")

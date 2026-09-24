@@ -1,29 +1,6 @@
 // Quest 3: Suara Pelindung - Arthur mencari Roland di peternakan.
 import SpriteKit
 
-struct VillageQuest3Progress: Codable {
-    static let saveKey = "village.carto.quest3.v1"
-
-    var spokeToRoland = false
-    var promisedRoland = false
-    var stayedSilent = false
-    var fenceChecked = false
-    var completed = false
-
-    static func load(defaults: UserDefaults = .standard) -> Self {
-        guard let data = defaults.data(forKey: saveKey),
-              let saved = try? JSONDecoder().decode(Self.self, from: data) else {
-            return Self()
-        }
-        return saved
-    }
-
-    func save(defaults: UserDefaults = .standard) {
-        guard let data = try? JSONEncoder().encode(self) else { return }
-        defaults.set(data, forKey: Self.saveKey)
-    }
-}
-
 private final class VillageQuest3Runtime {
     static let shared = VillageQuest3Runtime()
 
@@ -44,12 +21,7 @@ extension VillageCartoScene {
     }
 
     var quest3Objective: String {
-        if quest3.completed { return "Quest 3 selesai: keping Rumah Anneth telah terbuka." }
-        if quest3.fenceChecked { return "Selesaikan percakapan dengan Roland." }
-        if quest3.spokeToRoland { return "Ketuk pagar kandang untuk membantu Roland mengecek tiangnya." }
-        return layout.buildingPlacements.contains(where: { $0.id == "roland-pen" })
-            ? "Jelajahi dan bicara dengan Roland di Kandang."
-            : "Tempatkan Kandang Roland (6x6), lalu Jelajahi."
+        VillageQuestEngine.quest3Objective(for: villageQuestSnapshot)
     }
 
     func saveQuest3() {

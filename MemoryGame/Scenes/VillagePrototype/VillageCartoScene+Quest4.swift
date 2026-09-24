@@ -1,28 +1,6 @@
 // Quest 4: Sang Perencana - Arthur membantu Anneth dan menerima misi rock salt.
 import SpriteKit
 
-struct VillageQuest4Progress: Codable {
-    static let saveKey = "village.carto.quest4.v1"
-
-    var metAnneth = false
-    var sortedTubers = false
-    var receivedSaltErrand = false
-    var completed = false
-
-    static func load(defaults: UserDefaults = .standard) -> Self {
-        guard let data = defaults.data(forKey: saveKey),
-              let saved = try? JSONDecoder().decode(Self.self, from: data) else {
-            return Self()
-        }
-        return saved
-    }
-
-    func save(defaults: UserDefaults = .standard) {
-        guard let data = try? JSONEncoder().encode(self) else { return }
-        defaults.set(data, forKey: Self.saveKey)
-    }
-}
-
 private final class VillageQuest4Runtime {
     static let shared = VillageQuest4Runtime()
 
@@ -42,12 +20,7 @@ extension VillageCartoScene {
     }
 
     var quest4Objective: String {
-        if quest4.completed { return "Quest 4 selesai: biome Rock Salt telah terbuka." }
-        if quest4.sortedTubers { return "Dengarkan misi garam dari Ibu Anneth." }
-        if quest4.metAnneth { return "Selesaikan sortir umbi di dapur belakang Anneth." }
-        return layout.buildingPlacements.contains(where: { $0.id == "anneth-house" })
-            ? "Jelajahi dan temui Anneth di dapur belakang."
-            : "Tempatkan Rumah Anneth (6x6), lalu Jelajahi."
+        VillageQuestEngine.quest4Objective(for: villageQuestSnapshot)
     }
 
     func saveQuest4() {

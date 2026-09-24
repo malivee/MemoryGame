@@ -3,31 +3,6 @@
 // disimpan di file sendiri agar quest lain dapat dikerjakan paralel.
 import SpriteKit
 
-struct VillageQuest2Progress: Codable {
-    static let saveKey = "village.carto.quest2.v1"
-
-    var spokeToGrandpa = false
-    var hasBasket = false
-    var metKeneth = false
-    var washedHands = false
-    var sortedSeeds = false
-    var doorWedged = false
-    var completed = false
-
-    static func load(defaults: UserDefaults = .standard) -> Self {
-        guard let data = defaults.data(forKey: saveKey),
-              let saved = try? JSONDecoder().decode(Self.self, from: data) else {
-            return Self()
-        }
-        return saved
-    }
-
-    func save(defaults: UserDefaults = .standard) {
-        guard let data = try? JSONEncoder().encode(self) else { return }
-        defaults.set(data, forKey: Self.saveKey)
-    }
-}
-
 private final class VillageQuest2Runtime {
     static let shared = VillageQuest2Runtime()
 
@@ -47,29 +22,7 @@ extension VillageCartoScene {
     }
 
     var quest2Objective: String {
-        if quest2.completed {
-            return "Quest 2 selesai: keping menuju peternakan telah terbuka."
-        }
-        if quest2.sortedSeeds {
-            return "Selesaikan percakapan dengan Keneth."
-        }
-        if quest2.washedHands {
-            return "Goyangkan perangkat untuk memisahkan gandum dan biji hitam."
-        }
-        if quest2.metKeneth {
-            return "Cuci tangan menggunakan ember di pojok lumbung."
-        }
-        if quest2.hasBasket {
-            return layout.buildingPlacements.contains(where: { $0.id == "village-barn" })
-                ? "Temui Keneth di Lumbung Desa dan berikan keranjang."
-                : "Tempatkan Lumbung Desa (9×15) di area kuning."
-        }
-        if quest2.spokeToGrandpa {
-            return layout.buildingPlacements.contains(where: { $0.id == "bu-mara-house" })
-                ? "Temui Bu Mara untuk mengambil keranjang tampah."
-                : "Tempatkan kembali Rumah Bu Mara untuk mengambil keranjang."
-        }
-        return "Bicara dengan Kakek di Rumah Arthur untuk membuka Lumbung Desa."
+        VillageQuestEngine.quest2Objective(for: villageQuestSnapshot)
     }
 
     func saveQuest2() {

@@ -3,40 +3,28 @@
 import CoreGraphics
 
 extension VillageCartoScene {
-    var villageQuestPieceOrder: [Int] { [26, 5, 20, 38, 6, 12] }
-
-    var villageUnlockedPieceIDs: Set<Int> {
-        var result = quest1UnlockedPieceIDs
-        // Keping Z (#3) dipakai untuk membangun area lumbung.
-        if quest2.spokeToGrandpa { result.insert(20) }
-        // Hadiah akhir Quest 2 membuka keping menuju peternakan.
-        if quest2.completed { result.insert(38) }
-        // Hadiah Quest 3 membuka keping L siku untuk Rumah Anneth.
-        if quest3.completed { result.insert(6) }
-        // Milestone Quest 4 membuka biome Rock Salt.
-        if quest4.completed { result.insert(12) }
-        return result
+    var villageQuestSnapshot: VillageQuestSnapshot {
+        VillageQuestSnapshot(
+            quest1: quest1,
+            quest2: quest2,
+            quest3: quest3,
+            quest4: quest4,
+            placedBuildingIDs: Set(layout.buildingPlacements.map(\.id))
+        )
     }
 
-    var villageUnlockedBuildingIDs: Set<String> {
-        var result = quest1UnlockedBuildingIDs
-        if quest1.returnedHome && quest2.spokeToGrandpa {
-            result.insert("village-barn")
-        }
-        if quest2.completed {
-            result.insert("roland-pen")
-        }
-        if quest3.completed {
-            result.insert("anneth-house")
-        }
-        return result
+    var villageQuestUnlocks: VillageQuestUnlocks {
+        VillageQuestEngine.unlocks(for: villageQuestSnapshot)
     }
+
+    var villageQuestPieceOrder: [Int] { villageQuestUnlocks.pieceOrder }
+
+    var villageUnlockedPieceIDs: Set<Int> { villageQuestUnlocks.unlockedPieceIDs }
+
+    var villageUnlockedBuildingIDs: Set<String> { villageQuestUnlocks.unlockedBuildingIDs }
 
     var villageQuestObjective: String {
-        if !quest1.returnedHome { return quest1Objective }
-        if !quest2.completed { return quest2Objective }
-        if !quest3.completed { return quest3Objective }
-        return quest4Objective
+        VillageQuestEngine.objective(for: villageQuestSnapshot)
     }
 
     func renderVillageQuestWorld() {

@@ -3,34 +3,6 @@
 // berada di file ini agar quest lain dapat dikerjakan pada file terpisah.
 import SpriteKit
 
-struct VillageQuestDialogueLine {
-    let speaker: String
-    let text: String
-}
-
-struct VillageQuest1Progress: Codable {
-    static let saveKey = "village.carto.quest1.v4"
-
-    var spokeToGrandpa = false
-    var collectedWater = false
-    var spokeToMara = false
-    var rackFixed = false
-    var returnedHome = false
-
-    static func load(defaults: UserDefaults = .standard) -> Self {
-        guard let data = defaults.data(forKey: saveKey),
-              let saved = try? JSONDecoder().decode(Self.self, from: data) else {
-            return Self()
-        }
-        return saved
-    }
-
-    func save(defaults: UserDefaults = .standard) {
-        guard let data = try? JSONEncoder().encode(self) else { return }
-        defaults.set(data, forKey: Self.saveKey)
-    }
-}
-
 private final class VillageQuest1Runtime {
     static let shared = VillageQuest1Runtime()
 
@@ -49,45 +21,8 @@ extension VillageCartoScene {
         set { VillageQuest1Runtime.shared.activeMinigame = newValue }
     }
 
-    // Quest 0 dimulai dengan satu keping awal, Rumah Arthur, dan Sumur.
-    // Quest 1 membuka keping kedua bersama Rumah Bu Mara.
-    var quest1PieceOrder: [Int] { [26, 5] }
-    var quest1UnlockedPieceIDs: Set<Int> {
-        var result: Set<Int> = [26]
-        if quest1.collectedWater { result.insert(5) }
-        return result
-    }
-
-    var quest1UnlockedBuildingIDs: Set<String> {
-        var result: Set<String> = ["arthur-house", "village-well"]
-        if quest1.collectedWater { result.insert("bu-mara-house") }
-        return result
-    }
-
     var quest1Objective: String {
-        if quest1.returnedHome { return "Quest 1 selesai: Arthur telah kembali ke rumah." }
-        if quest1.rackFixed {
-            return layout.buildingPlacements.contains(where: { $0.id == "arthur-house" })
-                ? "Kembali ke Rumah Arthur dan bicara dengan Kakek."
-                : "Tempatkan Rumah Arthur, lalu kembali menemui Kakek."
-        }
-        if quest1.spokeToMara { return "Dekati rak miring lalu ketuk [Interact: Periksa Rak]." }
-        if quest1.collectedWater {
-            return layout.buildingPlacements.contains(where: { $0.id == "bu-mara-house" })
-                ? "Temui Bu Mara di depan rumahnya."
-                : "Keping kedua dan Rumah Bu Mara terbuka. Tempatkan Rumah Bu Mara (6x6) di area kuning."
-        }
-        if quest1.spokeToGrandpa {
-            return layout.buildingPlacements.contains(where: { $0.id == "village-well" })
-                ? "Dekati Sumur dan ambil air."
-                : "Tempatkan Sumur (3x3) di area kuning keping awal."
-        }
-        let hasArthur = layout.buildingPlacements.contains(where: { $0.id == "arthur-house" })
-        let hasWell = layout.buildingPlacements.contains(where: { $0.id == "village-well" })
-        if hasArthur && hasWell {
-            return "Jelajahi dan bicara dengan Kakek di Rumah Arthur."
-        }
-        return "Tempatkan Rumah Arthur dan Sumur di area kuning keping awal."
+        VillageQuestEngine.quest1Objective(for: villageQuestSnapshot)
     }
 
     func presentQuestDialogue(

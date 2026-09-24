@@ -28,11 +28,28 @@ struct VillageCartoPreview: UIViewRepresentable {
     func updateUIView(_ view: SKView, context: Context) {}
 }
 
+struct VillageCocCartoPreview: UIViewRepresentable {
+    func makeUIView(context: Context) -> SKView {
+        let defaultSize = CGSize(width: 844, height: 390)
+        let view = SKView(frame: CGRect(origin: .zero, size: defaultSize))
+        let scene = VillageCartoScene(size: defaultSize, uiMode: .coc)
+        scene.scaleMode = .resizeFill
+        view.presentScene(scene)
+        return view
+    }
+    func updateUIView(_ view: SKView, context: Context) {}
+}
+
 struct VillagePrototypePreviewProvider: PreviewProvider {
     static var previews: some View {
         Group {
+            VillageCocCartoPreview()
+                .previewDisplayName("Carto Desa (COC Mode)")
+                .ignoresSafeArea()
+                .previewInterfaceOrientation(.landscapeLeft)
+
             VillageCartoPreview()
-                .previewDisplayName("Carto Map & Buildings")
+                .previewDisplayName("Carto Map & Buildings (Classic)")
                 .ignoresSafeArea()
                 .previewInterfaceOrientation(.landscapeLeft)
 

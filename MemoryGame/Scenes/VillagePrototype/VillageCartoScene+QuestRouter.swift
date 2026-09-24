@@ -27,7 +27,10 @@ extension VillageCartoScene {
     var villageUnlockedBuildingIDs: Set<String> { villageQuestUnlocks.unlockedBuildingIDs }
 
     var villageQuestObjective: String {
-        VillageQuestEngine.objective(for: villageQuestSnapshot)
+        if quest5.completed {
+            return quest6VillageObjective
+        }
+        return VillageQuestEngine.objective(for: villageQuestSnapshot)
     }
 
     func renderVillageQuestWorld() {
@@ -39,8 +42,10 @@ extension VillageCartoScene {
             renderQuest3World()
         } else if !quest4.completed {
             renderQuest4World()
-        } else {
+        } else if !quest5.completed {
             renderQuest5World()
+        } else {
+            renderQuest6VillageWorld()
         }
     }
 
@@ -49,6 +54,7 @@ extension VillageCartoScene {
         if !quest2.completed { return handleQuest2Interaction(at: point) }
         if !quest3.completed { return handleQuest3Interaction(at: point) }
         if !quest4.completed { return handleQuest4Interaction(at: point) }
-        return handleQuest5Interaction(at: point)
+        if !quest5.completed { return handleQuest5Interaction(at: point) }
+        return handleQuest6VillageInteraction(at: point)
     }
 }

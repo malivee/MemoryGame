@@ -236,6 +236,17 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             let number = VillageCartoMap.displayNumber(forPieceID: id) ?? (id + 1)
             text("\(number)",at:.zero,size:15,parent:badge)
             node.addChild(badge)
+
+            if let roleLabel = villageQuestUnlocks.role(forPieceID: id).label {
+                let roleBadge = SKShapeNode(circleOfRadius: 8)
+                roleBadge.position = CGPoint(x: 17, y: -17)
+                roleBadge.fillColor = .systemOrange
+                roleBadge.strokeColor = SKColor(white: 0, alpha: 0.65)
+                roleBadge.lineWidth = 1.2
+                roleBadge.zRotation = -node.zRotation
+                text(String(roleLabel.prefix(1)), at: .zero, size: 8, parent: roleBadge, color: .black)
+                node.addChild(roleBadge)
+            }
         }
         return node
     }
@@ -500,7 +511,8 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             button("Pusatkan",name:"center",at:CGPoint(x:435,y:56),width:90)
             if let id = selected {
                 let number = VillageCartoMap.displayNumber(forPieceID: id) ?? (id + 1)
-                text("Keping \(number) · \(draftTurns*90)°",at:CGPoint(x:board.midX,y:size.height-58),size:12,parent:hud,color:cream)
+                let role = villageQuestUnlocks.role(forPieceID: id).label.map { " · \($0)" } ?? ""
+                text("Keping \(number)\(role) · \(draftTurns*90)°",at:CGPoint(x:board.midX,y:size.height-58),size:12,parent:hud,color:cream)
             } else if let id = selectedBuilding, let building = VillageTileLayout.building(id) {
                 text("\(building.title) · \(building.width)x\(building.height) subgrid",at:CGPoint(x:board.midX,y:size.height-58),size:12,parent:hud,color:cream)
             }

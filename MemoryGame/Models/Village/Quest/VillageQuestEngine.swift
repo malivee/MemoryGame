@@ -20,13 +20,17 @@ enum VillageQuestEngine {
             buildings.insert(VillageQuestCatalog.BuildingID.buMaraHouse)
         }
 
-        if snapshot.quest1.returnedHome && snapshot.quest2.spokeToGrandpa {
+        if snapshot.quest1.returnedHome {
             pieces.insert(VillageQuestCatalog.PieceID.barnPath)
+        }
+
+        if snapshot.quest1.returnedHome && snapshot.quest2.spokeToGrandpa {
             buildings.insert(VillageQuestCatalog.BuildingID.villageBarn)
         }
 
         if snapshot.quest2.completed {
             pieces.insert(VillageQuestCatalog.PieceID.rolandPenPath)
+            pieces.insert(VillageQuestCatalog.PieceID.rockSaltPath)
             buildings.insert(VillageQuestCatalog.BuildingID.rolandPen)
         }
 
@@ -35,15 +39,23 @@ enum VillageQuestEngine {
             buildings.insert(VillageQuestCatalog.BuildingID.annethHouse)
         }
 
-        if snapshot.quest4.completed {
-            pieces.insert(VillageQuestCatalog.PieceID.rockSaltPath)
-        }
-
         return VillageQuestUnlocks(
             pieceOrder: VillageQuestCatalog.pieceOrder,
             unlockedPieceIDs: pieces,
-            unlockedBuildingIDs: buildings
+            unlockedBuildingIDs: buildings,
+            pieceRoles: pieceRoles(for: snapshot)
         )
+    }
+
+    static func pieceRole(forPieceID id: Int, snapshot: VillageQuestSnapshot) -> VillageQuestPieceRole {
+        pieceRoles(for: snapshot)[id] ?? .required
+    }
+
+    private static func pieceRoles(for snapshot: VillageQuestSnapshot) -> [Int: VillageQuestPieceRole] {
+        var roles: [Int: VillageQuestPieceRole] = [:]
+        roles[VillageQuestCatalog.PieceID.annethHousePath] = .reserved(label: "Pengecoh")
+        roles[VillageQuestCatalog.PieceID.rockSaltPath] = .reserved(label: "Pengecoh")
+        return roles
     }
 
     static func objective(for snapshot: VillageQuestSnapshot) -> String {
@@ -89,7 +101,7 @@ enum VillageQuestEngine {
     static func quest2Objective(for snapshot: VillageQuestSnapshot) -> String {
         let quest = snapshot.quest2
         if quest.completed {
-            return "Quest 2 selesai: keping menuju peternakan telah terbuka."
+            return "Quest 2 selesai: keping menuju peternakan dan jalur Rock Salt telah terbuka."
         }
         if quest.sortedSeeds {
             return "Selesaikan percakapan dengan Keneth."
@@ -125,7 +137,7 @@ enum VillageQuestEngine {
 
     static func quest4Objective(for snapshot: VillageQuestSnapshot) -> String {
         let quest = snapshot.quest4
-        if quest.completed { return "Quest 4 selesai: biome Rock Salt telah terbuka." }
+        if quest.completed { return "Quest 4 selesai: misi Rock Salt telah diterima." }
         if quest.sortedTubers { return "Dengarkan misi garam dari Ibu Anneth." }
         if quest.metAnneth { return "Selesaikan sortir umbi di dapur belakang Anneth." }
         return snapshot.hasBuilding(VillageQuestCatalog.BuildingID.annethHouse)

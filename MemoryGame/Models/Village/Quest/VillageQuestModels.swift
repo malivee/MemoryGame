@@ -113,22 +113,41 @@ struct VillageQuestSnapshot {
     let placedBuildingIDs: Set<String>
 }
 
+enum VillageQuestPieceRole: Equatable {
+    case required
+    case reserved(label: String)
+
+    var label: String? {
+        switch self {
+        case .required:
+            return nil
+        case .reserved(let label):
+            return label
+        }
+    }
+}
+
 struct VillageQuestUnlocks {
     let pieceOrder: [Int]
     let unlockedPieceIDs: Set<Int>
     let unlockedBuildingIDs: Set<String>
+    let pieceRoles: [Int: VillageQuestPieceRole]
+
+    func role(forPieceID id: Int) -> VillageQuestPieceRole {
+        pieceRoles[id] ?? .required
+    }
 }
 
 enum VillageQuestCatalog {
-    static let pieceOrder = [26, 5, 20, 38, 12, 6]
+    static let pieceOrder = [26, 5, 20, 38, 6, 12]
 
     enum PieceID {
         static let first = 26
         static let buMaraPath = 5
         static let barnPath = 20
         static let rolandPenPath = 38
-        static let annethHousePath = 12
-        static let rockSaltPath = 6
+        static let annethHousePath = 6
+        static let rockSaltPath = 12
     }
 
     enum BuildingID {

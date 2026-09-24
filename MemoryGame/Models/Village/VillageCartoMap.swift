@@ -166,16 +166,16 @@ enum VillageCartoMap {
     // Urutan enam keping mengikuti storyboard pemain (gambar 1 ... gambar 6).
     // ID tetap menunjuk empat sel unik pada atlas sumber, sedangkan nomor yang
     // dilihat pemain berasal dari posisi ID di array ini.
-    static let playablePieceIDs: [Int] = [5, 26, 20, 38, 12, 6]
+    static let playablePieceIDs: [Int] = [5, 26, 20, 38, 6, 12]
 
     static func displayNumber(forPieceID id: Int) -> Int? {
         playablePieceIDs.firstIndex(of: id).map { $0 + 1 }
     }
 
-    // Keping keempat memakai bentuk atlas yang orientasi sumbernya terbalik
-    // 180° dari storyboard.
+    // Keping keempat dan keenam memakai bentuk atlas yang orientasi sumbernya
+    // terbalik 180° dari storyboard.
     static func preferredTurns(forPieceID id: Int) -> Int {
-        id == 38 ? 2 : 0
+        id == 38 || id == 12 ? 2 : 0
     }
 
     // Storyboard memberi warna per kotak: rumput desa (kuning), rumput yang
@@ -218,10 +218,10 @@ enum VillageCartoMap {
                 (1, 0, .rockSalt, .rockSalt)
             ]),
             (12, [
-                (0, 1, .darkGreenForest, .villageSoil),
+                (0, 1, .darkGreenForest, .darkGreenForest),
                 (1, 1, .darkGreenForest, .darkGreenForest),
                 (2, 1, .darkGreenForest, .darkGreenForest),
-                (1, 0, .darkGreenForest, .darkGreenForest)
+                (1, 0, .darkGreenForest, .villageSoil)
             ])
         ]
 
@@ -247,7 +247,7 @@ enum VillageCartoMap {
         case Cell(x: 11, y: 9),
              Cell(x: 8, y: 8), Cell(x: 8, y: 7), Cell(x: 8, y: 6):
             return .centeredRightTriangle
-        case Cell(x: 9, y: 6):
+        case Cell(x: 10, y: 5):
             return .centeredLeftTriangle
         case Cell(x: 10, y: 8):
             return .lowerRightTriangle

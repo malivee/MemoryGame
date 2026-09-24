@@ -6,7 +6,9 @@ enum VillageQuestEngine {
         if !snapshot.quest2.completed { return .quest2 }
         if !snapshot.quest3.completed { return .quest3 }
         if !snapshot.quest4.completed { return .quest4 }
-        return .quest5
+        if !snapshot.quest5.completed { return .quest5 }
+        if !snapshot.quest7.completed { return .quest7 }
+        return .quest8
     }
 
     static func unlocks(for snapshot: VillageQuestSnapshot) -> VillageQuestUnlocks {
@@ -47,6 +49,10 @@ enum VillageQuestEngine {
             pieces.insert(VillageQuestCatalog.PieceID.hollowForestReward)
         }
 
+        if snapshot.quest7.completed {
+            buildings.insert(VillageQuestCatalog.BuildingID.emptyWarehouse)
+        }
+
         return VillageQuestUnlocks(
             pieceOrder: VillageQuestCatalog.pieceOrder,
             unlockedPieceIDs: pieces,
@@ -79,6 +85,10 @@ enum VillageQuestEngine {
             return quest4Objective(for: snapshot)
         case .quest5:
             return quest5Objective(for: snapshot)
+        case .quest7:
+            return quest7Objective(for: snapshot)
+        case .quest8:
+            return quest8Objective(for: snapshot)
         }
     }
 
@@ -164,6 +174,54 @@ enum VillageQuestEngine {
         return snapshot.hasPiece(VillageQuestCatalog.PieceID.rockSaltMinePath)
             ? "Jelajahi ke mulut tambang di keping Rock Salt."
             : "Tempatkan keping Rock Salt (piece 5), lalu Jelajahi ke mulut tambang."
+    }
+
+    static func quest7Objective(for snapshot: VillageQuestSnapshot) -> String {
+        let quest = snapshot.quest7
+        if quest.completed {
+            return "Quest 7 selesai: Gudang Kosong (Markas Rahasia) telah terbuka."
+        }
+        guard snapshot.hasPiece(VillageQuestCatalog.PieceID.hollowForestReward) else {
+            return "Tempatkan Keping Hutan (#8) yang didapat dari Quest 6 di papan peta."
+        }
+        if quest.confrontedGrandpa {
+            return "Arthur telah bergegas menemui teman-temannya."
+        }
+        if quest.foundEliasBook {
+            return "Kembali ke Rumah Arthur dan tanyakan isi buku kepada Kakek."
+        }
+        if quest.hasGatheredWood {
+            return "Periksa tanah longsor dan akar pohon tua di dekat lereng hutan."
+        }
+        if quest.spokeToGrandpa {
+            return "Cari dan kumpulkan 5 ranting kayu bakar di lereng hutan (\(quest.woodCollectedCount)/5)."
+        }
+        return "Bicara dengan Kakek di Rumah Arthur untuk mengambil tugas mencari kayu."
+    }
+
+    static func quest8Objective(for snapshot: VillageQuestSnapshot) -> String {
+        let quest = snapshot.quest8
+        if quest.completed {
+            return "Quest 8 selesai: Rombongan Arthur siap menjelajah keluar desa esok fajar."
+        }
+        if quest.allItemsPacked {
+            return quest.returnedToGrandpa
+                ? "Quest 8 selesai: Rombongan Arthur siap menjelajah keluar desa esok fajar."
+                : "Kembali ke Rumah Kakek untuk beristirahat malam sebelum fajar keberangkatan."
+        }
+        if quest.annethBackyardMet {
+            return "Kumpulkan dan kemas 5 perlengkapan ekspedisi di sekitar halaman Anneth (\(quest.packedCount)/5)."
+        }
+        if quest.experiencedFog {
+            return "Temui Roland, Keneth, dan Anneth di belakang rumah Anneth malam ini."
+        }
+        if quest.convincingFailed {
+            return "Berjalan pulang menyusuri jalan desa di tengah kabut senja."
+        }
+        if quest.secretBaseMetFriends {
+            return "Bicarakan Buku Elias dan yakinkan teman-teman di Gudang Kosong."
+        }
+        return "Temui Roland, Keneth, dan Anneth di Gudang Kosong dekat sungai (Markas Rahasia)."
     }
 }
 

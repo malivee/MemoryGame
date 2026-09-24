@@ -98,10 +98,11 @@ extension RightDeckPuzzleScene {
 
         // --- Kolom Kiri: Wilayah Desa ---
         let leftItems: [(title: String, sub: String, key: String)] = [
+            ("🗺️ Peta Desa Carto (Q1-7)", "Susun peta & selektor Quest 1-7", "debug-carto"),
+            ("🏰 Carto Desa (COC Mode)", "List rumah bar hijau & keping di map", "debug-coc-carto"),
             ("1. 🏠 Rumah Arthur", "Kamar tidur & meja peta Anneth", "debug-world-0"),
             ("2. 🏡 Pusat Desa", "Jalan utama, kedai & warga lembah", "debug-world-1"),
-            ("3. 🏔️ Kaki Perbukitan", "Jalan setapak lama & tebing", "debug-world-2"),
-            ("4. 🌫️ Wilayah Echoes", "Zona bahaya kabut kenangan", "debug-world-4")
+            ("3. 🏔️ Kaki Perbukitan", "Jalan setapak lama & tebing", "debug-world-2")
         ]
 
         for (idx, item) in leftItems.enumerated() {

@@ -121,12 +121,84 @@ struct VillageQuest5Progress: Codable {
     }
 }
 
+struct VillageQuest7Progress: Codable {
+    static let saveKey = "village.carto.quest7.v1"
+
+    var spokeToGrandpa = false
+    var woodCollectedCount = 0
+    var hasGatheredWood = false
+    var inspectedLandslide = false
+    var foundEliasBook = false
+    var confrontedGrandpa = false
+    var completed = false
+
+    static func load(defaults: UserDefaults = .standard) -> Self {
+        guard let data = defaults.data(forKey: saveKey),
+              let saved = try? JSONDecoder().decode(Self.self, from: data) else {
+            return Self()
+        }
+        return saved
+    }
+
+    func save(defaults: UserDefaults = .standard) {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        defaults.set(data, forKey: Self.saveKey)
+    }
+}
+
+struct VillageQuest8Progress: Codable {
+    static let saveKey = "village.carto.quest8.v1"
+
+    var secretBaseMetFriends = false
+    var convincingAttempted = false
+    var convincingFailed = false
+    var experiencedFog = false
+    var spokeToElderInFog = false
+    var annethBackyardMet = false
+    var packedKnife = false
+    var packedRope = false
+    var packedWater = false
+    var packedOintment = false
+    var packedJournal = false
+    var returnedToGrandpa = false
+    var completed = false
+
+    var packedCount: Int {
+        var count = 0
+        if packedKnife { count += 1 }
+        if packedRope { count += 1 }
+        if packedWater { count += 1 }
+        if packedOintment { count += 1 }
+        if packedJournal { count += 1 }
+        return count
+    }
+
+    var allItemsPacked: Bool {
+        packedCount >= 5
+    }
+
+    static func load(defaults: UserDefaults = .standard) -> Self {
+        guard let data = defaults.data(forKey: saveKey),
+              let saved = try? JSONDecoder().decode(Self.self, from: data) else {
+            return Self()
+        }
+        return saved
+    }
+
+    func save(defaults: UserDefaults = .standard) {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        defaults.set(data, forKey: Self.saveKey)
+    }
+}
+
 enum VillageQuestStage: Int, CaseIterable {
     case quest1 = 1
     case quest2
     case quest3
     case quest4
     case quest5
+    case quest7
+    case quest8
 }
 
 struct VillageQuestSnapshot {
@@ -135,6 +207,8 @@ struct VillageQuestSnapshot {
     let quest3: VillageQuest3Progress
     let quest4: VillageQuest4Progress
     let quest5: VillageQuest5Progress
+    let quest7: VillageQuest7Progress
+    let quest8: VillageQuest8Progress
     let placedPieceIDs: Set<Int>
     let quest6RewardUnlocked: Bool
     let placedBuildingIDs: Set<String>
@@ -187,5 +261,6 @@ enum VillageQuestCatalog {
         static let rolandPen = "roland-pen"
         static let annethHouse = "anneth-house"
         static let berynHouse = "beryn-house"
+        static let emptyWarehouse = "empty-warehouse"
     }
 }

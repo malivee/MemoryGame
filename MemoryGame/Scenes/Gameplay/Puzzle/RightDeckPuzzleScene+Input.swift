@@ -27,6 +27,20 @@ extension RightDeckPuzzleScene {
                 enterDebugWorld(world)
                 return
             }
+            if names.contains("debug-carto") {
+                toggleDebugMenu()
+                let carto = VillageCartoScene(size: size)
+                carto.scaleMode = .resizeFill
+                view?.presentScene(carto, transition: .fade(withDuration: 0.25))
+                return
+            }
+            if names.contains("debug-coc-carto") {
+                toggleDebugMenu()
+                let carto = VillageCartoScene(size: size, uiMode: .coc)
+                carto.scaleMode = .resizeFill
+                view?.presentScene(carto, transition: .fade(withDuration: 0.25))
+                return
+            }
             if names.contains("debug-close") {
                 toggleDebugMenu()
                 return
@@ -47,6 +61,7 @@ extension RightDeckPuzzleScene {
             return
         }
         if names.contains("villagePreview") { openVillagePreview(); return }
+        if names.contains("cocCartoPreview") { openCocCartoPreview(); return }
         if names.contains("enter") || names.contains("entryPrompt") { enterSelected(); return }
         guard !progress.assembled else { return }
         // Transparent margins and sockets never steal a neighbouring piece's tap.

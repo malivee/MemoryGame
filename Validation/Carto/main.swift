@@ -86,6 +86,66 @@ let secondDarkCounts = (0..<VillageCartoMap.subdivisions).map { row in
 check(secondDarkCounts == [6, 5, 4, 3, 2, 1],
       "Tetromino 2 dark green occupies the lower-right half")
 
+// Keping 3 adalah Z: dua kotak atas, lalu dua kotak bawah bergeser ke kanan.
+// Tiga kotak pertama kuning penuh. Kotak kanan bawah memiliki rock salt pada
+// segitiga kanan atas seperti storyboard.
+let thirdID = VillageCartoMap.playablePieceIDs[2]
+check(thirdID == 20 && normalizedCells(id: thirdID) == ["0,1", "1,1", "1,0", "2,0"],
+      "Tetromino 3 uses the referenced Z silhouette")
+for cell in [VillageCartoMap.Cell(x: 8, y: 5),
+             VillageCartoMap.Cell(x: 9, y: 5),
+             VillageCartoMap.Cell(x: 9, y: 4)] {
+    check((0..<VillageCartoMap.subdivisions).allSatisfy { row in
+        (0..<VillageCartoMap.subdivisions).allSatisfy { column in
+            VillageCartoMap.biomeForSubcell(.init(
+                x: cell.x * VillageCartoMap.subdivisions + column,
+                y: cell.y * VillageCartoMap.subdivisions + row
+            )) == .villageSoil
+        }
+    }, "Tetromino 3 keeps its first three cells fully yellow")
+}
+let thirdRockCell = VillageCartoMap.Cell(x: 10, y: 4)
+let thirdRockBiomes = VillageCartoMap.diagonalBiomes(for: thirdRockCell)
+check(thirdRockBiomes.primary == .villageSoil && thirdRockBiomes.secondary == .rockSalt,
+      "Tetromino 3 bottom-right cell uses yellow and rock salt")
+let thirdRockCounts = (0..<VillageCartoMap.subdivisions).map { row in
+    (0..<VillageCartoMap.subdivisions).filter { column in
+        VillageCartoMap.biomeForSubcell(.init(
+            x: thirdRockCell.x * VillageCartoMap.subdivisions + column,
+            y: thirdRockCell.y * VillageCartoMap.subdivisions + row
+        )) == .rockSalt
+    }.count
+}
+check(thirdRockCounts == [1, 2, 3, 4, 5, 6],
+      "Tetromino 3 rock salt fills the upper-right triangle")
+
+// Keping 4 memakai bentuk tiga kotak mendatar dengan satu kotak di bawah
+// kiri setelah rotasi preferensi 180°. Segitiga hijau tua pada kotak bawah
+// berbentuk sama kaki, setinggi tiga subgrid.
+let fourthID = VillageCartoMap.playablePieceIDs[3]
+check(fourthID == 38 && VillageCartoMap.preferredTurns(forPieceID: fourthID) == 2,
+      "Tetromino 4 uses its referenced orientation")
+let fourthDarkCell = VillageCartoMap.Cell(x: 15, y: 2)
+check(VillageCartoMap.terrainSplit(for: fourthDarkCell) == .centeredTopTriangle,
+      "Tetromino 4 uses the centered dark-green triangle")
+let fourthDarkBiomes = VillageCartoMap.diagonalBiomes(for: fourthDarkCell)
+check(fourthDarkBiomes.primary == .villageSoil && fourthDarkBiomes.secondary == .darkGreenForest,
+      "Tetromino 4 triangle combines yellow and dark green")
+let fourthDarkCounts = (0..<VillageCartoMap.subdivisions).map { row in
+    (0..<VillageCartoMap.subdivisions).filter { column in
+        VillageCartoMap.biomeForSubcell(.init(
+            x: fourthDarkCell.x * VillageCartoMap.subdivisions + column,
+            y: fourthDarkCell.y * VillageCartoMap.subdivisions + row
+        )) == .darkGreenForest
+    }.count
+}
+check(fourthDarkCounts == [0, 0, 0, 2, 4, 6],
+      "Tetromino 4 source triangle becomes a three-subgrid bottom triangle after rotation")
+let fourthLightCell = VillageCartoMap.Cell(x: 13, y: 1)
+let fourthLightBiomes = VillageCartoMap.diagonalBiomes(for: fourthLightCell)
+check(fourthLightBiomes.primary == .naturalGrass && fourthLightBiomes.secondary == .villageSoil,
+      "Tetromino 4 keeps the light-green diagonal from the reference")
+
 var layout = VillageTileLayout()
 let start = VillageTileLayout.initial
 check(start.id == 26, "Quest 1 starts on the L piece before the Z piece")

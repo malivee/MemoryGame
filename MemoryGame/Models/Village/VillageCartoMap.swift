@@ -26,6 +26,7 @@ enum VillageCartoMap {
     enum TerrainSplit: Equatable {
         case diagonal
         case centeredRightTriangle
+        case centeredTopTriangle
         case lowerRightTriangle
     }
 
@@ -180,7 +181,7 @@ enum VillageCartoMap {
                 (0, 0, .naturalGrass, .villageSoil),
                 (1, 0, .villageSoil, .villageSoil),
                 (2, 0, .villageSoil, .villageSoil),
-                (2, 1, .darkGreenForest, .villageSoil)
+                (2, 1, .villageSoil, .darkGreenForest)
             ]),
             (6, [
                 (0, 2, .villageSoil, .rockSalt),
@@ -216,6 +217,9 @@ enum VillageCartoMap {
         switch cell {
         case Cell(x: 11, y: 9): return .centeredRightTriangle
         case Cell(x: 10, y: 8): return .lowerRightTriangle
+        // Keping 4 diputar 180° saat ditampilkan. Segitiga atas pada sumber
+        // menjadi segitiga hijau tua beralas di bawah pada tampilan pemain.
+        case Cell(x: 15, y: 2): return .centeredTopTriangle
         default: return .diagonal
         }
     }
@@ -270,6 +274,10 @@ enum VillageCartoMap {
             let center = CGFloat(subdivisions) / 2
             let depth = localX - center
             return depth >= 0 && abs(localY - center) <= depth ? diagonal.secondary : diagonal.primary
+        case .centeredTopTriangle:
+            let center = CGFloat(subdivisions) / 2
+            let depth = localY - center
+            return depth >= 0 && abs(localX - center) <= depth ? diagonal.secondary : diagonal.primary
         case .lowerRightTriangle:
             return localY <= localX ? diagonal.secondary : diagonal.primary
         case .diagonal:
@@ -301,6 +309,8 @@ enum VillageCartoMap {
         switch terrainSplit(for: cell) {
         case .centeredRightTriangle:
             return normalizedEdge == 0 ? diagonal.secondary : diagonal.primary
+        case .centeredTopTriangle:
+            return normalizedEdge == 1 ? diagonal.secondary : diagonal.primary
         case .lowerRightTriangle:
             return normalizedEdge == 0 || normalizedEdge == 3 ? diagonal.secondary : diagonal.primary
         case .diagonal:

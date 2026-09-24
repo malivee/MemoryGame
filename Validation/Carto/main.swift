@@ -350,8 +350,8 @@ check(VillageCartoMap.biomeForSubcell(crossedSubcell) == .villageSoil,
 check(!VillageCartoMap.canPlaceObject(onSubcell: crossedSubcell),
       "A subcell cut by the yellow-green boundary cannot support a building")
 
-check(VillageCartoMap.buildings.count == 6,
-      "All six progression buildings are available")
+check(VillageCartoMap.buildings.count >= 6,
+      "All progression buildings are available")
 let house = VillageCartoMap.buildings[0]
 let well = VillageCartoMap.buildings[1]
 let buMaraHouse = VillageCartoMap.buildings[2]

@@ -27,6 +27,13 @@ extension RightDeckPuzzleScene {
                 enterDebugWorld(world)
                 return
             }
+            if names.contains("debug-carto") {
+                toggleDebugMenu()
+                let carto = VillageCartoScene(size: size)
+                carto.scaleMode = .resizeFill
+                view?.presentScene(carto, transition: .fade(withDuration: 0.25))
+                return
+            }
             if names.contains("debug-close") {
                 toggleDebugMenu()
                 return

@@ -106,10 +106,10 @@ extension ExplorationScene {
 
         // --- Kolom Kiri: Wilayah Desa ---
         let leftItems: [(title: String, sub: String, key: String)] = [
+            ("🗺️ Peta Desa Carto (Q1-7)", "Susun peta & selektor Quest 1-7", "debug-warp-carto"),
             ("1. 🏠 Rumah Arthur", "Kamar tidur & meja peta Anneth", "debug-warp-house"),
             ("2. 🏡 Pusat Desa", "Jalan utama, kedai & warga lembah", "debug-warp-village"),
-            ("3. 🏔️ Kaki Perbukitan", "Jalan setapak lama & tebing", "debug-warp-hills"),
-            ("4. 🌫️ Wilayah Echoes", "Zona bahaya kabut kenangan", "debug-warp-echoes")
+            ("3. 🏔️ Kaki Perbukitan", "Jalan setapak lama & tebing", "debug-warp-hills")
         ]
 
         for (idx, item) in leftItems.enumerated() {
@@ -198,6 +198,15 @@ extension ExplorationScene {
         if names.contains("debug-warp-close") {
             menu.removeFromParent()
             debugMenuNode = nil
+            return true
+        }
+
+        if names.contains("debug-warp-carto") {
+            menu.removeFromParent()
+            debugMenuNode = nil
+            let carto = VillageCartoScene(size: size)
+            carto.scaleMode = .resizeFill
+            view?.presentScene(carto, transition: .fade(withDuration: 0.25))
             return true
         }
 

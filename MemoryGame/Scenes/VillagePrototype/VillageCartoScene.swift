@@ -10,11 +10,11 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
     let world = SKNode(), hud = SKNode(), backdrop = SKNode()
     private let viewport = SKCropNode()
     let actor = MemoryCharacter(title: "Arthur", color: .systemGreen)
-    private var isMap = true
-    private var selected: Int?, draftTurns = 0, page = 0
-    private var selectedBuilding: String?
+    var isMap = true
+    var selected: Int?, draftTurns = 0, page = 0
+    var selectedBuilding: String?
     private var buildingPage = 0
-    private var sourcePosition = VillageCartoMap.spawn
+    var sourcePosition = VillageCartoMap.spawn
     private var mapCenter = VillageTileLayout.initial.center
     private var zoom: CGFloat = 1
     private weak var pinchGesture: UIPinchGestureRecognizer?
@@ -441,6 +441,7 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         if isMap {
             button("Debug selesai",name:"debugSolveCarto",at:CGPoint(x:210,y:size.height-32),width:145)
         }
+        addQuestDebugButton()
         text(isMap ? "KEPING DESA" : "DESA ARTHUR",at:CGPoint(x:size.width/2,y:size.height-30),size:18,parent:hud,color:cream)
         if isMap {
             let panel = SKShapeNode(rect:inventoryArea,cornerRadius:8)
@@ -528,7 +529,7 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         updateCamera()
     }
 
-    private func nearestSafePoint(_ current: CGPoint) -> CGPoint? {
+    func nearestSafePoint(_ current: CGPoint) -> CGPoint? {
         guard let piece = layout.placement(at:current) else { return nil }
         var result: CGPoint?, distance = CGFloat.greatestFiniteMagnitude
         for cell in VillageTileLayout.cells(of:piece) {
@@ -734,8 +735,8 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
     override func didChangeSize(_ oldSize: CGSize) {
         guard world.parent != nil else { return }; stopInput(); rebuild()
     }
-    private func stopInput() { activeTouch = nil; stickTouch = nil; stick = .zero; route = []; dragging = false; panning = false; ghost?.removeFromParent(); ghost = nil; hideBuildingGrid(); world.childNode(withName:"dropSlot")?.removeFromParent() }
-    private func save() { if let data = layout.encoded { UserDefaults.standard.set(data,forKey:Self.saveKey) } }
+    func stopInput() { activeTouch = nil; stickTouch = nil; stick = .zero; route = []; dragging = false; panning = false; ghost?.removeFromParent(); ghost = nil; hideBuildingGrid(); world.childNode(withName:"dropSlot")?.removeFromParent() }
+    func save() { if let data = layout.encoded { UserDefaults.standard.set(data,forKey:Self.saveKey) } }
     private func returnSelected() {
         if let buildingID = selectedBuilding {
             if layout.removeBuilding(id: buildingID) {
@@ -790,6 +791,7 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         guard activeTouch == nil, stickTouch == nil, let touch = touches.first else { return }
         let p = touch.location(in:hud), actions = names(at:p)
         if handleQuestChoiceTap(actions: actions) { return }
+        if handleQuestDebugTouch(actions: actions) { return }
         if actions.contains("exit") { stopInput(); onExit?(); return }
         if actions.contains("debugSolveCarto") {
             stopInput()
@@ -980,5 +982,6 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         keepActorAboveMap()
         sourcePosition = layout.source(next) ?? sourcePosition
         if !cameraTransitioning { updateCamera() }
+        checkQuest7Proximity()
     }
 }

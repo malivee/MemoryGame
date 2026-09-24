@@ -31,7 +31,13 @@ struct VillageTileLayout {
     private(set) var placements: [Placement]
     private(set) var buildingPlacements: [BuildingPlacement]
     static var initial: Placement {
-        Placement(id: tileID(VillageCartoMap.spawn)!, column: 12, row: 10, turns: 0)
+        let id = tileID(VillageCartoMap.spawn)!
+        return Placement(
+            id: id,
+            column: 12,
+            row: 10,
+            turns: VillageCartoMap.preferredTurns(forPieceID: id)
+        )
     }
     init() {
         placements = [Self.initial]
@@ -41,7 +47,7 @@ struct VillageTileLayout {
         placements = [Self.initial]
         buildingPlacements = []
         if let data, let saved = try? JSONDecoder().decode(Save.self, from: data),
-           (3...4).contains(saved.version) {
+           saved.version == 5 {
             var playablePlacements = saved.placements.filter { Self.playablePieceIDs.contains($0.id) }
             if !playablePlacements.contains(where: { $0.id == Self.initial.id }) {
                 playablePlacements.insert(Self.initial, at: 0)
@@ -58,7 +64,7 @@ struct VillageTileLayout {
         }
     }
     var encoded: Data? {
-        try? JSONEncoder().encode(Save(version: 4, placements: placements, buildingPlacements: buildingPlacements))
+        try? JSONEncoder().encode(Save(version: 5, placements: placements, buildingPlacements: buildingPlacements))
     }
     var inventory: [Int] {
         Self.playablePieceIDs.filter { id in !placements.contains { $0.id == id } }
@@ -267,6 +273,11 @@ struct VillageTileLayout {
     }
     func canPlace(id: Int, column: Int, row: Int, turns: Int) -> Bool {
         let candidate = Placement(id:id,column:column,row:row,turns:turns)
+        if let current = placements.first(where: { $0.id == id }),
+           hasBuilding(onPieceID: id),
+           candidate != current {
+            return false
+        }
         let others = placements.filter { $0.id != id }
         return Self.valid(others + [candidate]) && others.allSatisfy { Self.matching(candidate,$0) }
     }
@@ -277,29 +288,21 @@ struct VillageTileLayout {
         return true
     }
     @discardableResult mutating func remove(id: Int) -> Bool {
-        guard placements.contains(where: { $0.id == id }) else { return false }
+        guard placements.contains(where: { $0.id == id }),
+              !hasBuilding(onPieceID: id) else { return false }
         placements.removeAll { $0.id == id }
-        let currentBuildings = buildingPlacements
-        buildingPlacements = currentBuildings.filter { building in
-            Self.validBuilding(
-                building,
-                pieces: placements,
-                otherBuildings: currentBuildings.filter { $0.id != building.id }
-            )
-        }
         return true
     }
     mutating func solveAllPieces() {
-        let initialAnchor = VillageCartoMap.pieces[Self.initial.id][0]
-        let columnOffset = Self.initial.column - initialAnchor.x
-        let rowOffset = Self.initial.row - initialAnchor.y
-        let solved = Self.playablePieceIDs.map { id in
-            let anchor = VillageCartoMap.pieces[id][0]
+        // Posisi debug dibuat renggang supaya keenam bentuk storyboard tidak
+        // saling bertumpuk walau orientasi awalnya berbeda-beda.
+        let debugAnchors = [(4, 15), (10, 15), (17, 15), (4, 8), (11, 8), (18, 8)]
+        let solved = zip(Self.playablePieceIDs, debugAnchors).map { id, anchor in
             return Placement(
                 id: id,
-                column: anchor.x + columnOffset,
-                row: anchor.y + rowOffset,
-                turns: 0
+                column: anchor.0,
+                row: anchor.1,
+                turns: VillageCartoMap.preferredTurns(forPieceID: id)
             )
         }
         placements = Self.valid(solved) ? solved : [Self.initial]
@@ -327,6 +330,25 @@ struct VillageTileLayout {
     func buildingPlacement(at point: CGPoint) -> BuildingPlacement? {
         buildingPlacements.first { placement in
             Self.buildingRect(placement)?.contains(point) == true
+        }
+    }
+
+    /// Bangunan yang melintasi lebih dari satu keping mengunci semua keping
+    /// yang ditutupnya sampai bangunan dipindahkan atau dikembalikan.
+    func hasBuilding(onPieceID id: Int) -> Bool {
+        guard let piece = placements.first(where: { $0.id == id }) else { return false }
+        let divisions = VillageCartoMap.subdivisions
+        let cells = Set(Self.cells(of: piece).map { $0.column + $0.row * Self.columns })
+        return buildingPlacements.contains { placement in
+            guard let building = Self.building(placement.id) else { return false }
+            for subColumn in placement.subColumn..<(placement.subColumn + building.width) {
+                for subRow in placement.subRow..<(placement.subRow + building.height) {
+                    let column = subColumn / divisions
+                    let row = subRow / divisions
+                    if cells.contains(column + row * Self.columns) { return true }
+                }
+            }
+            return false
         }
     }
     static func validBuildings(_ buildings: [BuildingPlacement], pieces: [Placement]) -> Bool {
@@ -361,7 +383,10 @@ struct VillageTileLayout {
 
         return otherBuildings.allSatisfy { other in
             guard let otherRect = buildingRect(other) else { return false }
-            return !rect.intersects(otherRect.insetBy(dx: -2, dy: -2))
+            // Tepat bersentuhan pada sisi atau sudut diperbolehkan. CGRect
+            // hanya dianggap bertabrakan jika kedua footprint punya luas
+            // irisan, sehingga bangunan tetap tidak boleh saling menimpa.
+            return !rect.intersects(otherRect)
         }
     }
     static func buildableSubcell(column: Int, row: Int, pieces: [Placement]) -> Bool {

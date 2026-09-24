@@ -5,7 +5,7 @@ import UIKit
 
 final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
     var onExit: (() -> Void)?
-    private static let saveKey = "village.carto.layout.v3"
+    private static let saveKey = "village.carto.layout.v6"
     private var layout = VillageTileLayout(data: UserDefaults.standard.data(forKey: saveKey))
     private let world = SKNode(), hud = SKNode(), backdrop = SKNode()
     private let viewport = SKCropNode()
@@ -45,14 +45,56 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
     private var board: CGRect { CGRect(x:20,y:80,width:max(150,rightEdge-208),height:max(110,size.height-148)) }
     private var stickCenter: CGPoint { CGPoint(x:85,y:105) }
     private let actorExplorationZ: CGFloat = 80
-    // Semua keping tersedia, termasuk keping tanpa jalan.
-    private var available: [Int] { layout.inventory }
+
+    private struct Quest1Progress: Codable {
+        var spokeToGrandpa = false
+        var collectedWater = false
+        var spokeToMara = false
+        var rackFixed = false
+        var returnedHome = false
+    }
+
+    private static let quest1SaveKey = "village.carto.quest1.v3"
+    private var quest1: Quest1Progress = {
+        guard let data = UserDefaults.standard.data(forKey: quest1SaveKey),
+              let saved = try? JSONDecoder().decode(Quest1Progress.self, from: data) else {
+            return Quest1Progress()
+        }
+        return saved
+    }()
+    private weak var activeQuestMinigame: ShelfBalanceMinigameNode?
+
+    private struct QuestDialogueLine {
+        let speaker: String
+        let text: String
+    }
+    private var questDialogue: [QuestDialogueLine] = []
+    private var questDialogueIndex = 0
+    private var questDialogueCompletion: (() -> Void)?
+
+    // Quest 1 dimulai dari L (ID 26), kemudian Z (ID 5). Keping lain
+    // disimpan untuk quest berikutnya.
+    private let quest1PieceOrder = [26, 5]
+    // Dokumen Quest 1 menetapkan L dan Z sebagai dua keping awal.
+    private var unlockedQuest1PieceIDs: Set<Int> { [26, 5] }
+    private var available: [Int] {
+        quest1PieceOrder.filter {
+            unlockedQuest1PieceIDs.contains($0) && layout.inventory.contains($0)
+        }
+    }
+    private var unlockedBuildingIDs: Set<String> {
+        var result: Set<String> = ["arthur-house"]
+        if quest1.spokeToGrandpa { result.insert("village-well") }
+        if quest1.collectedWater { result.insert("bu-mara-house") }
+        return result
+    }
+    private var unlockedBuildingInventory: [VillageCartoMap.Building] {
+        layout.buildingInventory.filter { unlockedBuildingIDs.contains($0.id) }
+    }
     private let pageSize = 4
     private let buildingPageSize = 2
     private var pages: Int { max(1,Int(ceil(Double(available.count)/Double(pageSize)))) }
     private let cream = SKColor(red:0.94,green:0.90,blue:0.65,alpha:1)
-    // Exploration camera is intentionally close; keep placed structures modest.
-    private let explorationBuildingScale: CGFloat = 0.48
 
     override func didMove(to view: SKView) {
         guard world.parent == nil else { return }
@@ -100,7 +142,7 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         case .rockSalt:
             return SKColor(red: 0.86, green: 0.76, blue: 0.42, alpha: 1)
         case .villageSoil:
-            return SKColor(red: 0.56, green: 0.73, blue: 0.33, alpha: 1)
+            return SKColor(red: 0.93, green: 0.86, blue: 0.34, alpha: 1)
         case .naturalGrass:
             return SKColor(red: 0.38, green: 0.62, blue: 0.27, alpha: 1)
         case .darkGreenForest:
@@ -141,8 +183,29 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             let bottomRight = CGPoint(x: center.x + h, y: center.y - h)
             let topLeft = CGPoint(x: center.x - h, y: center.y + h)
             let topRight = CGPoint(x: center.x + h, y: center.y + h)
-            node.addChild(triangleNode(points: [bottomLeft, bottomRight, topLeft], color: biomeColor(diagonal.primary)))
-            node.addChild(triangleNode(points: [topRight, topLeft, bottomRight], color: biomeColor(diagonal.secondary)))
+            switch VillageCartoMap.terrainSplit(for: cell) {
+            case .diagonal:
+                node.addChild(triangleNode(points: [bottomLeft, bottomRight, topLeft], color: biomeColor(diagonal.primary)))
+                node.addChild(triangleNode(points: [topRight, topLeft, bottomRight], color: biomeColor(diagonal.secondary)))
+            case .centeredRightTriangle:
+                node.addChild(triangleNode(
+                    points: [bottomLeft, bottomRight, topRight, topLeft],
+                    color: biomeColor(diagonal.primary)
+                ))
+                node.addChild(triangleNode(
+                    points: [center, bottomRight, topRight],
+                    color: biomeColor(diagonal.secondary)
+                ))
+            case .lowerRightTriangle:
+                node.addChild(triangleNode(
+                    points: [bottomLeft, bottomRight, topRight, topLeft],
+                    color: biomeColor(diagonal.primary)
+                ))
+                node.addChild(triangleNode(
+                    points: [bottomLeft, bottomRight, topRight],
+                    color: biomeColor(diagonal.secondary)
+                ))
+            }
 
             let cellBorder = SKShapeNode(rectOf: CGSize(width: s, height: s))
             cellBorder.position = center
@@ -182,16 +245,18 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             let badge = SKShapeNode(circleOfRadius:13)
             badge.fillColor = SKColor(white:0,alpha:0.7); badge.strokeColor = .clear
             badge.zRotation = -node.zRotation
-            text("\(id+1)",at:.zero,size:15,parent:badge)
+            let number = VillageCartoMap.displayNumber(forPieceID: id) ?? (id + 1)
+            text("\(number)",at:.zero,size:15,parent:badge)
             node.addChild(badge)
         }
         return node
     }
 
-    private func buildingNode(_ id: String, miniature: Bool) -> SKNode {
+    private func buildingNode(_ id: String, miniature: Bool, inExploration: Bool = false) -> SKNode {
         guard let building = VillageTileLayout.building(id) else { return SKNode() }
         let unit = VillageCartoMap.subcellSide
-        let size = CGSize(width: CGFloat(building.width) * unit, height: CGFloat(building.height) * unit)
+        let displaySize = building.displaySize(inExploration: inExploration)
+        let size = CGSize(width: displaySize.width * unit, height: displaySize.height * unit)
         let node = SKNode()
         let footprint = SKShapeNode(rectOf: size, cornerRadius: miniature ? 5 : 8)
         footprint.fillColor = SKColor(red: 0.26, green: 0.22, blue: 0.15, alpha: miniature ? 0.45 : 0.34)
@@ -200,6 +265,22 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         footprint.name = "building-\(id)"
         node.addChild(footprint)
 
+        if building.kind == .well {
+            let radius = min(size.width, size.height) * 0.38
+            let stone = SKShapeNode(circleOfRadius: radius)
+            stone.fillColor = SKColor(red: 0.48, green: 0.48, blue: 0.43, alpha: 1)
+            stone.strokeColor = SKColor(red: 0.25, green: 0.25, blue: 0.22, alpha: 1)
+            stone.lineWidth = miniature ? 1.4 : 2
+            stone.name = "building-\(id)"
+            node.addChild(stone)
+
+            let water = SKShapeNode(circleOfRadius: radius * 0.58)
+            water.fillColor = SKColor(red: 0.25, green: 0.58, blue: 0.66, alpha: 1)
+            water.strokeColor = SKColor(red: 0.17, green: 0.35, blue: 0.39, alpha: 1)
+            water.lineWidth = miniature ? 1 : 1.5
+            water.name = "building-\(id)"
+            node.addChild(water)
+        } else {
         let houseWidth = size.width * 0.74
         let houseHeight = size.height * 0.58
         let wall = SKShapeNode(rectOf: CGSize(width: houseWidth, height: houseHeight * 0.58), cornerRadius: miniature ? 4 : 7)
@@ -228,6 +309,7 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         door.strokeColor = .clear
         door.name = "building-\(id)"
         node.addChild(door)
+        }
 
         let grid = SKShapeNode(rectOf: size)
         grid.strokeColor = SKColor(white: 0.05, alpha: 0.30)
@@ -327,11 +409,13 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         }
         for placement in layout.buildingPlacements {
             guard let rect = VillageTileLayout.buildingRect(placement) else { continue }
-            let node = buildingNode(placement.id, miniature: isMap)
+            let node = buildingNode(placement.id, miniature: isMap, inExploration: !isMap)
             node.position = CGPoint(x: rect.midX, y: rect.midY)
-            if !isMap { node.setScale(explorationBuildingScale) }
             node.zPosition = 22
             world.addChild(node)
+        }
+        if !isMap {
+            renderQuest1World()
         }
         // Keping Arthur boleh dikembalikan. Cari tempat aman di keping tersisa.
         if layout.world(sourcePosition) == nil {
@@ -371,7 +455,10 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             let thumb = min(CGFloat(54), max(32, (availablePuzzleHeight - 28) / puzzleRows))
             let puzzleSpacing = thumb + 10
             for (index,id) in available.dropFirst(page*pageSize).prefix(pageSize).enumerated() {
-                let node = tile(id,turns:selected == id ? draftTurns : 0,miniature:true)
+                let inventoryTurns = selected == id
+                    ? draftTurns
+                    : VillageCartoMap.preferredTurns(forPieceID: id)
+                let node = tile(id,turns:inventoryTurns,miniature:true)
                 let bounds = VillageTileLayout.outline(id).boundingBoxOfPath
                 node.setScale(thumb/max(bounds.width,bounds.height)); node.name = "inventory-\(id)"
                 node.position = CGPoint(
@@ -379,7 +466,7 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
                     y: puzzleTopY - CGFloat(index / 2) * puzzleSpacing
                 )
                 let center = VillageTileLayout.rotated(CGPoint(x:bounds.midX,y:bounds.midY),
-                    turns:selected == id ? draftTurns : 0)
+                    turns:inventoryTurns)
                 node.position.x -= center.x*node.xScale
                 node.position.y -= center.y*node.yScale
                 hud.addChild(node)
@@ -393,7 +480,7 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             divider.strokeColor = .clear
             hud.addChild(divider)
             text("BANGUNAN",at:CGPoint(x:rightEdge-94,y:buildingHeaderY),size:11,parent:hud,color:cream)
-            let buildingInventory = layout.buildingInventory
+            let buildingInventory = unlockedBuildingInventory
             let buildingPages = max(1, Int(ceil(Double(buildingInventory.count) / Double(buildingPageSize))))
             buildingPage = min(buildingPage, buildingPages - 1)
             for (index, building) in buildingInventory
@@ -424,7 +511,8 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             button("+",name:"plus",at:CGPoint(x:362,y:56),width:38)
             button("Pusatkan",name:"center",at:CGPoint(x:435,y:56),width:90)
             if let id = selected {
-                text("Keping \(id+1) · \(draftTurns*90)°",at:CGPoint(x:board.midX,y:size.height-58),size:12,parent:hud,color:cream)
+                let number = VillageCartoMap.displayNumber(forPieceID: id) ?? (id + 1)
+                text("Keping \(number) · \(draftTurns*90)°",at:CGPoint(x:board.midX,y:size.height-58),size:12,parent:hud,color:cream)
             } else if let id = selectedBuilding, let building = VillageTileLayout.building(id) {
                 text("\(building.title) · \(building.width)x\(building.height) subgrid",at:CGPoint(x:board.midX,y:size.height-58),size:12,parent:hud,color:cream)
             }
@@ -436,8 +524,422 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         }
         status.removeFromParent(); status.fontSize = 11; status.fontColor = cream; status.verticalAlignmentMode = .center
         status.position = CGPoint(x:size.width/2,y:19); hud.addChild(status)
-        status.text = message ?? ""
+        status.text = message ?? quest1Objective
         updateCamera()
+    }
+
+    private var quest1Objective: String {
+        if quest1.returnedHome { return "Quest 1 selesai: Arthur telah kembali ke rumah." }
+        if quest1.rackFixed {
+            return layout.buildingPlacements.contains(where: { $0.id == "arthur-house" })
+                ? "Kembali ke Rumah Arthur dan bicara dengan Kakek."
+                : "Tempatkan Rumah Arthur, lalu kembali menemui Kakek."
+        }
+        if quest1.spokeToMara { return "Dekati rak miring lalu ketuk [Interact: Periksa Rak]." }
+        if quest1.collectedWater {
+            return layout.buildingPlacements.contains(where: { $0.id == "bu-mara-house" })
+                ? "Temui Bu Mara di depan rumahnya."
+                : "Tempatkan Rumah Bu Mara (6x6) di area kuning."
+        }
+        if quest1.spokeToGrandpa {
+            return layout.buildingPlacements.contains(where: { $0.id == "village-well" })
+                ? "Dekati Sumur dan ambil air."
+                : "Sumur terbuka. Tempatkan Sumur (3x3) pada susunan awal L dan Z."
+        }
+        return layout.buildingPlacements.contains(where: { $0.id == "arthur-house" })
+            ? "Susun keping awal L dan Z, lalu Jelajahi dan bicara dengan Kakek di Rumah Arthur."
+            : "Tempatkan Rumah Arthur (6x9) di area kuning pada keping L, lalu susun L dan Z."
+    }
+
+    private func presentQuestDialogue(
+        _ lines: [QuestDialogueLine],
+        onFinished: (() -> Void)? = nil
+    ) {
+        questDialogue = lines
+        questDialogueIndex = 0
+        questDialogueCompletion = onFinished
+        renderQuestDialogue()
+    }
+
+    private func renderQuestDialogue() {
+        hud.childNode(withName: "quest-dialogue")?.removeFromParent()
+        guard questDialogue.indices.contains(questDialogueIndex) else { return }
+        let line = questDialogue[questDialogueIndex]
+        let width = min(size.width - 44, 680)
+        let panel = SKShapeNode(rectOf: CGSize(width: width, height: 116), cornerRadius: 12)
+        panel.name = "quest-dialogue"
+        panel.position = CGPoint(x: size.width / 2, y: 96)
+        panel.fillColor = SKColor(white: 0.08, alpha: 0.96)
+        panel.strokeColor = cream.withAlphaComponent(0.75)
+        panel.lineWidth = 2
+        panel.zPosition = 2500
+
+        let speaker = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        speaker.text = line.speaker
+        speaker.fontSize = 15
+        speaker.fontColor = .systemYellow
+        speaker.horizontalAlignmentMode = .left
+        speaker.position = CGPoint(x: -width / 2 + 20, y: 31)
+        panel.addChild(speaker)
+
+        let body = SKLabelNode(fontNamed: "AvenirNext-Regular")
+        body.text = line.text
+        body.fontSize = 13
+        body.fontColor = .white
+        body.horizontalAlignmentMode = .left
+        body.verticalAlignmentMode = .top
+        body.preferredMaxLayoutWidth = width - 40
+        body.numberOfLines = 3
+        body.position = CGPoint(x: -width / 2 + 20, y: 13)
+        panel.addChild(body)
+
+        let next = SKLabelNode(fontNamed: "AvenirNext-DemiBold")
+        next.text = questDialogueIndex == questDialogue.count - 1 ? "Ketuk untuk lanjut" : "Ketuk untuk berikutnya"
+        next.fontSize = 10
+        next.fontColor = cream.withAlphaComponent(0.8)
+        next.position = CGPoint(x: width / 2 - 82, y: -43)
+        panel.addChild(next)
+        hud.addChild(panel)
+    }
+
+    private func advanceQuestDialogue() {
+        guard !questDialogue.isEmpty else { return }
+        questDialogueIndex += 1
+        if questDialogue.indices.contains(questDialogueIndex) {
+            renderQuestDialogue()
+            return
+        }
+        hud.childNode(withName: "quest-dialogue")?.removeFromParent()
+        questDialogue = []
+        questDialogueIndex = 0
+        let completion = questDialogueCompletion
+        questDialogueCompletion = nil
+        completion?()
+    }
+
+    private func bucketFade(completion: @escaping () -> Void) {
+        let fade = SKSpriteNode(color: .black, size: size)
+        fade.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        fade.alpha = 0
+        fade.zPosition = 2900
+        hud.addChild(fade)
+        AudioService.shared.playSystemSound(id: 1104)
+        fade.run(.sequence([
+            .fadeAlpha(to: 0.95, duration: 0.35),
+            .wait(forDuration: 0.28),
+            .fadeOut(withDuration: 0.35),
+            .removeFromParent(),
+            .run(completion)
+        ]))
+    }
+
+    private func saveQuest1() {
+        if let data = try? JSONEncoder().encode(quest1) {
+            UserDefaults.standard.set(data, forKey: Self.quest1SaveKey)
+        }
+    }
+
+    private func questPosition(for buildingID: String, offset: CGPoint = .zero) -> CGPoint? {
+        guard let placement = layout.buildingPlacements.first(where: { $0.id == buildingID }),
+              let rect = VillageTileLayout.buildingRect(placement) else { return nil }
+        return CGPoint(x: rect.midX + offset.x, y: rect.midY + offset.y)
+    }
+
+    private func questMarker(at position: CGPoint, name: String, color: SKColor, symbol: String) {
+        let marker = SKShapeNode(circleOfRadius: 10)
+        marker.name = name
+        marker.position = position
+        marker.fillColor = color
+        marker.strokeColor = .white
+        marker.lineWidth = 1.5
+        marker.zPosition = 70
+        text(symbol, at: .zero, size: 10, parent: marker)
+        world.addChild(marker)
+    }
+
+    private func questNPC(at position: CGPoint, name: String, color: SKColor) {
+        let npc = MemoryCharacter(title: name, color: color)
+        npc.name = "quest-\(name)"
+        npc.position = position
+        npc.setScale(0.3)
+        npc.zPosition = 65
+        world.addChild(npc)
+    }
+
+    private var grandpaQuestPosition: CGPoint? {
+        if let house = questPosition(for: "arthur-house") {
+            return CGPoint(x: house.x + 30, y: house.y)
+        }
+        return nil
+    }
+
+    private func renderGrandpaPorch(at position: CGPoint) {
+        let porch = SKShapeNode(rectOf: CGSize(width: 62, height: 25), cornerRadius: 3)
+        porch.position = CGPoint(x: position.x, y: position.y - 7)
+        porch.fillColor = SKColor(red: 0.38, green: 0.23, blue: 0.12, alpha: 1)
+        porch.strokeColor = SKColor(red: 0.18, green: 0.10, blue: 0.06, alpha: 1)
+        porch.lineWidth = 2
+        porch.zPosition = 54
+        world.addChild(porch)
+
+        for x in stride(from: -24, through: 24, by: 12) {
+            let plank = SKShapeNode(rectOf: CGSize(width: 1.5, height: 22))
+            plank.position = CGPoint(x: CGFloat(x), y: 0)
+            plank.fillColor = cream.withAlphaComponent(0.25)
+            plank.strokeColor = .clear
+            porch.addChild(plank)
+        }
+    }
+
+    private func renderMaraBackyard(at position: CGPoint) {
+        let yard = SKNode()
+        yard.position = position
+        yard.zPosition = 53
+
+        for offset in [CGPoint(x: -25, y: -14), CGPoint(x: 15, y: -17)] {
+            let mud = SKShapeNode(ellipseOf: CGSize(width: 42, height: 18))
+            mud.position = offset
+            mud.fillColor = SKColor(red: 0.28, green: 0.19, blue: 0.12, alpha: 0.75)
+            mud.strokeColor = SKColor(red: 0.16, green: 0.11, blue: 0.08, alpha: 0.8)
+            yard.addChild(mud)
+        }
+
+        let shelf = SKShapeNode(rectOf: CGSize(width: 46, height: 5), cornerRadius: 1)
+        shelf.position = CGPoint(x: -18, y: 4)
+        shelf.zRotation = -0.16
+        shelf.fillColor = .systemBrown
+        shelf.strokeColor = .black.withAlphaComponent(0.45)
+        yard.addChild(shelf)
+        for x in [-17.0, 17.0] {
+            let leg = SKShapeNode(rectOf: CGSize(width: 4, height: 25))
+            leg.position = CGPoint(x: x, y: -11)
+            leg.fillColor = .systemBrown
+            leg.strokeColor = .clear
+            shelf.addChild(leg)
+        }
+        for x in [-31.0, -18.0, -5.0] {
+            let pot = SKShapeNode(circleOfRadius: 5)
+            pot.position = CGPoint(x: x, y: 13)
+            pot.fillColor = SKColor(red: 0.72, green: 0.35, blue: 0.18, alpha: 1)
+            pot.strokeColor = .black.withAlphaComponent(0.35)
+            yard.addChild(pot)
+        }
+        let brick = SKShapeNode(rectOf: CGSize(width: 14, height: 7), cornerRadius: 1)
+        brick.position = CGPoint(x: 28, y: -9)
+        brick.fillColor = .systemRed
+        brick.strokeColor = .black.withAlphaComponent(0.4)
+        yard.addChild(brick)
+        world.addChild(yard)
+    }
+
+    private func renderQuest1World() {
+        if let grandpa = grandpaQuestPosition {
+            renderGrandpaPorch(at: grandpa)
+            questNPC(at: grandpa, name: "Kakek", color: .systemBrown)
+            if !quest1.spokeToGrandpa || quest1.rackFixed {
+                questMarker(at: CGPoint(x: grandpa.x, y: grandpa.y + 25),
+                            name: "quest-grandpa", color: .systemYellow, symbol: "!")
+            }
+        }
+
+        if quest1.spokeToGrandpa,
+           !quest1.collectedWater,
+           let well = questPosition(for: "village-well") {
+            questMarker(at: CGPoint(x: well.x, y: well.y + 22),
+                        name: "quest-well", color: .systemTeal, symbol: "!")
+        }
+
+        if quest1.collectedWater,
+           let maraHouse = questPosition(for: "bu-mara-house") {
+            renderMaraBackyard(at: CGPoint(x: maraHouse.x - 28, y: maraHouse.y))
+            let mara = CGPoint(x: maraHouse.x + 28, y: maraHouse.y)
+            questNPC(at: mara, name: "Bu Mara", color: .systemTeal)
+            if !quest1.spokeToMara {
+                questMarker(at: CGPoint(x: mara.x, y: mara.y + 25),
+                            name: "quest-mara", color: .systemYellow, symbol: "!")
+            } else if !quest1.rackFixed {
+                questMarker(at: CGPoint(x: maraHouse.x - 28, y: maraHouse.y),
+                            name: "quest-rack", color: .systemOrange, symbol: "!")
+            }
+        }
+    }
+
+    private func closeEnough(_ target: CGPoint) -> Bool {
+        hypot(actor.position.x - target.x, actor.position.y - target.y) <= 70
+    }
+
+    private func approachOrInteract(_ target: CGPoint, message: String, action: () -> Void) {
+        if closeEnough(target) {
+            route = []
+            stick = .zero
+            action()
+        } else {
+            route = [target]
+            status.text = message
+        }
+    }
+
+    private func handleQuest1Interaction(at point: CGPoint) -> Bool {
+        if let grandpa = grandpaQuestPosition {
+            if hypot(point.x - grandpa.x, point.y - grandpa.y) <= 45 {
+                approachOrInteract(grandpa, message: "Dekati Kakek untuk berbicara.") { [weak self] in
+                    guard let self else { return }
+                    if self.quest1.rackFixed {
+                        self.presentQuestDialogue([
+                            .init(
+                                speaker: "Kakek",
+                                text: "Did the well move further away today? Half your water is gone."
+                            ),
+                            .init(
+                                speaker: "Arthur",
+                                text: "Bu Mara's shelf almost collapsed. I had to fix it."
+                            ),
+                            .init(
+                                speaker: "Kakek",
+                                text: "Good thing you saw it before the well collapsed too."
+                            ),
+                            .init(
+                                speaker: "Narasi",
+                                text: "Kakek menyodorkan mangkuk sarapan kepada Arthur."
+                            ),
+                            .init(
+                                speaker: "Kakek",
+                                text: "Where are you off to next?"
+                            ),
+                            .init(
+                                speaker: "Arthur",
+                                text: "The barn. If there's nothing to help with, I'll come straight home."
+                            ),
+                            .init(
+                                speaker: "Kakek",
+                                text: "We both know you rarely find a day like that."
+                            )
+                        ]) { [weak self] in
+                            guard let self else { return }
+                            self.quest1.returnedHome = true
+                            let progress = PrologueStore.shared.progress
+                            progress.storyProgress = max(progress.storyProgress, 1)
+                            PrologueStore.shared.save()
+                            self.saveQuest1()
+                            self.rebuild("Quest 1 selesai. Tujuan berikutnya: lumbung.")
+                        }
+                    } else if !self.quest1.spokeToGrandpa {
+                        self.presentQuestDialogue([
+                            .init(
+                                speaker: "Kakek",
+                                text: "Arthur, can you bring me well water? Our water is running out."
+                            ),
+                            .init(
+                                speaker: "Arthur",
+                                text: "Sure, Grandpa. I will bring the bucket and get the water."
+                            )
+                        ]) { [weak self] in
+                            guard let self else { return }
+                            self.quest1.spokeToGrandpa = true
+                            self.saveQuest1()
+                            self.rebuild("Sumur terbuka. Tempatkan Sumur pada susunan L dan Z.")
+                        }
+                    } else {
+                        self.status.text = self.quest1Objective
+                    }
+                }
+                return true
+            }
+        }
+
+        if quest1.spokeToGrandpa,
+           !quest1.collectedWater,
+           let well = questPosition(for: "village-well"),
+           hypot(point.x - well.x, point.y - well.y) <= 45 {
+            approachOrInteract(well, message: "Dekati Sumur untuk mengambil air.") { [weak self] in
+                guard let self else { return }
+                self.quest1.collectedWater = true
+                self.saveQuest1()
+                self.rebuild("Air diambil. Bu Mara muncul dan Rumah Bu Mara terbuka.")
+            }
+            return true
+        }
+
+        if quest1.collectedWater,
+           let maraHouse = questPosition(for: "bu-mara-house") {
+            let mara = CGPoint(x: maraHouse.x + 28, y: maraHouse.y)
+            if !quest1.spokeToMara,
+               hypot(point.x - mara.x, point.y - mara.y) <= 45 {
+                approachOrInteract(mara, message: "Dekati Bu Mara untuk berbicara.") { [weak self] in
+                    guard let self else { return }
+                    self.presentQuestDialogue([
+                        .init(
+                            speaker: "Narasi",
+                            text: "Arthur berjalan membawa ember air. Bu Mara melambai dari halaman belakangnya yang becek."
+                        ),
+                        .init(
+                            speaker: "Bu Mara",
+                            text: "Arthur! Just in time. Can you help me move these clay pots? The shelf is about to give out."
+                        ),
+                        .init(
+                            speaker: "Arthur",
+                            text: "The ground is sinking under this leg, Bu Mara. Moving the pots won't fix it. Let me wedge this broken brick under it."
+                        )
+                    ]) { [weak self] in
+                        guard let self else { return }
+                        self.quest1.spokeToMara = true
+                        self.saveQuest1()
+                        self.rebuild("Dekati rak dan ketuk [Interact: Periksa Rak].")
+                    }
+                }
+                return true
+            }
+
+            let rack = CGPoint(x: maraHouse.x - 28, y: maraHouse.y)
+            if quest1.spokeToMara,
+               !quest1.rackFixed,
+               hypot(point.x - rack.x, point.y - rack.y) <= 45 {
+                approachOrInteract(rack, message: "Dekati rak lalu ketuk [Interact: Periksa Rak].") { [weak self] in
+                    self?.startQuest1RackMinigame()
+                }
+                return true
+            }
+        }
+        return false
+    }
+
+    private func startQuest1RackMinigame() {
+        guard activeQuestMinigame == nil else { return }
+        let event = ShelfBalanceMinigameNode()
+        event.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        event.zPosition = 3000
+        event.onComplete = { [weak self] success in
+            guard success, let self else { return }
+            self.quest1.rackFixed = true
+            self.saveQuest1()
+        }
+        event.onDismiss = { [weak self, weak event] in
+            guard let self else { return }
+            if self.activeQuestMinigame === event {
+                self.activeQuestMinigame = nil
+            }
+            if self.quest1.rackFixed {
+                self.presentQuestDialogue([
+                    .init(
+                        speaker: "Bu Mara",
+                        text: "Oh, thank you! I can always count on you, Arthur. Now, since you're already here... help me lift these other two pots anyway."
+                    ),
+                    .init(
+                        speaker: "Narasi",
+                        text: "Arthur menghela napas pasrah sambil tersenyum, memindahkan dua pot, lalu mengambil kembali ember yang isinya sudah tumpah separuh."
+                    )
+                ]) { [weak self] in
+                    self?.bucketFade { [weak self] in
+                        self?.rebuild("Air tinggal separuh. Kembali ke Rumah Arthur.")
+                    }
+                }
+            } else {
+                self.rebuild("Rak belum selesai. Ketuk rak untuk mencoba lagi.")
+            }
+        }
+        activeQuestMinigame = event
+        addChild(event)
+        event.start()
     }
     private func nearestSafePoint(_ current: CGPoint) -> CGPoint? {
         guard let piece = layout.placement(at:current) else { return nil }
@@ -515,7 +1017,10 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
     }
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         if gestureRecognizer === pinchGesture { return isMap }
-        if gestureRecognizer === rotationGesture { return isMap && selected != nil && selectedBuilding == nil }
+        if gestureRecognizer === rotationGesture {
+            guard isMap, selectedBuilding == nil, let selected else { return false }
+            return !layout.hasBuilding(onPieceID: selected)
+        }
         if gestureRecognizer === twoFingerPanGesture { return isMap }
         return true
     }
@@ -655,14 +1160,22 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             return
         }
         guard let id = selected else { status.text = "Pilih keping yang ingin dibalikkan."; return }
+        guard !layout.hasBuilding(onPieceID: id) else {
+            status.text = "Keping tidak bisa dikembalikan karena masih ada bangunan di atasnya."
+            return
+        }
         if layout.remove(id:id) {
             save(); selected = nil
             if let index = available.firstIndex(of:id) { page = index/pageSize }
-            rebuild("Keping \(id+1) kembali ke inventori.")
+            let number = VillageCartoMap.displayNumber(forPieceID: id) ?? (id + 1)
+            rebuild("Keping \(number) kembali ke inventori.")
         } else { status.text = "Keping ini sudah ada di inventori." }
     }
     private func select(_ id: Int) {
-        if selected != id { draftTurns = layout.placements.first(where:{$0.id == id})?.turns ?? 0 }
+        if selected != id {
+            draftTurns = layout.placements.first(where:{$0.id == id})?.turns
+                ?? VillageCartoMap.preferredTurns(forPieceID: id)
+        }
         selected = id; selectedBuilding = nil; rebuild()
     }
     private func selectBuilding(_ id: String) {
@@ -683,6 +1196,10 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         return result
     }
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if !questDialogue.isEmpty {
+            advanceQuestDialogue()
+            return
+        }
         guard activeTouch == nil, stickTouch == nil, let touch = touches.first else { return }
         let p = touch.location(in:hud), actions = names(at:p)
         if actions.contains("exit") { stopInput(); onExit?(); return }
@@ -714,10 +1231,14 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         }
         if isMap {
             if actions.contains("rotate") {
-                guard selected != nil else { status.text = "Pilih keping terlebih dahulu."; return }
+                guard let selectedID = selected else { status.text = "Pilih keping terlebih dahulu."; return }
+                guard !layout.hasBuilding(onPieceID: selectedID) else {
+                    status.text = "Pindahkan bangunan dari keping ini sebelum memutarnya."
+                    return
+                }
                 draftTurns = (draftTurns+1)%4
-                if let id = selected, let piece = layout.placements.first(where:{$0.id == id}) {
-                    if layout.place(id:id,column:piece.column,row:piece.row,turns:draftTurns) {
+                if let piece = layout.placements.first(where:{$0.id == selectedID}) {
+                    if layout.place(id:selectedID,column:piece.column,row:piece.row,turns:draftTurns) {
                         save(); rebuild("Keping diputar 90°.")
                     } else { rebuild("Rotasi terhalang keping lain, batas peta, atau sambungan jalan.") }
                 } else { rebuild("Rotasi siap. Letakkan keping di slot kosong untuk menerapkan.") }
@@ -758,6 +1279,10 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
                 dragOffset = CGPoint(x: rect.midX - q.x, y: rect.midY - q.y)
                 activeTouch = touch; touchStart = p
             } else if let piece = layout.placement(at:q) {
+                if layout.hasBuilding(onPieceID: piece.id) {
+                    status.text = "Keping terkunci karena masih ada bangunan di atasnya. Pindahkan bangunannya dahulu."
+                    return
+                }
                 select(piece.id); dragOffset = CGPoint(x:piece.center.x-q.x,y:piece.center.y-q.y)
                 activeTouch = touch; touchStart = p
             } else {
@@ -765,9 +1290,14 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             }
         } else {
             guard p.y < size.height-58, p.y > 38 else { return }
-            if hypot(p.x-stickCenter.x,p.y-stickCenter.y) < 62 { stickTouch = touch; route = []; updateStick(touch) }
-            else {
-                route = layout.route(from:actor.position,to:touch.location(in:world))
+            if hypot(p.x-stickCenter.x,p.y-stickCenter.y) < 62 {
+                stickTouch = touch
+                route = []
+                updateStick(touch)
+            } else {
+                let destination = touch.location(in: world)
+                if handleQuest1Interaction(at: destination) { return }
+                route = layout.route(from: actor.position, to: destination)
                 if route.isEmpty { status.text = "Tidak ada jalan ke sana. Coba susun kembali kepingnya." }
             }
         }

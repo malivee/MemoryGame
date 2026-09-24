@@ -23,12 +23,27 @@ enum VillageCartoMap {
         let y: Int
     }
 
+    enum TerrainSplit: Equatable {
+        case diagonal
+        case centeredRightTriangle
+        case lowerRightTriangle
+    }
+
     struct Building: Identifiable, Equatable {
         let id: String
         let title: String
         let width: Int
         let height: Int
+        let explorationWidth: Int
+        let explorationHeight: Int
         let kind: Kind
+
+        func displaySize(inExploration: Bool) -> CGSize {
+            CGSize(
+                width: inExploration ? explorationWidth : width,
+                height: inExploration ? explorationHeight : height
+            )
+        }
 
         enum Kind: String, Codable {
             case house
@@ -38,16 +53,36 @@ enum VillageCartoMap {
         }
     }
 
-    // Footprints use the 6 x 6 subgrid. Values are doubled from the original
-    // 3 x 3 design so their world-space size remains unchanged.
+    // Ukuran width x height adalah footprint subgrid di layer peta. Versi
+    // eksplorasi memakai skala 1:3: 6x9 menjadi 2x3 dan 3x3 menjadi 1x1.
     static let buildings: [Building] = [
-        .init(id: "building-3x2", title: "Bangunan 1", width: 6, height: 4, kind: .house),
-        .init(id: "building-4x3-a", title: "Bangunan 2", width: 8, height: 6, kind: .house),
-        .init(id: "building-7x5", title: "Bangunan 3", width: 14, height: 10, kind: .barn),
-        .init(id: "building-5x5", title: "Bangunan 4", width: 10, height: 10, kind: .house),
-        .init(id: "building-10x2", title: "Bangunan 5", width: 20, height: 4, kind: .barn),
-        .init(id: "building-3x3", title: "Bangunan 6", width: 6, height: 6, kind: .well),
-        .init(id: "building-4x3-b", title: "Bangunan 7", width: 8, height: 6, kind: .pen)
+        .init(
+            id: "arthur-house",
+            title: "Rumah Arthur",
+            width: 6,
+            height: 9,
+            explorationWidth: 2,
+            explorationHeight: 3,
+            kind: .house
+        ),
+        .init(
+            id: "village-well",
+            title: "Sumur",
+            width: 3,
+            height: 3,
+            explorationWidth: 1,
+            explorationHeight: 1,
+            kind: .well
+        ),
+        .init(
+            id: "bu-mara-house",
+            title: "Rumah Bu Mara",
+            width: 6,
+            height: 6,
+            explorationWidth: 2,
+            explorationHeight: 2,
+            kind: .house
+        )
     ]
 
     // Four edge-connected source cells form one indivisible piece.
@@ -99,8 +134,91 @@ enum VillageCartoMap {
         [.init(x: 12, y: 0), .init(x: 13, y: 0), .init(x: 14, y: 0), .init(x: 15, y: 0)],
     ]
 
-    // Prototype Carto uses a small playable set, not the whole source-map slice.
-    static let playablePieceIDs: [Int] = [5, 6, 16, 26, 2, 13]
+    // Urutan enam keping mengikuti storyboard pemain (gambar 1 ... gambar 6).
+    // ID tetap menunjuk empat sel unik pada atlas sumber, sedangkan nomor yang
+    // dilihat pemain berasal dari posisi ID di array ini.
+    static let playablePieceIDs: [Int] = [5, 26, 20, 38, 6, 12]
+
+    static func displayNumber(forPieceID id: Int) -> Int? {
+        playablePieceIDs.firstIndex(of: id).map { $0 + 1 }
+    }
+
+    // Keping keempat dan keenam memakai bentuk atlas yang orientasi sumbernya
+    // terbalik 180° dari storyboard.
+    static func preferredTurns(forPieceID id: Int) -> Int {
+        id == 38 || id == 12 ? 2 : 0
+    }
+
+    // Storyboard memberi warna per kotak: rumput desa (kuning), rumput yang
+    // tidak bisa dibangun (hijau muda), hutan (hijau tua), dan rock salt
+    // (abu-abu). Setiap pasangan adalah dua segitiga pada satu kotak 6 x 6.
+    // Koordinat pola dinormalisasi dari kiri-bawah bentuk tetromino.
+    private static let playableTerrain: [Cell: (primary: BiomeType, secondary: BiomeType)] = {
+        typealias Paint = (x: Int, y: Int, primary: BiomeType, secondary: BiomeType)
+        let patterns: [(id: Int, paint: [Paint])] = [
+            (5, [
+                // Sesuai storyboard, kedua bidang hijau berada pada segitiga
+                // kiri-bawah di masing-masing kotak diagonal.
+                (0, 1, .naturalGrass, .villageSoil),
+                (1, 1, .villageSoil, .villageSoil),
+                (1, 0, .naturalGrass, .villageSoil),
+                (2, 0, .villageSoil, .villageSoil)
+            ]),
+            (26, [
+                (0, 1, .villageSoil, .villageSoil),
+                (1, 1, .villageSoil, .naturalGrass),
+                (2, 1, .naturalGrass, .naturalGrass),
+                (0, 0, .villageSoil, .darkGreenForest)
+            ]),
+            (20, [
+                (0, 1, .villageSoil, .villageSoil),
+                (1, 1, .villageSoil, .villageSoil),
+                (1, 0, .villageSoil, .villageSoil),
+                (2, 0, .villageSoil, .rockSalt)
+            ]),
+            (38, [
+                (0, 0, .naturalGrass, .villageSoil),
+                (1, 0, .villageSoil, .villageSoil),
+                (2, 0, .villageSoil, .villageSoil),
+                (2, 1, .darkGreenForest, .villageSoil)
+            ]),
+            (6, [
+                (0, 2, .villageSoil, .rockSalt),
+                (1, 2, .rockSalt, .rockSalt),
+                (1, 1, .rockSalt, .rockSalt),
+                (1, 0, .rockSalt, .rockSalt)
+            ]),
+            (12, [
+                (0, 1, .darkGreenForest, .darkGreenForest),
+                (1, 1, .darkGreenForest, .villageSoil),
+                (2, 1, .darkGreenForest, .darkGreenForest),
+                (1, 0, .darkGreenForest, .villageSoil)
+            ])
+        ]
+
+        var result: [Cell: (primary: BiomeType, secondary: BiomeType)] = [:]
+        for entry in patterns {
+            let shape = pieces[entry.id]
+            guard let minX = shape.map(\.x).min(), let minY = shape.map(\.y).min() else { continue }
+            for paint in entry.paint {
+                let cell = Cell(x: minX + paint.x, y: minY + paint.y)
+                guard shape.contains(cell) else { continue }
+                result[cell] = (paint.primary, paint.secondary)
+            }
+        }
+        return result
+    }()
+
+    // Pada keping 2, kotak kanan sepenuhnya hijau muda. Warnanya masuk ke
+    // kotak tengah sebagai segitiga sama kaki sejauh 3/6 subgrid. Kotak bawah
+    // memakai diagonal kebalikan agar hijau tua berada di kanan bawah.
+    static func terrainSplit(for cell: Cell) -> TerrainSplit {
+        switch cell {
+        case Cell(x: 11, y: 9): return .centeredRightTriangle
+        case Cell(x: 10, y: 8): return .lowerRightTriangle
+        default: return .diagonal
+        }
+    }
 
     static func biome(for cell: Cell) -> BiomeType {
         if hasWater(in: cell) {
@@ -122,6 +240,9 @@ enum VillageCartoMap {
     }
 
     static func diagonalBiomes(for cell: Cell) -> (primary: BiomeType, secondary: BiomeType) {
+        if let curated = playableTerrain[cell] {
+            return curated
+        }
         let primary = biome(for: cell)
         let diagonalNeighbor = [Cell(x: cell.x + 1, y: cell.y), Cell(x: cell.x, y: cell.y + 1)]
             .first { candidate in
@@ -137,20 +258,55 @@ enum VillageCartoMap {
 
     static func biomeForSubcell(_ subcell: Cell) -> BiomeType {
         let source = Cell(x: subcell.x / subdivisions, y: subcell.y / subdivisions)
-        let localX = subcell.x % subdivisions
-        let localY = subcell.y % subdivisions
+        let localX = CGFloat(subcell.x % subdivisions) + 0.5
+        let localY = CGFloat(subcell.y % subdivisions) + 0.5
+        return biome(in: source, localX: localX, localY: localY)
+    }
+
+    private static func biome(in source: Cell, localX: CGFloat, localY: CGFloat) -> BiomeType {
         let diagonal = diagonalBiomes(for: source)
-        return localX + localY >= subdivisions ? diagonal.secondary : diagonal.primary
+        switch terrainSplit(for: source) {
+        case .centeredRightTriangle:
+            let center = CGFloat(subdivisions) / 2
+            let depth = localX - center
+            return depth >= 0 && abs(localY - center) <= depth ? diagonal.secondary : diagonal.primary
+        case .lowerRightTriangle:
+            return localY <= localX ? diagonal.secondary : diagonal.primary
+        case .diagonal:
+            return localX + localY >= CGFloat(subdivisions) ? diagonal.secondary : diagonal.primary
+        }
     }
 
     static func canPlaceObject(onSubcell subcell: Cell) -> Bool {
-        biomeForSubcell(subcell) == .villageSoil
+        let source = Cell(x: subcell.x / subdivisions, y: subcell.y / subdivisions)
+        let column = CGFloat(subcell.x % subdivisions)
+        let row = CGFloat(subcell.y % subdivisions)
+        let epsilon: CGFloat = 0.001
+        let samples = [
+            (column + epsilon, row + epsilon),
+            (column + 1 - epsilon, row + epsilon),
+            (column + epsilon, row + 1 - epsilon),
+            (column + 1 - epsilon, row + 1 - epsilon),
+            (column + 0.5, row + 0.5)
+        ]
+        return samples.allSatisfy { x, y in
+            biome(in: source, localX: x, localY: y) == .villageSoil
+        }
     }
 
     // Edge indices follow VillageTileLayout: east, north, west, south.
     static func sideBiome(for cell: Cell, edge: Int) -> BiomeType {
         let diagonal = diagonalBiomes(for: cell)
-        switch (edge % 4 + 4) % 4 {
+        let normalizedEdge = (edge % 4 + 4) % 4
+        switch terrainSplit(for: cell) {
+        case .centeredRightTriangle:
+            return normalizedEdge == 0 ? diagonal.secondary : diagonal.primary
+        case .lowerRightTriangle:
+            return normalizedEdge == 0 || normalizedEdge == 3 ? diagonal.secondary : diagonal.primary
+        case .diagonal:
+            break
+        }
+        switch normalizedEdge {
         case 0, 1:
             return diagonal.secondary
         default:
@@ -170,7 +326,10 @@ enum VillageCartoMap {
                         id: "\(cell.x)-\(cell.y)-\(column)-\(row)",
                         x: column,
                         y: row,
-                        biome: column + row >= subdivisions ? diagonal.secondary : diagonal.primary,
+                        biome: biomeForSubcell(Cell(
+                            x: cell.x * subdivisions + column,
+                            y: cell.y * subdivisions + row
+                        )),
                         isFilled: true,
                         isWalkable: diagonal.primary != .water
                     )
@@ -249,7 +408,9 @@ enum VillageCartoMap {
     static func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
         CGPoint(x: x * size.width / 1672, y: (941 - y) * size.height / 941)
     }
-    static let spawn = point(825, 359)
+    // Quest pertama dimulai pada keping berbentuk L (ID 26). Keping Z
+    // tersedia sesudahnya sebagai keping kedua pada alur tutorial.
+    static let spawn = CGPoint(x: 10.5 * side, y: 9.5 * side)
     static let roads: [[CGPoint]] = [
         [point(780,330), point(816,352), point(875,382), point(942,408), point(976,412), point(1005,401)],
         [point(942,408), point(951,448), point(991,476), point(1046,503)],

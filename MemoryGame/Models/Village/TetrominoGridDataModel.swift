@@ -14,15 +14,6 @@ enum BiomeType: String, Codable, Hashable {
     case darkGreenForest
     case hillSoil
     case water
-
-    var backgroundAssetName: String? {
-        switch self {
-        case .villageSoil:
-            return "biomeRumput"
-        default:
-            return nil
-        }
-    }
 }
 
 enum SideType: String, Codable, Hashable {

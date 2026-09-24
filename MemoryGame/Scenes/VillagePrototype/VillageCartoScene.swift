@@ -154,33 +154,10 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
 
     private func triangleNode(points: [CGPoint], biome: BiomeType) -> SKNode {
         let path = trianglePath(points: points)
-        guard let assetName = biome.backgroundAssetName else {
-            let node = SKShapeNode(path: path)
-            node.fillColor = biomeColor(biome)
-            node.strokeColor = .clear
-            return node
-        }
-
-        let bounds = path.boundingBoxOfPath
-        let texture = SKTexture(imageNamed: assetName)
-
-        let mask = SKShapeNode(path: path)
-        mask.fillColor = .white
-        mask.strokeColor = .clear
-
-        let sprite = SKSpriteNode(texture: texture)
-        sprite.position = CGPoint(x: bounds.midX, y: bounds.midY)
-        sprite.size = CGSize(
-            width: max(bounds.width, VillageCartoMap.side),
-            height: max(bounds.height, VillageCartoMap.side)
-        )
-        sprite.color = biomeColor(biome)
-        sprite.colorBlendFactor = 0.56
-
-        let crop = SKCropNode()
-        crop.maskNode = mask
-        crop.addChild(sprite)
-        return crop
+        let node = SKShapeNode(path: path)
+        node.fillColor = biomeColor(biome)
+        node.strokeColor = .clear
+        return node
     }
 
     // Map editing shows the puzzle outline; exploration draws clean map cells without cutout seams.
@@ -190,6 +167,7 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
         let cells = VillageCartoMap.pieces[id]
         let node = SKNode()
         node.zRotation = CGFloat(turns) * .pi / 2
+        let path = VillageTileLayout.outline(id)
 
         for cell in cells {
             let center = CGPoint(
@@ -266,7 +244,6 @@ final class VillageCartoScene: SKScene, UIGestureRecognizerDelegate {
             }
         }
 
-        let path = VillageTileLayout.outline(id)
         if miniature {
             let outerShadow = SKShapeNode(path: path)
             outerShadow.strokeColor = SKColor(white: 0.04, alpha: 0.78)

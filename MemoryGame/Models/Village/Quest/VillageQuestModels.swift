@@ -21,6 +21,7 @@ struct VillageQuest1Progress: Codable {
         }
         return saved
     }
+    
 
     func save(defaults: UserDefaults = .standard) {
         guard let data = try? JSONEncoder().encode(self) else { return }

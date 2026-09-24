@@ -28,23 +28,23 @@ extension VillageCartoScene {
     }
 
     var quest5RockSaltMinePosition: CGPoint? {
-        guard layout.placements.contains(where: { $0.id == VillageQuestCatalog.PieceID.rockSaltPath }) else {
+        guard layout.placements.contains(where: { $0.id == VillageQuestCatalog.PieceID.rockSaltMinePath }) else {
             return nil
         }
         let source = CGPoint(
-            x: 10.45 * VillageCartoMap.side,
-            y: 6.45 * VillageCartoMap.side
+            x: 8.35 * VillageCartoMap.side,
+            y: 7.55 * VillageCartoMap.side
         )
         return layout.world(source)
     }
 
     var quest5OldMinerPosition: CGPoint? {
-        guard layout.placements.contains(where: { $0.id == VillageQuestCatalog.PieceID.rockSaltPath }) else {
+        guard layout.placements.contains(where: { $0.id == VillageQuestCatalog.PieceID.rockSaltMinePath }) else {
             return nil
         }
         let source = CGPoint(
-            x: 11.10 * VillageCartoMap.side,
-            y: 6.12 * VillageCartoMap.side
+            x: 8.78 * VillageCartoMap.side,
+            y: 7.18 * VillageCartoMap.side
         )
         return layout.world(source)
     }

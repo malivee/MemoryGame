@@ -62,10 +62,7 @@ enum VillageQuestEngine {
     private static func pieceRoles(for snapshot: VillageQuestSnapshot) -> [Int: VillageQuestPieceRole] {
         var roles: [Int: VillageQuestPieceRole] = [:]
         if !snapshot.quest4.completed {
-            roles[VillageQuestCatalog.PieceID.annethHousePath] = .reserved(label: "Pengecoh")
-        }
-        if !snapshot.quest5.completed {
-            roles[VillageQuestCatalog.PieceID.rockSaltPath] = .reserved(label: "Pengecoh")
+            roles[VillageQuestCatalog.PieceID.rockSaltMinePath] = .reserved(label: "Pengecoh")
         }
         return roles
     }
@@ -164,7 +161,7 @@ enum VillageQuestEngine {
         if quest.completed { return "Quest 5 selesai: Rumah Kakek Beryn telah terbuka." }
         if quest.deliveredSalt { return "Temui Anak Kecil di persimpangan jalan." }
         if quest.minedSalt { return "Kembali ke Rumah Anneth dan serahkan rock salt ke Ibu Anneth." }
-        return snapshot.hasPiece(VillageQuestCatalog.PieceID.rockSaltPath)
+        return snapshot.hasPiece(VillageQuestCatalog.PieceID.rockSaltMinePath)
             ? "Jelajahi ke mulut tambang di keping Rock Salt."
             : "Tempatkan keping Rock Salt (piece 5), lalu Jelajahi ke mulut tambang."
     }

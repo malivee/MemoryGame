@@ -174,6 +174,7 @@ enum VillageQuestCatalog {
         static let barnPath = 20
         static let rolandPenPath = 38
         static let annethHousePath = 6
+        static let rockSaltMinePath = 6
         static let rockSaltPath = 12
         static let hollowForestReward = 8
     }
